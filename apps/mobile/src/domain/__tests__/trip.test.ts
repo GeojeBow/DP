@@ -1,6 +1,6 @@
 import { uuidv7 } from '../id';
 import type { Expense, Trip } from '../models';
-import { groupByDate, isValidIsoDate, summarizeTrip } from '../trip';
+import { dailySpend, groupByDate, isValidIsoDate, summarizeTrip } from '../trip';
 
 const trip: Trip = {
   id: 't1',
@@ -84,5 +84,33 @@ describe('uuidv7', () => {
     const id = uuidv7(0x0190_1234_5678, (b) => b.fill(0xff));
     expect(id).toBe('01901234-5678-7fff-bfff-ffffffffffff');
     expect(uuidv7(1, (b) => b.fill(0)) < uuidv7(2, (b) => b.fill(0))).toBe(true);
+  });
+});
+
+describe('dailySpend', () => {
+  const expenses = [
+    expense('a', { localDate: '2026-10-05', totalBase: '1000' }),
+    expense('b', { localDate: '2026-10-07', totalBase: '2000' }),
+    expense('c', { localDate: '2026-10-07', totalBase: '500' }),
+    expense('d', { localDate: '2026-10-07', totalBase: '9999', tripId: 'other' }),
+  ];
+
+  it('lists each trip day with zero-spend days filled in', () => {
+    expect(dailySpend(trip, expenses, '2026-10-07')).toEqual([
+      { date: '2026-10-05', amount: 1000n },
+      { date: '2026-10-06', amount: 0n },
+      { date: '2026-10-07', amount: 2500n },
+      { date: '2026-10-08', amount: 0n },
+      { date: '2026-10-09', amount: 0n },
+    ]);
+  });
+
+  it('keeps the last N days and stops at the trip end', () => {
+    const series = dailySpend(trip, expenses, '2026-12-01', 3);
+    expect(series.map((d) => d.date)).toEqual(['2026-10-07', '2026-10-08', '2026-10-09']);
+  });
+
+  it('ends the window at today once the trip outgrows it', () => {
+    expect(dailySpend(trip, expenses, '2026-10-08', 2).map((d) => d.date)).toEqual(['2026-10-07', '2026-10-08']);
   });
 });
