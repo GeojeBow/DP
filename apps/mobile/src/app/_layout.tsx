@@ -39,6 +39,9 @@ export default function RootLayout() {
         <Stack.Screen name="rules" options={{ title: t('screen.rules') }} />
         <Stack.Screen name="fields" options={{ title: t('screen.fields') }} />
         <Stack.Screen name="account" options={{ title: t('screen.account') }} />
+        <Stack.Screen name="company/index" options={{ title: t('screen.company') }} />
+        <Stack.Screen name="company/approvals" options={{ title: t('screen.approvals') }} />
+        <Stack.Screen name="company/submission/[id]" options={{ title: t('screen.submission') }} />
       </Stack>
     </>
   );

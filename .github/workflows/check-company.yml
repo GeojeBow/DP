@@ -1,0 +1,37 @@
+name: Check company approvals
+
+# With the public key only: an owner creates a company and an invite, a second
+# account joins and submits, the member can't approve, the owner returns it.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      URL: https://sxkembehrqovjmovagwy.supabase.co
+      KEY: sb_publishable_eu98CP8qgSb6JHi3bOBZbA_XvGJWFU1
+    steps:
+      - run: |
+          set -e
+          signup() {
+            curl -sS -X POST "$URL/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' \
+              -d "{\"email\":\"company-check-$1-$GITHUB_RUN_ID@example.com\",\"password\":\"check-$GITHUB_RUN_ID\"}" | jq -r .access_token
+          }
+          call() { curl -sS -w '\nHTTP %{http_code}\n' "$URL/rest/v1/$2" -H "apikey: $KEY" -H "Authorization: Bearer $1" -H 'Content-Type: application/json' "${@:3}"; }
+          owner=$(signup owner); staff=$(signup staff)
+          org=$(call "$owner" rpc/create_company -X POST -d '{"p_name":"Check Co","p_currency":"KRW"}' | head -1 | tr -d '"')
+          echo "company: $org"
+          code=$(call "$owner" rpc/create_invite -X POST -d "{\"p_org\":\"$org\"}" | head -1 | tr -d '"')
+          echo "invite length: ${#code}"
+          echo '--- staff joins'; call "$staff" rpc/join_company -X POST -d "{\"p_code\":\"$code\"}"
+          echo '--- staff submits'
+          sub=$(call "$staff" submissions -X POST -H 'Prefer: return=representation' -H 'Accept: application/vnd.pgrst.object+json' \
+            -d "{\"org_id\":\"$org\",\"trip_id\":\"t1\",\"title\":\"Check trip\",\"period\":\"2026-10-01 ~ 2026-10-02\",\"base_currency\":\"KRW\",\"total\":1000,\"item_count\":1,\"snapshot\":{\"expenses\":[]}}")
+          echo "$sub" | head -1 | jq '{status, submitter}'
+          id=$(echo "$sub" | head -1 | jq -r .id)
+          echo '--- staff tries to approve (expect 403/42501)'; call "$staff" rpc/decide_submission -X POST -d "{\"p_id\":\"$id\",\"p_approve\":true}"
+          echo '--- owner sees it and returns it'
+          call "$owner" "submissions?select=status,submitter&id=eq.$id"
+          call "$owner" rpc/decide_submission -X POST -d "{\"p_id\":\"$id\",\"p_approve\":false,\"p_comment\":\"check\"}"
+          call "$staff" "submissions?select=status,comment,decider&id=eq.$id"
