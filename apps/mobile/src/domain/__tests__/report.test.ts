@@ -29,6 +29,12 @@ describe('buildReport', () => {
     expect(r.headers[0]).toBe('date');
   });
 
+  it('summarises by category and by day for the charts', () => {
+    const r = buildReport(trip, [...expenses, { ...expenses[2]!, id: 'd', category: 'lodging', totalBase: '100000' }], BUILTIN_PRESETS[1]!, labels);
+    expect(r.summary.byCategory.map((c) => [c.label, c.number, c.share])).toEqual([['lodging', 100000, 70], ['meals', 42864, 30]]);
+    expect(r.summary.byDay.map((d) => [d.date, d.number])).toEqual([['2026-10-01', 29184], ['2026-10-02', 113680]]);
+  });
+
   it('adds custom fields as columns after the preset ones', () => {
     const fields = [{ id: 'p', name: 'Project', type: 'text' as const, options: [], required: false },
       { id: 'n', name: 'People', type: 'number' as const, options: [], required: false }];
