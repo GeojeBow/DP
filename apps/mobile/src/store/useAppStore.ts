@@ -26,6 +26,9 @@ interface AppState {
   /** Reuse the exchange rate entered once for the rest of the trip */
   rememberFx: boolean;
   setRememberFx: (on: boolean) => void;
+  /** Report format or company template picked last, preselected next time */
+  lastFormatId: string | null;
+  setLastFormatId: (id: string) => void;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
@@ -81,6 +84,8 @@ export const useAppStore = create<AppState>()(
       setReminders: (reminders) => set({ reminders }),
       rememberFx: true,
       setRememberFx: (rememberFx) => set({ rememberFx }),
+      lastFormatId: null,
+      setLastFormatId: (lastFormatId) => set({ lastFormatId }),
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
