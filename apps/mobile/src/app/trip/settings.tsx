@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
+import { Button } from '../../components/Form';
 import { perDiemDays, travelDayPercent } from '../../domain/claim';
 import { formatMoney, toCurrencyCode, toMinor } from '../../domain/money';
 import { companyPolicyOf, policyFits, rulesForTrip } from '../../features/policy/rules';
@@ -27,6 +28,9 @@ export default function TripSettingsScreen() {
   const policy = useAppStore((s) => companyPolicyOf(s.policies));
   const updateTrip = useAppStore((s) => s.updateTrip);
   const setActiveTrip = useAppStore((s) => s.setActiveTrip);
+  const deleteTrip = useAppStore((s) => s.deleteTrip);
+  const expenseCount = useAppStore((s) => s.expenses.filter((e) => e.tripId === (trip?.id ?? '')).length);
+  const [confirming, setConfirming] = useState(false);
 
   if (!trip) return null;
   const base = toCurrencyCode(trip.baseCurrency);
@@ -106,6 +110,37 @@ export default function TripSettingsScreen() {
         <Text style={[type.caption, { color: palette.textMuted }]}>{t('tripSettings.fxHint')}</Text>
       </Card>
 
+      <Card title={t('tripSettings.delete')}>
+        {confirming ? (
+          <>
+            <Text style={[type.body, { color: palette.block, fontWeight: '600' }]}>
+              {t('tripSettings.deleteConfirm', { trip: trip.title, n: expenseCount })}
+            </Text>
+            <View style={styles.deleteRow}>
+              <View style={styles.flex}>
+                <Button title={t('tripSettings.deleteCancel')} variant="secondary" onPress={() => setConfirming(false)} />
+              </View>
+              <Pressable
+                onPress={() => {
+                  router.back();
+                  void deleteTrip(trip.id);
+                }}
+                accessibilityRole="button"
+                style={[styles.deleteNow, { backgroundColor: palette.block }]}
+              >
+                <Ionicons name="trash" size={18} color="#FFFFFF" />
+                <Text style={[type.label, { color: '#FFFFFF', fontWeight: '700' }]}>{t('tripSettings.deleteNow')}</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <Pressable onPress={() => setConfirming(true)} accessibilityRole="button" style={styles.deleteLink} hitSlop={8}>
+            <Ionicons name="trash-outline" size={18} color={palette.block} />
+            <Text style={[type.label, { color: palette.block, fontWeight: '700' }]}>{t('tripSettings.deleteStart')}</Text>
+          </Pressable>
+        )}
+      </Card>
+
       <Pressable onPress={() => router.push('/settings')} accessibilityRole="button" style={[styles.appLink, { borderColor: palette.border }]}>
         <Ionicons name="settings-outline" size={18} color={palette.textMuted} />
         <Text style={[type.caption, { color: palette.textMuted, flex: 1 }]}>{t('tripSettings.appSettings')}</Text>
@@ -146,5 +181,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   flex: { flex: 1, gap: 2 },
   change: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 2 },
+  deleteRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  deleteNow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: 16 },
+  deleteLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   appLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderRadius: 16, borderStyle: 'dashed' },
 });

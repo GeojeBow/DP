@@ -40,6 +40,7 @@ export default function RootLayout() {
         <Stack.Screen name="report/[id]" options={{ title: t('screen.preset') }} />
         <Stack.Screen name="template/[id]" options={{ title: t('screen.template') }} />
         <Stack.Screen name="rules" options={{ title: t('screen.rules') }} />
+        <Stack.Screen name="trips" options={{ title: t('settings.history') }} />
         <Stack.Screen name="theme" options={{ title: t('settings.theme') }} />
         <Stack.Screen name="fields" options={{ title: t('screen.fields') }} />
         <Stack.Screen name="account" options={{ title: t('screen.account') }} />
