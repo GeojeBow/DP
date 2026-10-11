@@ -1,4 +1,4 @@
-import type { Expense } from '../../domain/models';
+import type { Expense, Trip } from '../../domain/models';
 import { toCurrencyCode, toMinor } from '../../domain/money';
 import { evaluatePolicies, type ExpenseForPolicy, type PolicyFlag, type PolicyRule } from '../../domain/policy';
 import type { ExpenseCategory } from '../../domain/schemas';
@@ -60,6 +60,28 @@ export function checkExpenses(expenses: readonly Expense[], rules: readonly Comp
     const currency = group[0]!.baseCurrency;
     const applicable = rules.filter((r) => !ruleNeedsAmount(r.type) || r.currency === currency).map(toPolicyRule);
     for (const [id, flags] of evaluatePolicies(group.map(toPolicyInput), applicable, toCurrencyCode(currency))) out.set(id, flags);
+  }
+  return out;
+}
+
+/** The rules a trip is checked against: its own set when it has chosen one, else the company defaults. */
+export function rulesForTrip(trip: Pick<Trip, 'ruleMode' | 'rules'> | null | undefined, defaults: readonly CompanyRule[]): readonly CompanyRule[] {
+  return trip?.ruleMode === 'trip' ? trip.rules ?? [] : defaults;
+}
+
+/** Every rule that can raise a flag: the defaults plus each trip's own. */
+export function allRules(trips: readonly Trip[], defaults: readonly CompanyRule[]): CompanyRule[] {
+  return [...defaults, ...trips.flatMap((t) => t.rules ?? [])];
+}
+
+/** Flags per expense id, each trip checked against its own rule set. */
+export function checkWithTrips(expenses: readonly Expense[], trips: readonly Trip[], defaults: readonly CompanyRule[]): Map<string, PolicyFlag[]> {
+  const byTrip = new Map<string | null, Expense[]>();
+  for (const e of expenses) byTrip.set(e.tripId, [...(byTrip.get(e.tripId) ?? []), e]);
+  const out = new Map<string, PolicyFlag[]>();
+  for (const [tripId, list] of byTrip) {
+    const rules = rulesForTrip(trips.find((t) => t.id === tripId), defaults);
+    for (const [id, flags] of checkExpenses(list, rules)) out.set(id, flags);
   }
   return out;
 }

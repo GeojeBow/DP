@@ -12,6 +12,7 @@ import { spacing, type, usePalette } from '../../theme/tokens';
 import { usePolicyFlags, useDescribeRule } from '../policy/usePolicy';
 import { type CompanyError, submit, type Submission, toCompanyError, tripSubmissions } from './api';
 import { buildSubmission } from './snapshot';
+import { rulesForTrip } from '../policy/rules';
 import { useCompanies } from './useCompanies';
 
 /** Sends the trip to the company for approval and shows where it stands. */
@@ -20,7 +21,8 @@ export function SubmitCard({ trip, expenses }: { trip: Trip; expenses: readonly 
   const t = useT();
   const { signedIn, company } = useCompanies();
   const customFields = useAppStore((s) => s.customFields);
-  const rules = useAppStore((s) => s.companyRules);
+  const defaults = useAppStore((s) => s.companyRules);
+  const rules = rulesForTrip(trip, defaults);
   const flags = usePolicyFlags();
   const describe = useDescribeRule();
 

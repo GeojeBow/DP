@@ -15,7 +15,7 @@ import { checkCustomValue } from '../../domain/customFields';
 import { findDuplicate } from '../../domain/duplicates';
 import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
-import { checkExpenses } from '../../features/policy/rules';
+import { checkExpenses, rulesForTrip } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
 import { useTracker } from '../../features/mileage/useTracker';
 import { pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
@@ -223,7 +223,8 @@ export default function ExpenseScreen() {
     : null;
 
   // Company rules, checked live against the trip's other expenses as the user types.
-  const companyRules = useAppStore((s) => s.companyRules);
+  const defaultRules = useAppStore((s) => s.companyRules);
+  const companyRules = rulesForTrip(trip, defaultRules);
   const draftId = existing?.id ?? 'draft';
   const draftTripId = existing?.tripId ?? activeTrip?.id ?? null;
   const draftFlags = useMemo(() => {

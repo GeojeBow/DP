@@ -6,7 +6,7 @@ import { Card } from '../components/Card';
 import { Button, Chips, TextField } from '../components/Form';
 import { uuidv7 } from '../domain/id';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../domain/schemas';
-import { COMPANY_RULE_TYPES, type CompanyRuleType, ruleNeedsAmount } from '../features/policy/rules';
+import { COMPANY_RULE_TYPES, type CompanyRule, type CompanyRuleType, ruleNeedsAmount } from '../features/policy/rules';
 import { useDescribeRule } from '../features/policy/usePolicy';
 import { useT } from '../i18n';
 import { useActiveTrip, useAppStore } from '../store/useAppStore';
@@ -19,10 +19,23 @@ export default function RulesScreen() {
   const palette = usePalette();
   const t = useT();
   const describe = useDescribeRule();
-  const rules = useAppStore((s) => s.companyRules);
-  const addRule = useAppStore((s) => s.addRule);
-  const deleteRule = useAppStore((s) => s.deleteRule);
-  const currency = useActiveTrip()?.baseCurrency ?? 'KRW';
+  const defaults = useAppStore((s) => s.companyRules);
+  const addDefault = useAppStore((s) => s.addRule);
+  const deleteDefault = useAppStore((s) => s.deleteRule);
+  const updateTrip = useAppStore((s) => s.updateTrip);
+  const trip = useActiveTrip();
+  const currency = trip?.baseCurrency ?? 'KRW';
+  // The active trip either follows the company defaults or keeps its own set; edits go to whichever applies.
+  const own = trip?.ruleMode === 'trip';
+  const rules = own ? trip.rules ?? [] : defaults;
+  const setMode = (mode: 'company' | 'trip') => {
+    if (!trip || mode === (trip.ruleMode ?? 'company')) return;
+    // Start the trip's own set from the defaults so only the differences need changing.
+    const rulesForTrip = trip.rules ?? defaults.map((r) => ({ ...r, id: uuidv7() }));
+    updateTrip({ ...trip, ruleMode: mode, rules: rulesForTrip });
+  };
+  const addRule = (rule: CompanyRule) => (own ? updateTrip({ ...trip, rules: [...(trip.rules ?? []), rule] }) : addDefault(rule));
+  const deleteRule = (id: string) => (own ? updateTrip({ ...trip, rules: (trip.rules ?? []).filter((r) => r.id !== id) }) : deleteDefault(id));
 
   const [kind, setKind] = useState<CompanyRuleType>('per_item_cap');
   const [category, setCategory] = useState<ExpenseCategory | typeof ALL>('meals');
@@ -43,7 +56,19 @@ export default function RulesScreen() {
 
   return (
     <ScrollView style={{ backgroundColor: palette.background }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Card title={t('screen.rules')}>
+      {trip ? (
+        <Card title={t('policy.mode.title', { trip: trip.title })}>
+          <Chips
+            label=""
+            options={['company', 'trip'] as const}
+            value={own ? 'trip' : 'company'}
+            labelOf={(m) => t(`policy.mode.${m}`)}
+            onChange={setMode}
+          />
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t(own ? 'policy.mode.tripHint' : 'policy.mode.companyHint')}</Text>
+        </Card>
+      ) : null}
+      <Card title={own ? t('policy.tripRules', { trip: trip.title }) : t('policy.defaultRules')}>
         {rules.length === 0 ? <Text style={[type.body, { color: palette.textMuted }]}>{t('policy.empty')}</Text> : null}
         {rules.map((rule) => (
           <View key={rule.id} style={[styles.rule, { borderColor: palette.border }]}>

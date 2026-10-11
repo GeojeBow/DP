@@ -5,16 +5,20 @@ import { formatMoney, toCurrencyCode, toMinor } from '../../domain/money';
 import type { PolicyFlag } from '../../domain/policy';
 import { useT } from '../../i18n';
 import { useAppStore } from '../../store/useAppStore';
-import { checkExpenses, type CompanyRule, ruleNeedsAmount } from './rules';
+import type { Trip } from '../../domain/models';
+import { allRules, checkWithTrips, type CompanyRule, ruleNeedsAmount } from './rules';
 
 // Every row asks for the same answer; compute it once per change of expenses or rules.
-let cache: { expenses: readonly Expense[]; rules: readonly CompanyRule[]; flags: Map<string, PolicyFlag[]> } | null = null;
+let cache: { expenses: readonly Expense[]; trips: readonly Trip[]; rules: readonly CompanyRule[]; flags: Map<string, PolicyFlag[]> } | null = null;
 
 /** Company-rule flags for every saved expense, by expense id. */
 export function usePolicyFlags(): Map<string, PolicyFlag[]> {
   const expenses = useAppStore((s) => s.expenses);
+  const trips = useAppStore((s) => s.trips);
   const rules = useAppStore((s) => s.companyRules);
-  if (cache?.expenses !== expenses || cache.rules !== rules) cache = { expenses, rules, flags: checkExpenses(expenses, rules) };
+  if (cache?.expenses !== expenses || cache.trips !== trips || cache.rules !== rules) {
+    cache = { expenses, trips, rules, flags: checkWithTrips(expenses, trips, rules) };
+  }
   return cache.flags;
 }
 
@@ -30,7 +34,9 @@ export function useDescribeRule(): (rule: CompanyRule) => string {
 
 /** The rules a set of flags points at, described; duplicates dropped. */
 export function useFlagMessages(flags: readonly PolicyFlag[] | undefined): string[] {
-  const rules = useAppStore((s) => s.companyRules);
+  const defaults = useAppStore((s) => s.companyRules);
+  const trips = useAppStore((s) => s.trips);
+  const rules = useMemo(() => allRules(trips, defaults), [trips, defaults]);
   const describe = useDescribeRule();
   return useMemo(() => {
     const ids = Array.from(new Set((flags ?? []).map((f) => f.ruleId)));
