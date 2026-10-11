@@ -38,6 +38,13 @@ export const ko = {
   'home.dailyChart': '날짜별 지출',
   'home.chartMax': '가장 많이 쓴 날 {amount}',
   'home.seeAll': '전체 보기',
+  'home.greeting': '즐거운 여행 되세요 ✈️',
+  'settings.theme': '테마',
+  'theme.peach': '피치 🍑',
+  'theme.lavender': '라벤더 💜',
+  'theme.mint': '민트 🌿',
+  'theme.ocean': '오션 🌊',
+  'theme.midnight': '미드나잇 🌙',
   'home.addReceipt': '영수증 추가',
 
   'expenses.unassigned': '출장 미지정 지출',
