@@ -10,7 +10,7 @@ export default function RootLayout() {
   const t = useT();
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style={palette.dark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: palette.surface },

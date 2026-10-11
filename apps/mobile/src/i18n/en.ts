@@ -40,6 +40,13 @@ export const en: Record<MessageKey, string> = {
   'home.dailyChart': 'Spending by day',
   'home.chartMax': 'Highest day {amount}',
   'home.seeAll': 'See all',
+  'home.greeting': 'Have a great trip ✈️',
+  'settings.theme': 'Theme',
+  'theme.peach': 'Peach 🍑',
+  'theme.lavender': 'Lavender 💜',
+  'theme.mint': 'Mint 🌿',
+  'theme.ocean': 'Ocean 🌊',
+  'theme.midnight': 'Midnight 🌙',
   'home.addReceipt': 'Add a receipt',
 
   'expenses.unassigned': 'Expenses without a trip',

@@ -13,7 +13,7 @@ interface CardProps {
 export function Card({ title, action, children }: CardProps) {
   const palette = usePalette();
   return (
-    <View style={[styles.card, shadow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+    <View style={[styles.card, shadow, { backgroundColor: `${palette.surface}EB`, borderColor: palette.border }]}>
       {title ? (
         <View style={styles.head}>
           <Text style={[type.label, styles.title, { color: palette.text }]}>{title}</Text>

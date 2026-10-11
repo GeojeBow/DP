@@ -64,10 +64,15 @@ export default function HomeScreen() {
 
   return (
     <Screen
+      eyebrow={t('home.greeting')}
       title={trip.title}
       subtitle={`${trip.startDate} ~ ${trip.endDate} · ${t('home.dayOfTrip', { day: summary.dayOfTrip, total: summary.totalDays })}`}
     >
       <View style={[styles.hero, { backgroundColor: palette.brand }]}>
+        {/* Brand-to-accent glow without a gradient module: two soft circles clipped by the card. */}
+        <View style={[styles.glow, { backgroundColor: palette.accent, top: -60, right: -70 }]} />
+        <View style={[styles.glow, styles.glowSmall, { backgroundColor: palette.accent, bottom: -70, left: -40 }]} />
+        <Ionicons name="airplane" size={64} color={palette.onBrand} style={styles.heroPlane} />
         <Text style={[type.label, styles.heroMuted, { color: palette.onBrand }]}>{heroLabel}</Text>
         <Text
           style={[type.hero, type.numeric, { color: status.available !== null && status.available < 0n ? '#FFB4B4' : palette.onBrand }]}
@@ -110,7 +115,7 @@ export default function HomeScreen() {
 
       <View style={styles.grid}>
         {stats.map((s) => (
-          <View key={s.label} style={[styles.stat, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <View key={s.label} style={[styles.stat, { backgroundColor: `${palette.surface}E6`, borderColor: palette.border }]}>
             <Ionicons name={s.icon} size={18} color={palette.brand} />
             <Text style={[type.caption, { color: palette.textMuted }]}>{s.label}</Text>
             <Text style={[type.body, type.numeric, { color: palette.text, fontWeight: '700' }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -198,7 +203,7 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.action,
-        { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed ? 0.7 : 1 },
+        { backgroundColor: `${palette.surface}E6`, borderColor: palette.border, opacity: pressed ? 0.7 : 1 },
       ]}
     >
       <View style={[styles.actionIcon, { backgroundColor: palette.brandSoft }]}>
@@ -212,7 +217,10 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 }
 
 const styles = StyleSheet.create({
-  hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm },
+  hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' },
+  glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.75 },
+  glowSmall: { width: 160, height: 160, borderRadius: 80, opacity: 0.45 },
+  heroPlane: { position: 'absolute', top: 14, right: 16, opacity: 0.25, transform: [{ rotate: '-15deg' }] },
   heroMuted: { opacity: 0.85 },
   heroBudget: { gap: spacing.sm, marginTop: spacing.sm },
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
