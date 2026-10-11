@@ -22,7 +22,6 @@ export default function SettingsScreen() {
   const theme = useAppStore((s) => s.theme);
   const trips = useAppStore((s) => s.trips);
   const activeTripId = useAppStore((s) => s.activeTripId);
-  const setActiveTrip = useAppStore((s) => s.setActiveTrip);
   const ruleCount = useAppStore((s) => s.companyRules.length);
   const fieldCount = useAppStore((s) => s.customFields.length);
   const reminders = useAppStore((s) => s.reminders);
@@ -54,22 +53,14 @@ export default function SettingsScreen() {
       </Section>
 
       <Section icon="briefcase-outline" title={t('settings.group.trips')}>
-        {[...trips]
-          .sort((a, b) => b.startDate.localeCompare(a.startDate))
-          .map((trip) => (
-            <NavRow
-              key={trip.id}
-              icon={trip.id === activeTripId ? 'radio-button-on' : 'radio-button-off'}
-              title={trip.title}
-              detail={`${trip.startDate} ~ ${trip.endDate} · ${trip.baseCurrency}${trip.id === activeTripId ? t('settings.active') : ''}`}
-              value={t('settings.editTrip')}
-              onPress={() => {
-                setActiveTrip(trip.id);
-                router.push({ pathname: '/trip/settings', params: { id: trip.id } });
-              }}
-            />
-          ))}
-        <NavRow icon="add-circle-outline" title={t('settings.newTrip')} onPress={go('/trip/new')} last />
+        <NavRow
+          icon="time-outline"
+          title={t('settings.history')}
+          detail={t('settings.historyBody')}
+          value={t('settings.historyCount', { n: trips.length })}
+          onPress={go('/trips')}
+          last
+        />
       </Section>
 
       <Section icon="shield-checkmark-outline" title={t('settings.group.company')}>

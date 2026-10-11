@@ -75,6 +75,8 @@ interface AppState {
   setActiveTrip: (id: string | null) => void;
   upsertExpense: (expense: Expense) => void;
   deleteExpense: (id: string) => Promise<void>;
+  /** Removes a trip with all its expenses and receipt photos */
+  deleteTrip: (id: string) => Promise<void>;
 }
 
 export const fxKey = (from: string, to: string) => `${from}>${to}`;
@@ -176,6 +178,20 @@ export const useAppStore = create<AppState>()(
                 : { ...s.lastFxRates, [fxKey(expense.currency, expense.baseCurrency)]: expense.fxRate },
           };
         }),
+      deleteTrip: async (id) => {
+        const receipts = get().expenses.filter((e) => e.tripId === id).flatMap((e) => (e.receiptId ? [e.receiptId] : []));
+        set((s) => {
+          const trips = s.trips.filter((t) => t.id !== id);
+          // Move to the most recent remaining trip when the active one goes.
+          const next = [...trips].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+          return {
+            trips,
+            expenses: s.expenses.filter((e) => e.tripId !== id),
+            activeTripId: s.activeTripId === id ? next?.id ?? null : s.activeTripId,
+          };
+        });
+        for (const r of receipts) await deleteReceiptImage(r);
+      },
       deleteExpense: async (id) => {
         const target = get().expenses.find((e) => e.id === id);
         set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) }));
