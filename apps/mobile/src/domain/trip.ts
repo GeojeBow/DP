@@ -86,3 +86,31 @@ export function groupByDate(expenses: readonly Expense[]): Array<{ date: string;
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, items]) => ({ date, items: items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
 }
+
+/**
+ * Base-currency spend per trip day, for the dashboard chart: a window of up to
+ * `days` trip days ending today, filled forward with upcoming days while the
+ * trip is younger than the window.
+ */
+export function dailySpend(
+  trip: Trip,
+  expenses: readonly Expense[],
+  today: string,
+  days = 7,
+): Array<{ date: string; amount: MinorUnits }> {
+  const base = toCurrencyCode(trip.baseCurrency);
+  const start = dayNumber(trip.startDate);
+  const last = Math.min(Math.max(dayNumber(today), start + days - 1), dayNumber(trip.endDate));
+  const first = Math.max(last - days + 1, start);
+  const totals = new Map<number, MinorUnits>();
+  for (const e of expenses) {
+    if (e.tripId !== trip.id) continue;
+    const d = dayNumber(e.localDate);
+    if (d >= first && d <= last) totals.set(d, (totals.get(d) ?? 0n) + toMinor(e.totalBase, base));
+  }
+  const out: Array<{ date: string; amount: MinorUnits }> = [];
+  for (let d = first; d <= last; d++) {
+    out.push({ date: new Date(d * DAY_MS).toISOString().slice(0, 10), amount: totals.get(d) ?? 0n });
+  }
+  return out;
+}

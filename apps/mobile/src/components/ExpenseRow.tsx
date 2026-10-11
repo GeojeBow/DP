@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatMoney, toCurrencyCode, toMinor } from '../domain/money';
 import type { Expense } from '../domain/models';
 import { useT } from '../i18n';
+import { CategoryIcon } from './CategoryIcon';
 import { spacing, type, usePalette } from '../theme/tokens';
 
 export function ExpenseRow({ expense }: { expense: Expense }) {
@@ -15,10 +16,11 @@ export function ExpenseRow({ expense }: { expense: Expense }) {
     <Pressable
       accessibilityRole="button"
       onPress={() => router.push({ pathname: '/expense/[id]', params: { id: expense.id } })}
-      style={[styles.row, { borderColor: palette.border }]}
+      style={styles.row}
     >
+        <CategoryIcon category={expense.category} />
         <View style={styles.left}>
-          <Text style={[type.body, { color: palette.text }]} numberOfLines={1}>
+          <Text style={[type.body, { color: palette.text, fontWeight: '600' }]} numberOfLines={1}>
             {expense.merchantName || t('expense.noMerchant')}
           </Text>
           <Text style={[type.caption, { color: palette.textMuted }]}>
@@ -45,8 +47,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth * 2,
+    paddingVertical: spacing.sm,
   },
   left: { flex: 1, gap: 2 },
   right: { alignItems: 'flex-end', gap: 2 },

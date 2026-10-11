@@ -55,11 +55,11 @@ export function Chips<T extends string>({ label, options, value, labelOf, onChan
                 styles.chip,
                 {
                   borderColor: selected ? palette.brand : palette.border,
-                  backgroundColor: selected ? palette.brand : palette.surface,
+                  backgroundColor: selected ? palette.brandSoft : palette.surface,
                 },
               ]}
             >
-              <Text style={[type.label, { color: selected ? palette.surface : palette.text }]}>{labelOf(option)}</Text>
+              <Text style={[type.label, { color: selected ? palette.brand : palette.text, fontWeight: selected ? '700' : '500' }]}>{labelOf(option)}</Text>
             </Pressable>
           );
         })}
@@ -79,7 +79,7 @@ interface ButtonProps {
 export function Button({ title, onPress, variant = 'primary', disabled, icon }: ButtonProps) {
   const palette = usePalette();
   const fill = variant === 'primary' ? palette.brand : palette.surface;
-  const ink = variant === 'primary' ? palette.surface : variant === 'danger' ? palette.block : palette.text;
+  const ink = variant === 'primary' ? palette.onBrand : variant === 'danger' ? palette.block : palette.text;
   return (
     <Pressable
       onPress={onPress}
@@ -113,7 +113,7 @@ export function ProgressBar({ ratio }: { ratio: number }) {
 
 const styles = StyleSheet.create({
   field: { gap: spacing.xs },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minHeight: 44 },
+  input: { borderWidth: 1, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minHeight: 44 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { borderWidth: 1, borderRadius: radius.chip, paddingHorizontal: spacing.md, paddingVertical: 6 },
   button: {
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: radius.control,
     minHeight: 48,
     paddingHorizontal: spacing.lg,
   },

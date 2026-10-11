@@ -1,34 +1,37 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { radius, spacing, type, usePalette } from '../theme/tokens';
+import { radius, shadow, spacing, type, usePalette } from '../theme/tokens';
 
 interface CardProps {
-  title: string;
+  title?: string;
+  /** Small control on the right of the title, e.g. a "see all" link. */
+  action?: ReactNode;
   children?: ReactNode;
 }
 
-export function Card({ title, children }: CardProps) {
+export function Card({ title, action, children }: CardProps) {
   const palette = usePalette();
   return (
-    <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-      <Text style={[type.label, { color: palette.textMuted }]}>{title}</Text>
+    <View style={[styles.card, shadow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+      {title ? (
+        <View style={styles.head}>
+          <Text style={[type.label, styles.title, { color: palette.text }]}>{title}</Text>
+          {action}
+        </View>
+      ) : null}
       {children}
     </View>
   );
 }
 
-/** Placeholder body for screens that are scheduled but not built yet. */
-export function PlannedNote({ children }: { children: string }) {
-  const palette = usePalette();
-  return <Text style={[type.body, { color: palette.textMuted }]}>{children}</Text>;
-}
-
 const styles = StyleSheet.create({
   card: {
-    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.card,
     padding: spacing.lg,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontWeight: '700' },
 });
