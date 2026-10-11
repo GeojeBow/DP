@@ -125,7 +125,7 @@ export default function SettingsScreen() {
                   {active ? t('settings.active') : ''}
                 </Text>
                 <Pressable
-                  onPress={() => router.push({ pathname: '/trip/new', params: { id: trip.id } })}
+                  onPress={() => router.push({ pathname: '/trip/settings', params: { id: trip.id } })}
                   accessibilityRole="button"
                   hitSlop={8}
                   style={styles.tripEdit}
