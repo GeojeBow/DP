@@ -25,7 +25,7 @@ export type SyncResult = 'ok' | 'no-account' | 'failed';
 const collections = (): Collections => {
   const s = useAppStore.getState();
   return {
-    trips: s.trips, expenses: s.expenses, companyRules: s.companyRules,
+    trips: s.trips, expenses: s.expenses, companyRules: s.companyRules, policies: s.policies,
     customFields: s.customFields, reportPresets: s.reportPresets, companyTemplates: s.companyTemplates,
   };
 };
@@ -162,8 +162,8 @@ export function startSync(): () => void {
     unsubscribe = useAppStore.subscribe((next, prev) => {
     if (applyingRemote) return;
     const keys = changedKeys(
-      { trips: prev.trips, expenses: prev.expenses, companyRules: prev.companyRules, customFields: prev.customFields, reportPresets: prev.reportPresets, companyTemplates: prev.companyTemplates },
-      { trips: next.trips, expenses: next.expenses, companyRules: next.companyRules, customFields: next.customFields, reportPresets: next.reportPresets, companyTemplates: next.companyTemplates },
+      { trips: prev.trips, expenses: prev.expenses, companyRules: prev.companyRules, policies: prev.policies, customFields: prev.customFields, reportPresets: prev.reportPresets, companyTemplates: prev.companyTemplates },
+      { trips: next.trips, expenses: next.expenses, companyRules: next.companyRules, policies: next.policies, customFields: next.customFields, reportPresets: next.reportPresets, companyTemplates: next.companyTemplates },
     );
     if (keys.length) {
       next.enqueue(keys);

@@ -1,19 +1,17 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { DateField } from '../../components/DateField';
 import { Button, Chips, TextField } from '../../components/Form';
 import { QUICK_CURRENCIES } from '../../constants';
-import { BUDGET_KINDS, type BudgetKind, type BudgetRule } from '../../domain/budget';
-import { tripDays } from '../../domain/claim';
 import { uuidv7 } from '../../domain/id';
+import type { Trip } from '../../domain/models';
 import { localToday } from '../../domain/trip';
+import { companyPolicyOf, type PolicyMode } from '../../features/policy/rules';
 import { useT } from '../../i18n';
 import { useAppStore } from '../../store/useAppStore';
-import { spacing } from '../../theme/tokens';
-
-const DECIMAL = /^\d+(\.\d{1,2})?$/;
+import { spacing, type, usePalette } from '../../theme/tokens';
 
 function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -23,64 +21,55 @@ function addDays(iso: string, days: number): string {
 
 export default function NewTripScreen() {
   const t = useT();
+  const palette = usePalette();
   // Opened with ?id= to edit an existing trip.
   const { id } = useLocalSearchParams<{ id?: string }>();
   const existing = useAppStore((s) => s.trips.find((x) => x.id === id));
   const addTrip = useAppStore((s) => s.addTrip);
   const updateTrip = useAppStore((s) => s.updateTrip);
   const today = localToday();
-  const budget0 = existing?.budget;
   const [title, setTitle] = useState(existing?.title ?? '');
   const [startDate, setStartDate] = useState(existing?.startDate ?? today);
   const [endDate, setEndDate] = useState(existing?.endDate ?? addDays(today, 3));
   const [baseCurrency, setBaseCurrency] = useState<string>(existing?.baseCurrency ?? 'KRW');
-  const [budgetKind, setBudgetKind] = useState<BudgetKind>(budget0?.kind ?? 'total');
-  const [amount, setAmount] = useState(budget0 && budget0.kind !== 'none' ? budget0.amount : '');
-  const [poolDays, setPoolDays] = useState(budget0?.kind === 'daily_pooled' ? String(budget0.poolDays) : '7');
-  const [perDiem, setPerDiem] = useState(existing?.perDiem?.amount ?? '');
-  const [perDiemDays, setPerDiemDays] = useState(existing?.perDiem?.days !== undefined ? String(existing.perDiem.days) : '');
+  const [mode, setMode] = useState<PolicyMode>('company');
+  const policy = useAppStore((s) => companyPolicyOf(s.policies));
+  const defaultRules = useAppStore((s) => s.companyRules);
   const [submitted, setSubmitted] = useState(false);
 
-  const amountClean = amount.replace(/,/g, '').trim();
   const errors = {
     title: title.trim() ? null : t('trip.err.name'),
     endDate: endDate < startDate ? t('trip.err.endBeforeStart') : null,
-    amount: budgetKind === 'none' || (DECIMAL.test(amountClean) && Number(amountClean) > 0) ? null : t('trip.err.amount'),
-    poolDays: budgetKind !== 'daily_pooled' || (/^\d+$/.test(poolDays) && Number(poolDays) >= 2) ? null : t('trip.err.poolDays'),
   };
-  const perDiemClean = perDiem.replace(/,/g, '').trim();
-  const perDiemErrors = {
-    perDiem: !perDiemClean || DECIMAL.test(perDiemClean) ? null : t('trip.err.perDiem'),
-    perDiemDays: !perDiemDays.trim() || /^\d+$/.test(perDiemDays.trim()) ? null : t('trip.err.perDiem'),
-  };
-  const valid = [...Object.values(errors), ...Object.values(perDiemErrors)].every((e) => e === null);
+  const valid = Object.values(errors).every((e) => e === null);
   const show = (e: string | null) => (submitted ? e : null);
 
   const save = () => {
     setSubmitted(true);
     if (!valid) return;
-    const budget: BudgetRule =
-      budgetKind === 'none'
-        ? { kind: 'none' }
-        : budgetKind === 'daily_pooled'
-          ? { kind: 'daily_pooled', amount: amountClean, poolDays: Number(poolDays) }
-          : { kind: budgetKind, amount: amountClean };
-    const trip = {
-      ...existing,
-      id: existing?.id ?? uuidv7(),
+    if (existing) {
+      // Budget, allowance and rules are edited on the company policy screen.
+      updateTrip({ ...existing, title: title.trim(), startDate, endDate, baseCurrency });
+      router.back();
+      return;
+    }
+    const fits = baseCurrency === policy.currency;
+    const trip: Trip = {
+      id: uuidv7(),
       title: title.trim(),
       startDate,
       endDate,
       baseCurrency,
-      budget,
-      perDiem: perDiemClean && Number(perDiemClean) > 0
-        ? { amount: perDiemClean, ...(perDiemDays.trim() ? { days: Number(perDiemDays.trim()) } : {}) }
-        : undefined,
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      // A trip with its own policy starts from the company's, ready to change.
+      budget: mode === 'trip' && fits ? policy.budget : { kind: 'none' },
+      perDiem: mode === 'trip' && fits && policy.perDiem ? { ...policy.perDiem } : undefined,
+      ruleMode: mode,
+      ...(mode === 'trip' ? { rules: defaultRules.map((r) => ({ ...r, id: uuidv7() })) } : {}),
+      createdAt: new Date().toISOString(),
     };
-    if (existing) updateTrip(trip);
-    else addTrip(trip);
-    router.back();
+    addTrip(trip);
+    if (mode === 'trip') router.replace('/rules');
+    else router.back();
   };
 
   return (
@@ -97,47 +86,26 @@ export default function NewTripScreen() {
           labelOf={(c) => c}
           onChange={setBaseCurrency}
         />
-        <Chips label={t('trip.budgetKind')} options={BUDGET_KINDS} value={budgetKind} labelOf={(k) => t(`budget.${k}`)} onChange={setBudgetKind} />
-        {budgetKind !== 'none' ? (
-          <TextField
-            label={t(budgetKind === 'total' ? 'trip.budgetAmount.total' : 'trip.budgetAmount.daily', { currency: baseCurrency })}
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholder={budgetKind === 'total' ? '1500000' : '70'}
-            error={show(errors.amount)}
-          />
-        ) : null}
-        {budgetKind === 'daily_pooled' ? (
-          <TextField
-            label={t('trip.poolDays')}
-            value={poolDays}
-            onChangeText={setPoolDays}
-            keyboardType="number-pad"
-            hint={t('trip.poolDaysHint')}
-            error={show(errors.poolDays)}
-          />
-        ) : null}
-        <TextField
-          label={t('trip.perDiem', { currency: baseCurrency })}
-          value={perDiem}
-          onChangeText={setPerDiem}
-          keyboardType="decimal-pad"
-          placeholder="0"
-          hint={t('trip.perDiemHint')}
-          error={show(perDiemErrors.perDiem)}
-        />
-        {perDiemClean ? (
-          <TextField
-            label={t('trip.perDiemDays')}
-            value={perDiemDays}
-            onChangeText={setPerDiemDays}
-            keyboardType="number-pad"
-            placeholder={String(tripDays({ startDate, endDate }))}
-            hint={t('trip.perDiemDaysHint', { n: tripDays({ startDate, endDate }) })}
-            error={show(perDiemErrors.perDiemDays)}
-          />
-        ) : null}
+        {existing ? (
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t('trip.policyElsewhere')}</Text>
+        ) : (
+          <>
+            <Chips
+              label={t('trip.policy')}
+              options={['company', 'trip'] as const}
+              value={mode}
+              labelOf={(m) => t(`policy.mode.${m}`)}
+              onChange={setMode}
+            />
+            <Text style={[type.caption, { color: mode === 'company' && baseCurrency !== policy.currency ? palette.warn : palette.textMuted }]}>
+              {mode === 'trip'
+                ? t('trip.policyTripHint')
+                : baseCurrency !== policy.currency
+                  ? t('policy.currencyMismatch', { policy: policy.currency, trip: baseCurrency })
+                  : t('trip.policyCompanyHint')}
+            </Text>
+          </>
+        )}
         <Button title={existing ? t('trip.save') : t('trip.create')} onPress={save} />
       </ScrollView>
     </KeyboardAvoidingView>

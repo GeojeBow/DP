@@ -21,9 +21,21 @@ export function perDiemDays(trip: Trip): number {
   return trip.perDiem?.days ?? tripDays(trip);
 }
 
+/** Percent paid on the departure and return days; 100 when the days are set by hand. */
+export function travelDayPercent(trip: Trip): number {
+  const pct = trip.perDiem?.travelDayPercent ?? 100;
+  return trip.perDiem?.days !== undefined ? 100 : Math.min(Math.max(pct, 0), 100);
+}
+
 export function perDiemTotal(trip: Trip): MinorUnits {
   if (!trip.perDiem) return 0n;
-  return toMinor(trip.perDiem.amount, toCurrencyCode(trip.baseCurrency)) * BigInt(perDiemDays(trip));
+  const perDay = toMinor(trip.perDiem.amount, toCurrencyCode(trip.baseCurrency));
+  const days = perDiemDays(trip);
+  const pct = travelDayPercent(trip);
+  if (pct === 100) return perDay * BigInt(days);
+  // The first and last day of the trip are travel days.
+  const travel = Math.min(2, days);
+  return perDay * BigInt(days - travel) + (perDay * BigInt(pct) * BigInt(travel)) / 100n;
 }
 
 /** Paid by the company card, so nothing comes back to the traveller. */
@@ -90,7 +102,7 @@ export interface ClaimLabels {
   spent: string;
   companyPaid: string;
   personal: string;
-  perDiem: (days: number, perDay: string) => string;
+  perDiem: (days: number, perDay: string, travelDayPercent: number) => string;
   claim: string;
   vatDeductible: string;
   vatForeign: string;
@@ -105,7 +117,7 @@ export function claimLines(trip: Trip, s: ClaimSummary, labels: ClaimLabels): Ar
   const out = [line(labels.spent, s.spent)];
   if (s.companyPaid > 0n) out.push(line(labels.companyPaid, s.companyPaid), line(labels.personal, s.personal));
   if (trip.perDiem) {
-    out.push(line(labels.perDiem(s.perDiemDays, formatMoney(toMinor(trip.perDiem.amount, base), base)), s.perDiem));
+    out.push(line(labels.perDiem(s.perDiemDays, formatMoney(toMinor(trip.perDiem.amount, base), base), travelDayPercent(trip)), s.perDiem));
   }
   if (s.companyPaid > 0n || trip.perDiem) out.push(line(labels.claim, s.claim, true));
   if (s.vatDeductible > 0n) out.push(line(labels.vatDeductible, s.vatDeductible));

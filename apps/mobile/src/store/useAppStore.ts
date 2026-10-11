@@ -6,7 +6,7 @@ import type { CustomField } from '../domain/customFields';
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
 import type { ReportPreset } from '../domain/report';
-import type { CompanyRule } from '../features/policy/rules';
+import { applyCompanyPolicy, type CompanyPolicy, type CompanyRule, companyPolicyOf } from '../features/policy/rules';
 import type { CompanyTemplate } from '../features/template/mapping';
 import { deleteTemplateFile } from '../features/template/storage';
 import type { ThemeId } from '../theme/tokens';
@@ -40,6 +40,10 @@ interface AppState {
   /** Company expense rules, checked on the device */
   companyRules: CompanyRule[];
   addRule: (rule: CompanyRule) => void;
+  /** The company's default budget and allowance: zero or one entry (a list so it syncs like the rest) */
+  policies: CompanyPolicy[];
+  /** Saves the company policy and copies it into every trip that follows it */
+  setCompanyPolicy: (policy: CompanyPolicy) => void;
   /** Extra boxes on every expense */
   customFields: CustomField[];
   saveField: (field: CustomField) => void;
@@ -95,6 +99,9 @@ export const useAppStore = create<AppState>()(
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
+      policies: [],
+      setCompanyPolicy: (policy) =>
+        set((s) => ({ policies: [policy], trips: s.trips.map((t) => applyCompanyPolicy(t, policy)) })),
       customFields: [],
       saveField: (field) =>
         set((s) => ({
@@ -134,15 +141,21 @@ export const useAppStore = create<AppState>()(
       setSynced: (patch) => set(patch),
       clearAccountData: () =>
         set({
-          trips: [], expenses: [], activeTripId: null, companyRules: [], customFields: [], reportPresets: [], companyTemplates: [],
+          trips: [], expenses: [], activeTripId: null, companyRules: [], policies: [], customFields: [], reportPresets: [], companyTemplates: [],
           outbox: [], lastPulledAt: null, syncedAt: null, companyId: null,
         }),
       companyId: null,
       setCompany: (companyId) => set({ companyId }),
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
-      addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),
-      updateTrip: (trip) => set((s) => ({ trips: s.trips.map((x) => (x.id === trip.id ? trip : x)) })),
+      // Trips that follow the company policy always carry its current budget and allowance.
+      addTrip: (trip) =>
+        set((s) => ({ trips: [...s.trips, applyCompanyPolicy(trip, companyPolicyOf(s.policies))], activeTripId: trip.id })),
+      updateTrip: (trip) =>
+        set((s) => {
+          const next = applyCompanyPolicy(trip, companyPolicyOf(s.policies));
+          return { trips: s.trips.map((x) => (x.id === trip.id ? next : x)) };
+        }),
       setActiveTrip: (id) => set({ activeTripId: id }),
       upsertExpense: (expense) =>
         set((s) => {
@@ -171,7 +184,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'trip-expense-store',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
@@ -183,6 +196,19 @@ export const useAppStore = create<AppState>()(
             budget: budgetTotal ? { kind: 'total', amount: budgetTotal } : { kind: 'none' },
           }));
           state.language ??= 'ko';
+        }
+        if (version < 3) {
+          // Budget and allowance moved under the company policy. Trips that set their own
+          // keep them (with a copy of the default rules); the rest follow the company.
+          const rules = (state.companyRules as CompanyRule[] | undefined) ?? [];
+          const trips = (state.trips as Trip[] | undefined) ?? [];
+          state.trips = trips.map((trip) => {
+            if (trip.ruleMode) return trip;
+            const own = trip.budget.kind !== 'none' || !!trip.perDiem;
+            return own
+              ? { ...trip, ruleMode: 'trip', rules: trip.rules ?? rules.map((r) => ({ ...r, id: `${r.id}-${trip.id}` })) }
+              : { ...trip, ruleMode: 'company' };
+          });
         }
         return state as unknown as AppState;
       },

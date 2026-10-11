@@ -29,6 +29,7 @@ export function useDescribeRule(): (rule: CompanyRule) => string {
     t(`policy.desc.${rule.type}`, {
       cat: rule.category ? t(`category.${rule.category}`) : t('policy.allCats'),
       amount: ruleNeedsAmount(rule.type) ? formatMoney(toMinor(rule.amount, toCurrencyCode(rule.currency)), toCurrencyCode(rule.currency)) : '',
+      words: (rule.keywords ?? []).join(', '),
     });
 }
 

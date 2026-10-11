@@ -4,9 +4,9 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
-import { perDiemDays } from '../../domain/claim';
+import { perDiemDays, travelDayPercent } from '../../domain/claim';
 import { formatMoney, toCurrencyCode, toMinor } from '../../domain/money';
-import { rulesForTrip } from '../../features/policy/rules';
+import { companyPolicyOf, policyFits, rulesForTrip } from '../../features/policy/rules';
 import { useT } from '../../i18n';
 import { useAppStore } from '../../store/useAppStore';
 import { spacing, type, usePalette } from '../../theme/tokens';
@@ -24,6 +24,7 @@ export default function TripSettingsScreen() {
   const trip = useAppStore((s) => s.trips.find((x) => x.id === id) ?? s.trips.find((x) => x.id === s.activeTripId));
   const defaults = useAppStore((s) => s.companyRules);
   const rememberFx = useAppStore((s) => s.rememberFx);
+  const policy = useAppStore((s) => companyPolicyOf(s.policies));
   const updateTrip = useAppStore((s) => s.updateTrip);
   const setActiveTrip = useAppStore((s) => s.setActiveTrip);
 
@@ -58,25 +59,28 @@ export default function TripSettingsScreen() {
         <Change onPress={edit} />
       </Card>
 
-      <Card title={t('tripSettings.money')}>
-        <Row icon="wallet-outline" label={t('trip.budgetKind')} value={budget} />
-        <Row
-          icon="gift-outline"
-          label={t('tripSettings.perDiem')}
-          value={trip.perDiem ? t('tripSettings.perDiemValue', { amount: money(trip.perDiem.amount), days: perDiemDays(trip) }) : t('tripSettings.none')}
-        />
-        <Change onPress={edit} />
-      </Card>
-
       <Card title={t('tripSettings.rules')}>
         <Row
           icon="shield-checkmark-outline"
           label={t('tripSettings.ruleMode')}
-          value={`${t(ownRules ? 'policy.mode.trip' : 'policy.mode.company')} · ${t('tripSettings.ruleCount', { n: ruleCount })}`}
+          value={t(ownRules ? 'policy.mode.trip' : 'policy.mode.company')}
         />
+        <Row icon="wallet-outline" label={t('trip.budgetKind')} value={budget} />
+        <Row
+          icon="gift-outline"
+          label={t('tripSettings.perDiem')}
+          value={trip.perDiem
+            ? `${t('tripSettings.perDiemValue', { amount: money(trip.perDiem.amount), days: perDiemDays(trip) })}${
+              travelDayPercent(trip) < 100 ? ` · ${t('tripSettings.travelDay', { pct: travelDayPercent(trip) })}` : ''}`
+            : t('tripSettings.none')}
+        />
+        <Row icon="list-outline" label={t('tripSettings.detailRules')} value={t('tripSettings.ruleCount', { n: ruleCount })} />
+        {!ownRules && !policyFits(trip, policy) ? (
+          <Text style={[type.caption, { color: palette.warn }]}>{t('policy.currencyMismatch', { policy: policy.currency, trip: trip.baseCurrency })}</Text>
+        ) : null}
         <Change
           onPress={() => {
-            // The rules screen works on the active trip.
+            // The policy screen works on the active trip.
             setActiveTrip(trip.id);
             router.push('/rules');
           }}

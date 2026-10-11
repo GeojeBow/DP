@@ -36,7 +36,8 @@ export async function runExport(
       spent: t('claim.spent'),
       companyPaid: t('claim.companyPaid'),
       personal: t('claim.personal'),
-      perDiem: (days, perDay) => t('claim.perDiem', { days, perDay }),
+      perDiem: (days, perDay, pct) =>
+        pct < 100 ? t('claim.perDiemTravel', { days, perDay, pct }) : t('claim.perDiem', { days, perDay }),
       claim: t('claim.total'),
       vatDeductible: t('claim.vatDeductible'),
       vatForeign: t('claim.vatForeign'),

@@ -17,6 +17,7 @@ import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
 import { checkExpenses, rulesForTrip } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
+import { worstAction } from '../../domain/policy';
 import { useTracker } from '../../features/mileage/useTracker';
 import { pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
@@ -239,6 +240,7 @@ export default function ExpenseScreen() {
     return checkExpenses([...others, draft], companyRules).get(draftId);
   }, [totalBase, companyRules, allExpenses, date, category, receiptId, baseCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
   const ruleMessages = useFlagMessages(draftFlags);
+  const blocked = worstAction(draftFlags) === 'block';
 
   const attachToDuplicate = () => {
     if (!duplicate || !receiptId) return;
@@ -363,8 +365,8 @@ export default function ExpenseScreen() {
         ) : null}
 
         {ruleMessages.length ? (
-          <View style={[styles.dup, { borderColor: palette.warn }]}>
-            <Text style={[type.label, { color: palette.warn, fontWeight: '700' }]}>{t('policy.broken')}</Text>
+          <View style={[styles.dup, { borderColor: blocked ? palette.block : palette.warn }]}>
+            <Text style={[type.label, { color: blocked ? palette.block : palette.warn, fontWeight: '700' }]}>{t(blocked ? 'policy.blocked' : 'policy.broken')}</Text>
             {ruleMessages.map((m) => (
               <Text key={m} style={[type.body, { color: palette.text }]}>· {m}</Text>
             ))}

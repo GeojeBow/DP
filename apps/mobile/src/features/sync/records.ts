@@ -1,7 +1,7 @@
 import type { CustomField } from '../../domain/customFields';
 import type { Expense, Trip } from '../../domain/models';
 import type { ReportPreset } from '../../domain/report';
-import type { CompanyRule } from '../policy/rules';
+import type { CompanyPolicy, CompanyRule } from '../policy/rules';
 import type { CompanyTemplate } from '../template/mapping';
 
 /** Records kept in the store, mirrored one row each in sync_records. */
@@ -9,12 +9,13 @@ export interface Collections {
   trips: Trip[];
   expenses: Expense[];
   companyRules: CompanyRule[];
+  policies: CompanyPolicy[];
   customFields: CustomField[];
   reportPresets: ReportPreset[];
   companyTemplates: CompanyTemplate[];
 }
 
-export const DOC_KINDS = ['trip', 'expense', 'rule', 'field', 'preset', 'template'] as const;
+export const DOC_KINDS = ['trip', 'expense', 'rule', 'field', 'preset', 'template', 'policy'] as const;
 export type DocKind = (typeof DOC_KINDS)[number];
 /** Files stored outside the store: receipt photos and uploaded template files. */
 export type FileKind = 'receipt' | 'templateFile';
@@ -27,6 +28,7 @@ export const COLLECTION: Record<DocKind, keyof Collections> = {
   field: 'customFields',
   preset: 'reportPresets',
   template: 'companyTemplates',
+  policy: 'policies',
 };
 
 export const syncKey = (kind: SyncKind, id: string) => `${kind}:${id}`;
@@ -67,7 +69,7 @@ export function changedKeys(prev: Collections, next: Collections): string[] {
 
 /** Every key a device holds, for the first push after signing in. */
 export function allKeys(state: Collections): string[] {
-  const empty: Collections = { trips: [], expenses: [], companyRules: [], customFields: [], reportPresets: [], companyTemplates: [] };
+  const empty: Collections = { trips: [], expenses: [], companyRules: [], policies: [], customFields: [], reportPresets: [], companyTemplates: [] };
   return changedKeys(empty, state);
 }
 

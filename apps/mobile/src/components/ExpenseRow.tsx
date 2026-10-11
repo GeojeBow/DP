@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatMoney, toCurrencyCode, toMinor } from '../domain/money';
 import type { Expense } from '../domain/models';
+import { worstAction } from '../domain/policy';
 import { usePolicyFlags } from '../features/policy/usePolicy';
 import { useT } from '../i18n';
 import { CategoryIcon } from './CategoryIcon';
@@ -14,7 +15,9 @@ export function ExpenseRow({ expense }: { expense: Expense }) {
   const t = useT();
   const local = toCurrencyCode(expense.currency);
   const base = toCurrencyCode(expense.baseCurrency);
-  const flagged = usePolicyFlags().has(expense.id);
+  const flags = usePolicyFlags().get(expense.id);
+  const flagged = !!flags?.length;
+  const blocked = worstAction(flags) === 'block';
   return (
     <Pressable
       accessibilityRole="button"
@@ -24,7 +27,7 @@ export function ExpenseRow({ expense }: { expense: Expense }) {
         <CategoryIcon category={expense.category} />
         <View style={styles.left}>
           <View style={styles.title}>
-            {flagged ? <Ionicons name="alert-circle" size={16} color={palette.warn} accessibilityLabel={t('policy.broken')} /> : null}
+            {flagged ? <Ionicons name="alert-circle" size={16} color={blocked ? palette.block : palette.warn} accessibilityLabel={t(blocked ? 'policy.blocked' : 'policy.broken')} /> : null}
             <Text style={[type.body, styles.flex, { color: palette.text, fontWeight: '600' }]} numberOfLines={1}>
               {expense.merchantName || t('expense.noMerchant')}
             </Text>
