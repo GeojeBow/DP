@@ -28,7 +28,7 @@ function cellXml(ref: string, cell: ReportCell, style: number): string {
 export function reportToXlsx(table: ReportTable, labels: { subtotal: string; total: string }): Uint8Array {
   const rows: string[] = [];
   const width = Math.max(table.headers.length, 2);
-  const lastCol = table.headers.length - 1;
+  const lastCol = Math.max(1, Math.min(table.totalColumn, table.headers.length - 1));
   const addRow = (cells: ReportCell[], style: number) => {
     const r = rows.length + 1;
     rows.push(`<row r="${r}">${cells.map((c, i) => cellXml(`${colName(i)}${r}`, c, style)).join('')}</row>`);

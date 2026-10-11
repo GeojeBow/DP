@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const activeTripId = useAppStore((s) => s.activeTripId);
   const setActiveTrip = useAppStore((s) => s.setActiveTrip);
   const ruleCount = useAppStore((s) => s.companyRules.length);
+  const fieldCount = useAppStore((s) => s.customFields.length);
 
   return (
     <Screen title={t('tab.settings')} subtitle={t('settings.subtitle')}>
@@ -54,6 +55,12 @@ export default function SettingsScreen() {
           {ruleCount ? t('settings.rulesCount', { n: ruleCount }) : t('settings.rulesBody')}
         </Text>
         <Button title={t('settings.rulesOpen')} variant="secondary" onPress={() => router.push('/rules')} />
+      </Card>
+      <Card title={t('settings.fields')}>
+        <Text style={[type.body, { color: palette.textMuted }]}>
+          {fieldCount ? t('settings.fieldsCount', { n: fieldCount }) : t('settings.fieldsBody')}
+        </Text>
+        <Button title={t('settings.fieldsOpen')} variant="secondary" onPress={() => router.push('/fields')} />
       </Card>
       <Card title={t('settings.language')}>
         <Chips label="Language / 언어 / 言語" options={LANGUAGES} value={language} labelOf={(l) => LANGUAGE_NAMES[l]} onChange={setLanguage} />

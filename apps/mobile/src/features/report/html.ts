@@ -15,11 +15,14 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   const numeric = (i: number) => table.sections.some((s) => s.rows.some((r) => r[i]?.number !== undefined));
   const align = table.headers.map((_, i) => (numeric(i) ? ' class="num"' : ''));
   const span = table.headers.length;
+  // Label across the columns before the total; blank cells after it for any extra columns.
+  const at = Math.max(1, Math.min(table.totalColumn, span - 1));
+  const tail = '<td></td>'.repeat(span - at - 1);
 
   const body = table.sections.map((s) => `
     ${s.title ? `<tr class="group"><td colspan="${span}">${esc(s.title)}</td></tr>` : ''}
     ${s.rows.map((r) => `<tr>${r.map((c, i) => `<td${align[i]}>${esc(c.text)}</td>`).join('')}</tr>`).join('')}
-    ${s.title ? `<tr class="sub"><td colspan="${span - 1}">${esc(labels.subtotal)}</td><td class="num">${esc(s.subtotal)}</td></tr>` : ''}
+    ${s.title ? `<tr class="sub"><td colspan="${at}">${esc(labels.subtotal)}</td><td class="num">${esc(s.subtotal)}</td>${tail}</tr>` : ''}
   `).join('');
 
   const appendix = table.receipts.filter((r) => images[r.receiptId]);
@@ -60,7 +63,7 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   <table>
     <thead><tr>${table.headers.map((h, i) => `<th${align[i]}>${esc(h)}</th>`).join('')}</tr></thead>
     <tbody>${body}
-      <tr class="grand"><td colspan="${span - 1}">${esc(labels.total)}</td><td class="num">${esc(table.total)}</td></tr>
+      <tr class="grand"><td colspan="${at}">${esc(labels.total)}</td><td class="num">${esc(table.total)}</td>${tail}</tr>
     </tbody>
   </table>
   <footer>${esc(labels.generated)}</footer>

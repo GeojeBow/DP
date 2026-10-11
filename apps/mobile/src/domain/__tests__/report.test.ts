@@ -29,6 +29,16 @@ describe('buildReport', () => {
     expect(r.headers[0]).toBe('date');
   });
 
+  it('adds custom fields as columns after the preset ones', () => {
+    const fields = [{ id: 'p', name: 'Project', type: 'text' as const, options: [], required: false },
+      { id: 'n', name: 'People', type: 'number' as const, options: [], required: false }];
+    const withCustom = expenses.map((e) => (e.id === 'a' ? { ...e, custom: { p: 'ALPHA', n: '3' } } : e));
+    const r = buildReport(trip, withCustom, BUILTIN_PRESETS[1]!, labels, fields);
+    expect(r.headers.slice(-2)).toEqual(['Project', 'People']);
+    expect(r.sections[0]!.rows[0]!.slice(-2)).toEqual([{ text: 'ALPHA' }, { text: '3', number: 3 }]);
+    expect(r.sections[1]!.rows[0]!.slice(-2)).toEqual([{ text: '' }, { text: '' }]);
+  });
+
   it('numbers receipts in table order for the appendix', () => {
     const preset = { ...BUILTIN_PRESETS[0]!, columns: ['merchant', 'receipt'] as const, groupBy: 'none' as const };
     const r = buildReport(trip, expenses, { ...preset, columns: [...preset.columns] }, labels);

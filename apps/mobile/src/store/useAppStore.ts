@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { CustomField } from '../domain/customFields';
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
 import type { ReportPreset } from '../domain/report';
@@ -26,6 +27,10 @@ interface AppState {
   /** Company expense rules, checked on the device */
   companyRules: CompanyRule[];
   addRule: (rule: CompanyRule) => void;
+  /** Extra boxes on every expense */
+  customFields: CustomField[];
+  saveField: (field: CustomField) => void;
+  deleteField: (id: string) => void;
   deleteRule: (id: string) => void;
   saveTemplate: (template: CompanyTemplate) => void;
   deleteTemplate: (id: string) => Promise<void>;
@@ -53,6 +58,14 @@ export const useAppStore = create<AppState>()(
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
+      customFields: [],
+      saveField: (field) =>
+        set((s) => ({
+          customFields: s.customFields.some((f) => f.id === field.id)
+            ? s.customFields.map((f) => (f.id === field.id ? field : f))
+            : [...s.customFields, field],
+        })),
+      deleteField: (id) => set((s) => ({ customFields: s.customFields.filter((f) => f.id !== id) })),
       addRule: (rule) => set((s) => ({ companyRules: [...s.companyRules, rule] })),
       deleteRule: (id) => set((s) => ({ companyRules: s.companyRules.filter((r) => r.id !== id) })),
       saveTemplate: (template) =>

@@ -41,11 +41,30 @@ export default function TemplateScreen() {
   const [fields, setFields] = useState<Record<string, string>>({ ...(source?.mapping.fields ?? {}) });
   const [firstRow, setFirstRow] = useState(source?.mapping.table ? String(source.mapping.table.firstRow) : '');
   const [columns, setColumns] = useState<Record<string, string>>({ ...(source?.mapping.table?.columns ?? {}) });
+  const customFields = useAppStore((s) => s.customFields);
+  const [custom, setCustom] = useState<Record<string, string>>({ ...(source?.mapping.table?.custom ?? {}) });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (id) loadTemplateFile(id).then((bytes) => bytes && setParsed(readTemplate(bytes))).catch(() => setParsed(null));
   }, [id]);
+
+  // Custom fields not placed yet: look for a header with the same name above the item rows.
+  useEffect(() => {
+    const row = Number(firstRow);
+    if (!parsed || !(row > 1)) return;
+    const norm = (x: string) => x.toLowerCase().replace(/\s/g, '');
+    const headers = parsed.cells.filter((c) => splitRef(c.ref).row === row - 1);
+    setCustom((s) => {
+      const next = { ...s };
+      for (const f of customFields) {
+        if (next[f.id]) continue;
+        const hit = headers.find((h) => norm(h.text) === norm(f.name));
+        if (hit) next[f.id] = splitRef(hit.ref).col;
+      }
+      return next;
+    });
+  }, [parsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!source) {
     return (
@@ -57,7 +76,7 @@ export default function TemplateScreen() {
 
   const up = (v: string) => v.toUpperCase().replace(/\s/g, '');
   const badFields = Object.values(fields).some((v) => v && !isRef(v));
-  const badColumns = Object.values(columns).some((v) => v && !isCol(v));
+  const badColumns = [...Object.values(columns), ...Object.values(custom)].some((v) => v && !isCol(v));
   const rowNum = Number(firstRow);
   const badRow = firstRow !== '' && !(Number.isInteger(rowNum) && rowNum > 0);
 
@@ -65,13 +84,17 @@ export default function TemplateScreen() {
     if (!name.trim() || badFields || badColumns || badRow) return;
     const cleanFields = Object.fromEntries(Object.entries(fields).filter(([, v]) => v)) as Partial<Record<TemplateField, string>>;
     const cleanColumns = Object.fromEntries(Object.entries(columns).filter(([, v]) => v)) as Partial<Record<TemplateColumn, string>>;
+    const cleanCustom = Object.fromEntries(Object.entries(custom).filter(([id, v]) => v && customFields.some((f) => f.id === id)));
     saveTemplate({
       ...source,
       name: name.trim(),
       values: { traveler: traveler.trim() || undefined, department: department.trim() || undefined },
       mapping: {
         fields: cleanFields,
-        table: firstRow && Object.keys(cleanColumns).length ? { firstRow: rowNum, columns: cleanColumns } : null,
+        table:
+          firstRow && Object.keys(cleanColumns).length + Object.keys(cleanCustom).length
+            ? { firstRow: rowNum, columns: cleanColumns, custom: cleanCustom }
+            : null,
       },
     });
     router.back();
@@ -145,6 +168,23 @@ export default function TemplateScreen() {
                   autoCapitalize="characters"
                   placeholder="—"
                   onChangeText={(x) => setColumns((s) => ({ ...s, [c]: up(x) }))}
+                  error={v && !isCol(v) ? t('template.err.col') : null}
+                  hint={header ? `“${header}”` : undefined}
+                />
+              </View>
+            );
+          })}
+          {customFields.map((f) => {
+            const v = custom[f.id] ?? '';
+            const header = parsed && isCol(v) && rowNum > 1 ? parsed.cells.find((x) => x.ref === `${v}${rowNum - 1}`)?.text : undefined;
+            return (
+              <View key={f.id} style={styles.gridItem}>
+                <TextField
+                  label={f.name}
+                  value={v}
+                  autoCapitalize="characters"
+                  placeholder="—"
+                  onChangeText={(x) => setCustom((s) => ({ ...s, [f.id]: up(x) }))}
                   error={v && !isCol(v) ? t('template.err.col') : null}
                   hint={header ? `“${header}”` : undefined}
                 />

@@ -32,6 +32,8 @@ export interface Expense {
   totalBase: string;
   receiptId: string | null;
   memo: string;
+  /** Company custom fields: field id → value as typed */
+  custom?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }

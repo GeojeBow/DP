@@ -10,6 +10,7 @@ import { uuidv7 } from '../../domain/id';
 import type { Expense } from '../../domain/models';
 import { convertMinor, formatMoney, fromMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../../domain/schemas';
+import { checkCustomValue } from '../../domain/customFields';
 import { findDuplicate } from '../../domain/duplicates';
 import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
@@ -54,6 +55,8 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState<ExpenseCategory>(existing?.category ?? 'meals');
   const [payment, setPayment] = useState<PaymentMethod>(existing?.paymentMethod ?? 'corporate_card');
   const [memo, setMemo] = useState(existing?.memo ?? '');
+  const customFields = useAppStore((s) => s.customFields);
+  const [custom, setCustom] = useState<Record<string, string>>({ ...(existing?.custom ?? {}) });
   const [image, setImage] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -115,7 +118,13 @@ export default function ExpenseScreen() {
     amount: AMOUNT.test(amountClean) && Number(amountClean) > 0 ? null : t('expense.err.amount'),
     fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : t('expense.err.rate'),
   };
-  const valid = Object.values(errors).every((e) => e === null);
+  const customErrors = Object.fromEntries(
+    customFields.map((f) => {
+      const problem = checkCustomValue(f, custom[f.id]);
+      return [f.id, problem ? t(`field.err.${problem}`) : null];
+    }),
+  );
+  const valid = [...Object.values(errors), ...Object.values(customErrors)].every((e) => e === null);
 
   const totalBase = useMemo(() => {
     if (errors.amount || errors.fxRate) return null;
@@ -180,6 +189,12 @@ export default function ExpenseScreen() {
       totalBase: fromMinor(totalBase, base),
       receiptId,
       memo: memo.trim(),
+      custom: Object.fromEntries(
+        customFields.flatMap((f) => {
+          const v = custom[f.id]?.trim() ?? '';
+          return v ? [[f.id, f.type === 'number' ? v.replace(/,/g, '') : v]] : [];
+        }),
+      ),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -289,6 +304,31 @@ export default function ExpenseScreen() {
         <DateField label={t('expense.date')} value={date} onChange={edit('date', setDate)} />
         <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
         <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+        {customFields.map((f) =>
+          f.type === 'choice' ? (
+            <View key={f.id} style={styles.customChoice}>
+              <Chips
+                label={`${f.name}${f.required ? ' *' : ''}`}
+                options={f.options}
+                value={custom[f.id] ?? ''}
+                labelOf={(o) => o}
+                onChange={(o) => setCustom((s) => ({ ...s, [f.id]: s[f.id] === o ? '' : o }))}
+              />
+              {show(customErrors[f.id] ?? null) ? (
+                <Text style={[type.caption, { color: palette.block }]}>{customErrors[f.id]}</Text>
+              ) : null}
+            </View>
+          ) : (
+            <TextField
+              key={f.id}
+              label={`${f.name}${f.required ? ' *' : ''}`}
+              value={custom[f.id] ?? ''}
+              onChangeText={(x) => setCustom((s) => ({ ...s, [f.id]: x }))}
+              keyboardType={f.type === 'number' ? 'decimal-pad' : 'default'}
+              error={show(customErrors[f.id] ?? null)}
+            />
+          ),
+        )}
         <TextField label={t('expense.memo')} value={memo} onChangeText={setMemo} placeholder={t('expense.memoPlaceholder')} multiline />
 
         <Button title={isNew ? t('expense.saveNew') : t('expense.saveEdit')} onPress={save} />
@@ -301,6 +341,7 @@ export default function ExpenseScreen() {
 }
 
 const styles = StyleSheet.create({
+  customChoice: { gap: 4 },
   dup: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.sm },
   flex: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
