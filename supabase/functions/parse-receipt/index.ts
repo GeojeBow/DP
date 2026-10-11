@@ -9,8 +9,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 
 const FREE_MONTHLY_CREDITS = 30;
 // Gemini's free tier keeps testing at no cost; override per environment with function secrets.
-const FAST_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
-const STRONG_MODEL = Deno.env.get('GEMINI_STRONG_MODEL') ?? 'gemini-3.5-flash';
+const FAST_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
+const STRONG_MODEL = Deno.env.get('GEMINI_STRONG_MODEL') ?? 'gemini-3.8-pro';
 const ESCALATE_BELOW = 0.8;
 const MAX_IMAGE_BASE64 = 6_000_000;
 const MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
