@@ -111,7 +111,7 @@ export function buildReport(
     const local = toCurrencyCode(e.currency);
     switch (c) {
       case 'date': return { text: e.localDate };
-      case 'merchant': return { text: e.merchantName || labels.none };
+      case 'merchant': return { text: (e.merchantName || labels.none) + (e.split ? ` (1/${e.split.people})` : '') };
       case 'category': return { text: labels.category(e.category) };
       case 'payment': return { text: labels.payment(e.paymentMethod) };
       case 'currency': return { text: e.currency };

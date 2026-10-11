@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
 import { Button, Chips } from '../../components/Form';
@@ -20,6 +20,8 @@ export default function SettingsScreen() {
   const setActiveTrip = useAppStore((s) => s.setActiveTrip);
   const ruleCount = useAppStore((s) => s.companyRules.length);
   const fieldCount = useAppStore((s) => s.customFields.length);
+  const reminders = useAppStore((s) => s.reminders);
+  const setReminders = useAppStore((s) => s.setReminders);
 
   return (
     <Screen title={t('tab.settings')} subtitle={t('settings.subtitle')}>
@@ -62,6 +64,18 @@ export default function SettingsScreen() {
         </Text>
         <Button title={t('settings.fieldsOpen')} variant="secondary" onPress={() => router.push('/fields')} />
       </Card>
+      {Platform.OS !== 'web' ? (
+        <Card title={t('settings.reminders')}>
+          <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.remindersBody')}</Text>
+          <Chips
+            label={t('settings.reminders')}
+            options={['on', 'off'] as const}
+            value={reminders ? 'on' : 'off'}
+            labelOf={(v) => t(v === 'on' ? 'settings.remindersOn' : 'settings.remindersOff')}
+            onChange={(v) => setReminders(v === 'on')}
+          />
+        </Card>
+      ) : null}
       <Card title={t('settings.language')}>
         <Chips label="Language / 언어 / 言語" options={LANGUAGES} value={language} labelOf={(l) => LANGUAGE_NAMES[l]} onChange={setLanguage} />
       </Card>

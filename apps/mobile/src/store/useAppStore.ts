@@ -20,6 +20,9 @@ interface AppState {
   lastFxRates: Record<string, string>;
   language: Language;
   theme: ThemeId;
+  /** Evening and end-of-trip reminders */
+  reminders: boolean;
+  setReminders: (on: boolean) => void;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
@@ -56,6 +59,8 @@ export const useAppStore = create<AppState>()(
       lastFxRates: {},
       language: 'ko',
       theme: 'peach',
+      reminders: true,
+      setReminders: (reminders) => set({ reminders }),
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],

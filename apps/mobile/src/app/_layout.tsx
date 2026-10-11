@@ -2,12 +2,14 @@ import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, Pressable, Text } from 'react-native';
 
+import { useReminders } from '../features/reminders/useReminders';
 import { useT } from '../i18n';
 import { spacing, type, usePalette } from '../theme/tokens';
 
 export default function RootLayout() {
   const palette = usePalette();
   const t = useT();
+  useReminders();
   return (
     <>
       <StatusBar style={palette.dark ? 'light' : 'dark'} />

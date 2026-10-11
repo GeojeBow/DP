@@ -45,6 +45,8 @@ export interface Expense {
   proof?: ProofType;
   /** Own-car travel: total = km × rate in baseCurrency */
   mileage?: { km: string; rate: string; route: string };
+  /** Shared bill: `total` is my share; fullTotal is the whole bill in `currency` */
+  split?: { people: number; fullTotal: string };
   /** Signed statement standing in for a lost receipt */
   missingReceipt?: { reason: string; signer: string; signedAt: string };
   /** Company custom fields: field id → value as typed */

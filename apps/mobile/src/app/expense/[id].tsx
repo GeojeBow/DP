@@ -17,6 +17,7 @@ import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
 import { checkExpenses } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
+import { useTracker } from '../../features/mileage/useTracker';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
@@ -36,7 +37,7 @@ const RATE = /^\d+(\.\d+)?$/;
 export default function ExpenseScreen() {
   const palette = usePalette();
   const t = useT();
-  const params = useLocalSearchParams<{ id: string; receiptId?: string }>();
+  const params = useLocalSearchParams<{ id: string; receiptId?: string; merchant?: string; amount?: string; currency?: string; category?: string }>();
   const isNew = params.id === 'new';
   const existing = useAppStore((s) => s.expenses.find((e) => e.id === params.id));
   const activeTrip = useActiveTrip();
@@ -48,12 +49,14 @@ export default function ExpenseScreen() {
   const baseCurrency = existing?.baseCurrency ?? activeTrip?.baseCurrency ?? 'KRW';
   const receiptId = existing?.receiptId ?? params.receiptId ?? null;
 
-  const [merchant, setMerchant] = useState(existing?.merchantName ?? '');
-  const [amount, setAmount] = useState(existing?.total ?? '');
-  const [currency, setCurrency] = useState(existing?.currency ?? baseCurrency);
+  const [merchant, setMerchant] = useState(existing?.merchantName ?? params.merchant ?? '');
+  const [amount, setAmount] = useState(existing?.split?.fullTotal ?? existing?.total ?? params.amount ?? '');
+  const [currency, setCurrency] = useState(existing?.currency ?? params.currency ?? baseCurrency);
   const [fxRate, setFxRate] = useState(existing?.fxRate ?? '');
   const [date, setDate] = useState(existing?.localDate ?? localToday());
-  const [category, setCategory] = useState<ExpenseCategory>(existing?.category ?? 'meals');
+  const [category, setCategory] = useState<ExpenseCategory>(
+    existing?.category ?? (EXPENSE_CATEGORIES as readonly string[]).find((c) => c === params.category) as ExpenseCategory ?? 'meals',
+  );
   const [payment, setPayment] = useState<PaymentMethod>(existing?.paymentMethod ?? 'corporate_card');
   const [memo, setMemo] = useState(existing?.memo ?? '');
   const [mode, setMode] = useState<'receipt' | 'mileage'>(existing?.mileage ? 'mileage' : 'receipt');
@@ -61,6 +64,8 @@ export default function ExpenseScreen() {
     () => [...allExpenses].filter((e) => e.mileage).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.mileage,
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const [people, setPeople] = useState(String(existing?.split?.people ?? 1));
+  const tracker = useTracker();
   const [km, setKm] = useState(existing?.mileage?.km ?? '');
   const [kmRate, setKmRate] = useState(existing?.mileage?.rate ?? lastMileage?.rate ?? '');
   const [route, setRoute] = useState(existing?.mileage?.route ?? '');
@@ -135,6 +140,16 @@ export default function ExpenseScreen() {
   const amountClean = isMileage
     ? (mileageMinor !== null ? fromMinor(mileageMinor, toCurrencyCode(baseCurrency)) : '')
     : amount.replace(/,/g, '').trim();
+  const fullClean = amountClean;
+  const peopleCount = !isMileage && /^\d+$/.test(people.trim()) && Number(people) >= 1 ? Number(people) : 1;
+  // My share of a bill split between `peopleCount` people, rounded to the currency's minor unit.
+  const share = (v: string) => {
+    if (peopleCount === 1 || !AMOUNT.test(v)) return v;
+    const c = toCurrencyCode(currency);
+    const n = BigInt(peopleCount);
+    return fromMinor((toMinor(v, c) * 2n + n) / (2n * n), c);
+  };
+  const shareClean = share(fullClean);
   const vatClean = isMileage ? '' : vat.replace(/,/g, '').trim();
   const proofValue = proof ?? defaultProof(currency, payment);
   const switchMode = (next: 'receipt' | 'mileage') => {
@@ -156,6 +171,7 @@ export default function ExpenseScreen() {
     km: !isMileage || (AMOUNT.test(kmClean) && Number(kmClean) > 0) ? null : t('mileage.err.km'),
     kmRate: !isMileage || (AMOUNT.test(kmRateClean) && Number(kmRateClean) > 0) ? null : t('mileage.err.rate'),
     vat: !vatClean || (AMOUNT.test(vatClean) && Number(vatClean) < Number(amountClean)) ? null : t('expense.err.vat'),
+    people: isMileage || (/^\d+$/.test(people.trim()) && Number(people) >= 1 && Number(people) <= 50) ? null : t('split.err'),
     missing: !missingOpen || (missingReason.trim() && missingSigner.trim() && missingAgree) ? null : t('missing.err'),
     fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : t('expense.err.rate'),
   };
@@ -171,8 +187,8 @@ export default function ExpenseScreen() {
     if (errors.amount || errors.fxRate || errors.km || errors.kmRate || !amountClean) return null;
     const from = toCurrencyCode(currency);
     const to = toCurrencyCode(baseCurrency);
-    return convertMinor(toMinor(amountClean, from), from, to, needsRate ? rateClean : '1');
-  }, [amountClean, rateClean, currency, baseCurrency, needsRate, errors.amount, errors.fxRate, errors.km, errors.kmRate]);
+    return convertMinor(toMinor(shareClean, from), from, to, needsRate ? rateClean : '1');
+  }, [shareClean, amountClean, rateClean, currency, baseCurrency, needsRate, errors.amount, errors.fxRate, errors.km, errors.kmRate]);
 
   // A new entry that matches one already recorded, e.g. a receipt for a card line entered earlier.
   const duplicate = isNew && amountClean
@@ -188,7 +204,7 @@ export default function ExpenseScreen() {
     const base = toCurrencyCode(baseCurrency);
     const draft: Expense = {
       id: draftId, tripId: draftTripId, localDate: date, merchantName: merchant, category, paymentMethod: payment,
-      currency, total: amountClean, fxRate: '1', baseCurrency, totalBase: fromMinor(totalBase, base), receiptId, memo,
+      currency, total: shareClean, fxRate: '1', baseCurrency, totalBase: fromMinor(totalBase, base), receiptId, memo,
       createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: '',
     };
     const others = allExpenses.filter((e) => e.id !== draftId && e.tripId === draftTripId);
@@ -224,13 +240,14 @@ export default function ExpenseScreen() {
       category,
       paymentMethod: payment,
       currency,
-      total: fromMinor(toMinor(amountClean, local), local),
+      total: fromMinor(toMinor(shareClean, local), local),
       fxRate: needsRate ? rateClean : '1',
       baseCurrency,
       totalBase: fromMinor(totalBase, base),
       receiptId,
       memo: memo.trim() || (isMileage ? t('mileage.memo', { km: kmClean, rate: formatMoney(toMinor(kmRateClean, base), base) }) : ''),
-      ...(vatClean ? { vat: vatClean } : {}),
+      ...(vatClean ? { vat: share(vatClean) } : {}),
+      ...(peopleCount > 1 ? { split: { people: peopleCount, fullTotal: fromMinor(toMinor(fullClean, local), local) } } : {}),
       ...(isMileage ? { mileage: { km: kmClean, rate: kmRateClean, route: route.trim() } } : { proof: proofValue }),
       ...(missingOpen
         ? { missingReceipt: { reason: missingReason.trim(), signer: missingSigner.trim(), signedAt: new Date().toISOString() } }
@@ -319,6 +336,11 @@ export default function ExpenseScreen() {
           <Text style={[type.display, type.numeric, { color: palette.text }]}>
             {totalBase === null ? '—' : formatMoney(totalBase, toCurrencyCode(baseCurrency))}
           </Text>
+          {peopleCount > 1 && totalBase !== null ? (
+            <Text style={[type.caption, { color: palette.textMuted }]}>
+              {t('split.share', { people: peopleCount, full: formatMoney(toMinor(fullClean, toCurrencyCode(currency)), toCurrencyCode(currency)) })}
+            </Text>
+          ) : null}
           {needsRate && totalBase !== null ? (
             <Text style={[type.caption, { color: palette.textMuted }]}>
               {t('expense.converted', { currency, amount: amountClean, rate: rateClean, base: baseCurrency })}
@@ -337,6 +359,14 @@ export default function ExpenseScreen() {
         ) : null}
         {isMileage ? (
           <>
+            {tracker.state === 'tracking' ? (
+              <Button title={t('mileage.gpsStop', { km: tracker.km })} onPress={() => setKm(tracker.stop())} />
+            ) : (
+              <Button title={t('mileage.gpsStart')} variant="secondary" onPress={tracker.start} />
+            )}
+            <Text style={[type.caption, { color: tracker.state === 'denied' || tracker.state === 'error' ? palette.block : palette.textMuted }]}>
+              {t(tracker.state === 'denied' ? 'mileage.gpsDenied' : tracker.state === 'error' ? 'mileage.gpsError' : 'mileage.gpsHint')}
+            </Text>
             <TextField label={t('mileage.km')} value={km} onChangeText={setKm} keyboardType="decimal-pad" placeholder="0" error={show(errors.km)} />
             <TextField
               label={t('mileage.rate', { currency: baseCurrency })}
@@ -379,6 +409,14 @@ export default function ExpenseScreen() {
           <>
             <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
             <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+            <TextField
+              label={t('split.people')}
+              value={people}
+              onChangeText={setPeople}
+              keyboardType="number-pad"
+              hint={t('split.hint')}
+              error={show(errors.people)}
+            />
             <TextField
               label={t('expense.vat', { currency })}
               value={vat}
