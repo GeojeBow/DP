@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
+import type { ReportPreset } from '../domain/report';
 import { deleteReceiptImage } from './receiptImages';
 
 interface AppState {
@@ -13,6 +14,10 @@ interface AppState {
   /** Last rate used per "FROM>TO" pair, offered as the default next time */
   lastFxRates: Record<string, string>;
   language: Language;
+  /** User-made report formats; built-ins live in code */
+  reportPresets: ReportPreset[];
+  savePreset: (preset: ReportPreset) => void;
+  deletePreset: (id: string) => void;
   setLanguage: (language: Language) => void;
   addTrip: (trip: Trip) => void;
   setActiveTrip: (id: string | null) => void;
@@ -30,6 +35,14 @@ export const useAppStore = create<AppState>()(
       activeTripId: null,
       lastFxRates: {},
       language: 'ko',
+      reportPresets: [],
+      savePreset: (preset) =>
+        set((s) => ({
+          reportPresets: s.reportPresets.some((p) => p.id === preset.id)
+            ? s.reportPresets.map((p) => (p.id === preset.id ? preset : p))
+            : [...s.reportPresets, preset],
+        })),
+      deletePreset: (id) => set((s) => ({ reportPresets: s.reportPresets.filter((p) => p.id !== id) })),
       setLanguage: (language) => set({ language }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),
       setActiveTrip: (id) => set({ activeTripId: id }),

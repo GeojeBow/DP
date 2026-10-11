@@ -41,7 +41,7 @@ export function Chips<T extends string>({ label, options, value, labelOf, onChan
   const palette = usePalette();
   return (
     <View style={styles.field}>
-      <Text style={[type.label, { color: palette.textMuted }]}>{label}</Text>
+      {label ? <Text style={[type.label, { color: palette.textMuted }]}>{label}</Text> : null}
       <View style={styles.chips}>
         {options.map((option) => {
           const selected = option === value;

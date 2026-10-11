@@ -25,7 +25,8 @@
       "output": "single"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-sharing"
     ],
     "scheme": "tripexpense",
     "owner": "geojebow",
