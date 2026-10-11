@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,7 +8,13 @@ import { Button, Chips } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { formatMoney, sumMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { BUILTIN_PRESETS } from '../../domain/report';
+import { uuidv7 } from '../../domain/id';
 import { runExport } from '../../features/report/runExport';
+import { pickTemplate } from '../../features/template/pickTemplate';
+import { runTemplateExport } from '../../features/template/runTemplateExport';
+import { saveTemplateFile } from '../../features/template/storage';
+import { suggestMapping } from '../../features/template/suggestMapping';
+import { readTemplate } from '../../features/template/xlsxTemplate';
 import { useT } from '../../i18n';
 import { useAppStore } from '../../store/useAppStore';
 import { radius, spacing, type, usePalette } from '../../theme/tokens';
@@ -19,15 +26,40 @@ export default function ReportsScreen() {
   const activeTripId = useAppStore((s) => s.activeTripId);
   const allExpenses = useAppStore((s) => s.expenses);
   const custom = useAppStore((s) => s.reportPresets);
+  const templates = useAppStore((s) => s.companyTemplates);
+  const saveTemplate = useAppStore((s) => s.saveTemplate);
   const presets = [...BUILTIN_PRESETS, ...custom];
 
   const [tripId, setTripId] = useState(activeTripId ?? trips[0]?.id ?? '');
   const [presetId, setPresetId] = useState(presets[0]!.id);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const trip = trips.find((x) => x.id === tripId) ?? trips[0];
+  const companyTemplate = templates.find((x) => x.id === presetId) ?? null;
   const preset = presets.find((p) => p.id === presetId) ?? presets[0]!;
+  const exportFormat = companyTemplate ? 'xlsx' : preset.format;
+
+  const upload = async () => {
+    setError(null);
+    setUploading(true);
+    try {
+      const file = await pickTemplate();
+      if (!file) return;
+      const parsed = readTemplate(file.bytes);
+      const { mapping, by } = await suggestMapping(parsed);
+      const id = uuidv7();
+      await saveTemplateFile(id, file.bytes);
+      saveTemplate({ id, name: file.name.replace(/\.xlsx$/i, ''), fileName: file.name, mapping, values: {} });
+      setPresetId(id);
+      router.push({ pathname: '/template/[id]', params: { id, by } });
+    } catch (e) {
+      setError(t('template.uploadFailed', { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (!trip) {
     return (
@@ -48,7 +80,8 @@ export default function ReportsScreen() {
     setBusy(true);
     setError(null);
     try {
-      await runExport(trip, expenses, preset, t);
+      if (companyTemplate) await runTemplateExport(trip, expenses, companyTemplate, t);
+      else await runExport(trip, expenses, preset, t);
     } catch (e) {
       setError(t('reports.failed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
@@ -67,7 +100,7 @@ export default function ReportsScreen() {
 
       <Card title={t('reports.formats')}>
         {presets.map((p) => {
-          const selected = p.id === preset.id;
+          const selected = !companyTemplate && p.id === preset.id;
           return (
             <Pressable
               key={p.id}
@@ -100,15 +133,46 @@ export default function ReportsScreen() {
         <Button title={t('reports.newPreset')} variant="secondary" onPress={() => router.push({ pathname: '/report/[id]', params: { id: 'new' } })} />
       </Card>
 
+      <Card title={t('template.section')}>
+        <Text style={[type.caption, { color: palette.textMuted }]}>{t('template.hint')}</Text>
+        {templates.map((x) => {
+          const selected = x.id === companyTemplate?.id;
+          return (
+            <Pressable
+              key={x.id}
+              onPress={() => setPresetId(x.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              style={[styles.preset, { borderColor: selected ? palette.brand : palette.border, borderWidth: selected ? 2 : 1 }]}
+            >
+              <View style={styles.presetText}>
+                <Text style={[type.body, { color: palette.text, fontWeight: '600' }]}>
+                  {x.name}
+                  <Text style={[type.caption, { color: palette.textMuted }]}>{'  '}{t('template.badge')}</Text>
+                </Text>
+                <Text style={[type.caption, { color: palette.textMuted }]} numberOfLines={1}>
+                  {x.fileName}
+                </Text>
+              </View>
+              <Pressable onPress={() => router.push({ pathname: '/template/[id]', params: { id: x.id } })} accessibilityRole="button" hitSlop={8}>
+                <Text style={[type.label, { color: palette.brand }]}>{t('reports.edit')}</Text>
+              </Pressable>
+            </Pressable>
+          );
+        })}
+        <Button title={uploading ? t('template.reading') : t('template.upload')} variant="secondary" onPress={upload} disabled={uploading} />
+      </Card>
+
       {expenses.length === 0 ? (
         <Text style={[type.body, { color: palette.textMuted }]}>{t('reports.empty')}</Text>
       ) : null}
       <Button
-        title={busy ? t('reports.exporting') : t('reports.export', { format: t(`format.${preset.format}`) })}
+        title={busy ? t('reports.exporting') : t('reports.export', { format: t(`format.${exportFormat}`) })}
         onPress={exportNow}
         disabled={busy || expenses.length === 0}
+        icon={<Ionicons name="share-social" size={20} color={palette.onBrand} />}
       />
-      {Platform.OS === 'web' && preset.format === 'pdf' ? (
+      {Platform.OS === 'web' && exportFormat === 'pdf' ? (
         <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.webPdfHint')}</Text>
       ) : null}
       {error ? <Text style={[type.caption, { color: palette.block }]}>{error}</Text> : null}

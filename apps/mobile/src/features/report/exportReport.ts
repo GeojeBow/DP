@@ -19,11 +19,25 @@ function downloadOnWeb(bytes: Uint8Array, filename: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Saves (web) or opens the share sheet (phone) for an .xlsx file. */
+/** Phone browsers can hand a file to other apps; desktop ones download it. */
+async function shareOnWeb(bytes: Uint8Array, filename: string, mime: string) {
+  const file = new globalThis.File([bytes as BlobPart], filename, { type: mime });
+  if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return; // the user closed the share sheet
+    }
+  }
+  downloadOnWeb(bytes, filename, mime);
+}
+
+/** Opens the share sheet (phone, phone browsers) or downloads (desktop) an .xlsx file. */
 export async function shareXlsx(bytes: Uint8Array, title: string): Promise<void> {
   const filename = `${safeName(title)}.xlsx`;
   if (Platform.OS === 'web') {
-    downloadOnWeb(bytes, filename, XLSX_MIME);
+    await shareOnWeb(bytes, filename, XLSX_MIME);
     return;
   }
   const file = new File(Paths.cache, filename);

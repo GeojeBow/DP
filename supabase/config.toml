@@ -3,3 +3,6 @@ project_id = "sxkembehrqovjmovagwy"
 
 [functions.parse-receipt]
 verify_jwt = true
+
+[functions.map-template]
+verify_jwt = true
