@@ -518,6 +518,7 @@ export const en: Record<MessageKey, string> = {
   'report.noPhoto.affidavit': 'Receipt lost · statement attached at the back',
   'report.noPhoto.mileage': 'Car trip · no receipt applies',
   'report.noPhoto.failed': 'Could not load the receipt photo',
+  'report.distance': 'Trip',
   'report.generated': 'Prepared with Trip Expense · {date}',
 
   'category.airfare': 'Airfare',

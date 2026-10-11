@@ -60,6 +60,11 @@ describe('buildReport', () => {
     expect(r.attachments.map((a) => [a.tags, a.receiptId, a.missing])).toEqual([
       [['#01'], 'r1', null], [['#02'], 'r2', null], [['#03'], null, 'none'],
     ]);
+    expect(r.attachments[2]!.details).toEqual([
+      { label: 'date', value: '2026-10-02' }, { label: 'merchant', value: 'M-c' }, { label: 'category', value: 'meals' },
+      { label: 'amount', value: 'JPY 500' }, { label: 'amountBase', value: 'KRW 4,560' }, { label: 'payment', value: 'cash' },
+    ]);
+    expect(r.attachments[0]!.details).toEqual([]);
   });
 
   it('numbers lines in the order the table shows them and shares a page between lines of one receipt', () => {
