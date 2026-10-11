@@ -11,10 +11,14 @@ const FREE_MONTHLY_CREDITS = 30;
 // Gemini's free tier keeps testing at no cost; override per environment with function secrets.
 const FAST_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
 const STRONG_MODEL = Deno.env.get('GEMINI_STRONG_MODEL') ?? 'gemini-3.8-pro';
+// Tried in order when a model is busy (503), rate-limited (429), gone (404) or slow; Google's
+// "-latest" aliases always point at a current model, so the chain keeps working as models retire.
+const FALLBACK_MODELS = (Deno.env.get('GEMINI_FALLBACK_MODELS') ?? 'gemini-flash-latest,gemini-flash-lite-latest')
+  .split(',').map((m) => m.trim()).filter(Boolean);
+const PER_MODEL_TIMEOUT_MS = 30_000;
 const ESCALATE_BELOW = 0.8;
 const MAX_IMAGE_BASE64 = 6_000_000;
 // Edge Functions stop at 150 s; leave room so the app gets an answer instead of a dropped connection.
-const FIRST_READ_TIMEOUT_MS = 60_000;
 const TOTAL_BUDGET_MS = 110_000;
 // Receipts need reading, not reasoning: keep the model's thinking short so a read takes seconds, not a minute.
 const THINKING: Record<string, string> = { fast: 'minimal', strong: 'low' };
@@ -135,6 +139,25 @@ async function readWithModel(model: string, image: string, mediaType: string, th
   return parsed as Parsed;
 }
 
+/** The first model that answers, so one busy model on the free tier doesn't fail the read. */
+async function firstRead(image: string, mediaType: string, started: number): Promise<{ model: string; result: Parsed }> {
+  const chain = [...new Set([FAST_MODEL, ...FALLBACK_MODELS])];
+  let lastError: unknown = null;
+  for (const model of chain) {
+    const left = TOTAL_BUDGET_MS - (Date.now() - started);
+    if (left < 5_000) break;
+    try {
+      return { model, result: await readWithModel(model, image, mediaType, THINKING.fast, Math.min(PER_MODEL_TIMEOUT_MS, left)) };
+    } catch (e) {
+      lastError = e;
+      const retryable = (e instanceof Error && e.name === 'TimeoutError') || /Vision API (404|429|500|503)\b/.test(String(e));
+      console.error(model, String(e).slice(0, 200));
+      if (!retryable) throw e;
+    }
+  }
+  throw lastError ?? new Error('Vision API timed out');
+}
+
 function needsSecondLook(parsed: Parsed): boolean {
   if (!parsed.is_receipt) return false;
   if (parsed.transactions.length === 0) return true;
@@ -170,8 +193,7 @@ Deno.serve(async (req) => {
 
   try {
     const started = Date.now();
-    let model = FAST_MODEL;
-    let result = await readWithModel(model, image, mediaType, THINKING.fast, FIRST_READ_TIMEOUT_MS);
+    let { model, result } = await firstRead(image, mediaType, started);
     const left = TOTAL_BUDGET_MS - (Date.now() - started);
     if (needsSecondLook(result) && left > 15_000) {
       // Keep the first reading if the stronger model is unavailable (e.g. outside the free tier) or too slow.
