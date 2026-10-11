@@ -25,6 +25,7 @@ export async function runExport(
     missingReceipt: t('report.missingReceipt'),
     noReceipt: t('report.noReceipt'),
     mileage: t('report.mileageNoReceipt'),
+    detail: { reason: t('affidavit.reason'), signer: t('affidavit.signer'), distance: t('report.distance') },
     proof: (p) => t(`proof.${p}`),
     claim: {
       spent: t('claim.spent'),

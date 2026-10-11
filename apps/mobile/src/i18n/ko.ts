@@ -516,6 +516,7 @@ export const ko = {
   'report.noPhoto.affidavit': '영수증 분실 · 확인서를 뒤에 붙였어요',
   'report.noPhoto.mileage': '자차 이동 · 영수증 해당 없음',
   'report.noPhoto.failed': '영수증 사진을 불러오지 못했어요',
+  'report.distance': '이동',
   'report.generated': 'Trip Expense로 작성 · {date}',
 
   'category.airfare': '항공',

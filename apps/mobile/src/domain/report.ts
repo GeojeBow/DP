@@ -95,6 +95,8 @@ export interface ReportAttachment {
   missing: null | 'none' | 'affidavit' | 'mileage';
   /** Extra line for the page, e.g. the lost-receipt reason or the route */
   note: string;
+  /** Everything the user entered, shown in place of the photo when there is none */
+  details: Array<{ label: string; value: string }>;
 }
 
 export interface ReportLabels {
@@ -111,6 +113,8 @@ export interface ReportLabels {
   noReceipt: string;
   /** Receipt cell for a car trip, which has no receipt */
   mileage: string;
+  /** Row labels on a no-photo page, beyond the column names */
+  detail?: { reason: string; signer: string; distance: string };
   proof: (p: NonNullable<Expense['proof']>) => string;
   claim: ClaimLabels;
   none: string;
@@ -140,6 +144,23 @@ export function buildReport(
   const tags = new Map(ordered.map((e, i) => [e.id, `#${String(i + 1).padStart(width, '0')}`]));
   const tagOf = (e: Expense) => tags.get(e.id)!;
 
+  // What the user typed in for an expense with no photo, so the page still says what was spent.
+  const noPhotoDetails = (e: Expense): ReportAttachment['details'] => {
+    const d = labels.detail;
+    const rows: Array<[string, string | undefined]> = [
+      [labels.column('date'), e.localDate],
+      [labels.column('merchant'), e.merchantName],
+      [labels.column('category'), labels.category(e.category)],
+      [labels.column('amount'), money(e)],
+      [labels.column('amountBase'), e.currency === e.baseCurrency ? undefined : formatMoney(toMinor(e.totalBase, base), base)],
+      [labels.column('payment'), labels.payment(e.paymentMethod)],
+      [d?.distance ?? 'km', e.mileage ? [e.mileage.route, `${e.mileage.km} km`].filter(Boolean).join(' · ') : undefined],
+      [d?.reason ?? 'reason', e.missingReceipt?.reason],
+      [d?.signer ?? 'signer', e.missingReceipt ? `${e.missingReceipt.signer} · ${e.missingReceipt.signedAt.slice(0, 10)}` : undefined],
+      [labels.column('memo'), e.memo],
+    ];
+    return rows.filter((r): r is [string, string] => !!r[1]).map(([label, value]) => ({ label, value }));
+  };
   const attachments: ReportAttachment[] = [];
   const byReceipt = new Map<string, ReportAttachment>();
   for (const e of ordered) {
@@ -157,6 +178,7 @@ export function buildReport(
       receiptId: e.receiptId,
       missing: e.receiptId ? null : e.mileage ? 'mileage' : e.missingReceipt ? 'affidavit' : 'none',
       note: e.receiptId ? '' : e.mileage ? [e.mileage.route, `${e.mileage.km} km`].filter(Boolean).join(' · ') : e.missingReceipt?.reason ?? e.memo,
+      details: e.receiptId ? [] : noPhotoDetails(e),
     };
     if (e.receiptId) byReceipt.set(e.receiptId, page);
     attachments.push(page);

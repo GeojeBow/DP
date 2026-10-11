@@ -517,6 +517,7 @@ export const ja: Record<MessageKey, string> = {
   'report.noPhoto.affidavit': '領収書紛失 · 確認書を後ろに添付',
   'report.noPhoto.mileage': '自家用車移動 · 領収書なし',
   'report.noPhoto.failed': '領収書の写真を読み込めませんでした',
+  'report.distance': '移動',
   'report.generated': 'Trip Expense で作成 · {date}',
 
   'category.airfare': '航空券',

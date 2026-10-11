@@ -62,7 +62,9 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     return `<figure class="${src ? '' : 'empty'}">
       <div class="cap"><span class="tag big">${a.tags.map(esc).join(' ')}</span>
         <div><strong>${esc(a.date)} · ${esc(a.merchant)}</strong><small>${esc(a.category)} · ${esc(a.amount)}</small></div></div>
-      ${src ? `<img src="${src}"/>` : `<div class="noimg"><strong>${esc(why)}</strong>${a.note ? `<small>${esc(a.note)}</small>` : ''}</div>`}
+      ${src ? `<img src="${src}"/>` : `<div class="noimg"><strong>${esc(why)}</strong>${a.details.length
+        ? `<table class="details">${a.details.map((d) => `<tr><th>${esc(d.label)}</th><td>${esc(d.value)}</td></tr>`).join('')}</table>`
+        : a.note ? `<small>${esc(a.note)}</small>` : ''}</div>`}
     </figure>`;
   });
   const photos = table.attachments.filter((a) => a.receiptId).length;
@@ -131,6 +133,9 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   figure.empty .tag { background: #B42318; }
   .noimg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 40mm; margin: 8px; border: 2px dashed #e3a0a0; border-radius: 6px; color: #B42318; text-align: center; padding: 8px; }
   .noimg small { color: #5b6470; }
+  table.details { width: 100%; margin-top: 6px; text-align: left; color: #1a1d21; }
+  table.details th { width: 32%; background: none; border: none; border-bottom: 1px solid #f0d4d4; font-weight: 600; color: #5b6470; padding: 3px 6px; font-size: 8.5pt; }
+  table.details td { border-bottom: 1px solid #f0d4d4; padding: 3px 6px; font-size: 9pt; }
   footer { margin-top: 14px; color: #8a929c; font-size: 8pt; }
   table.claim { width: 60%; margin: 16px 0 0 auto; }
   table.claim td { border-bottom: 1px solid #e3e6ea; }

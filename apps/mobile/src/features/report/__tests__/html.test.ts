@@ -13,8 +13,8 @@ const table: ReportTable = {
   }],
   total: 'KRW 50,960', totalNumber: 50960,
   attachments: [
-    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', category: 'Meals', receiptId: 'r1', missing: null, note: '' },
-    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', category: 'Transport', receiptId: null, missing: 'none', note: 'no slip' },
+    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', category: 'Meals', receiptId: 'r1', missing: null, note: '', details: [] },
+    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', category: 'Transport', receiptId: null, missing: 'none', note: 'no slip', details: [{ label: 'Memo', value: 'airport taxi' }] },
   ],
   claim: [], affidavits: [],
 };
@@ -32,7 +32,7 @@ describe('reportToHtml receipt pages', () => {
     expect(html).toContain('<span class="tag off">#02</span>');
     expect(html.indexOf('<span class="tag big">#01</span>')).toBeLessThan(html.indexOf('<span class="tag big">#02</span>'));
     expect(html).toContain('NO RECEIPT');
-    expect(html).toContain('no slip');
+    expect(html).toContain('<th>Memo</th><td>airport taxi</td>');
   });
 
   it('keeps the page when the photo cannot be loaded', () => {
