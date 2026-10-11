@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
 import { CategoryIcon, useCategoryColor } from '../../components/CategoryIcon';
@@ -24,6 +24,8 @@ export default function HomeScreen() {
   const t = useT();
   const trip = useActiveTrip();
   const expenses = useAppStore((s) => s.expenses);
+  const trips = useAppStore((s) => s.trips);
+  const setActiveTrip = useAppStore((s) => s.setActiveTrip);
   const categoryColor = useCategoryColor();
   const flags = usePolicyFlags();
 
@@ -81,6 +83,38 @@ export default function HomeScreen() {
       title={trip.title}
       subtitle={`${trip.startDate} ~ ${trip.endDate} · ${t('home.dayOfTrip', { day: summary.dayOfTrip, total: summary.totalDays })}`}
     >
+      {trips.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tripRow}>
+          {[...trips].sort((a, b) => b.startDate.localeCompare(a.startDate)).map((x) => {
+            const selected = x.id === trip.id;
+            return (
+              <Pressable
+                key={x.id}
+                onPress={() => setActiveTrip(x.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={[styles.tripChip, {
+                  backgroundColor: selected ? palette.brand : `${palette.surface}E6`,
+                  borderColor: selected ? palette.brand : palette.border,
+                }]}
+              >
+                <Text style={[type.label, { color: selected ? palette.onBrand : palette.text, fontWeight: '700' }]} numberOfLines={1}>{x.title}</Text>
+                <Text style={[type.caption, { color: selected ? palette.onBrand : palette.textMuted }]}>
+                  {x.startDate.slice(5).replace('-', '/')} ~ {x.endDate.slice(5).replace('-', '/')}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => router.push('/trip/new')}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.createTrip')}
+            style={[styles.tripChip, styles.tripAdd, { borderColor: palette.border }]}
+          >
+            <Ionicons name="add" size={22} color={palette.brand} />
+          </Pressable>
+        </ScrollView>
+      ) : null}
       <View style={[styles.hero, { backgroundColor: palette.brand }]}>
         {/* Brand-to-accent glow without a gradient module: two soft circles clipped by the card. */}
         <View style={[styles.glow, { backgroundColor: palette.accent, top: -60, right: -70 }]} />
@@ -280,6 +314,9 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 }
 
 const styles = StyleSheet.create({
+  tripRow: { gap: spacing.sm, paddingVertical: 2 },
+  tripChip: { borderWidth: 1, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxWidth: 180 },
+  tripAdd: { justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   ccy: { width: 44, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' },

@@ -1,3 +1,4 @@
+import type { CompanyRule } from '../features/policy/rules';
 import type { BudgetRule } from './budget';
 import type { ExpenseCategory, PaymentMethod } from './schemas';
 
@@ -18,6 +19,9 @@ export interface Trip {
   reimbursedAt?: string;
   /** Exchange rates remembered for this trip: currency → units of baseCurrency */
   fxRates?: Record<string, string>;
+  /** 'trip' = this trip uses its own `rules` instead of the company defaults */
+  ruleMode?: 'company' | 'trip';
+  rules?: CompanyRule[];
   createdAt: string;
 }
 
