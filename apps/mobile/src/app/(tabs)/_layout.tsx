@@ -10,7 +10,12 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: palette.brand,
         tabBarInactiveTintColor: palette.textMuted,
-        tabBarStyle: { backgroundColor: palette.surface, borderTopColor: palette.border },
+        tabBarStyle: { backgroundColor: palette.surface, borderTopColor: palette.border, height: 56 },
+        // Text-only tabs until the icon set is chosen; avoids placeholder glyphs.
+        tabBarIcon: () => null,
+        tabBarIconStyle: { display: 'none' },
+        tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
+        tabBarItemStyle: { justifyContent: 'center' },
       }}
     >
       <Tabs.Screen name="index" options={{ title: '홈' }} />
