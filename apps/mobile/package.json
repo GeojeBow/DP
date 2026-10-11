@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.27",
     "expo-constants": "~57.0.21",
+    "expo-crypto": "~57.0.3",
+    "expo-image-manipulator": "~57.0.21",
+    "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.12",
     "expo-router": "~57.0.25",
     "expo-status-bar": "~57.0.1",
@@ -14,7 +18,8 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "~0.21.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -29,7 +34,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "build:preview": "expo export --platform web --output-dir dist && node scripts/build-web-preview.mjs dist dist/preview.html"
   },
   "private": true,
   "jest": {
