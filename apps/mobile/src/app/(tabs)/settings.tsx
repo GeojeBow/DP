@@ -25,6 +25,8 @@ export default function SettingsScreen() {
   const fieldCount = useAppStore((s) => s.customFields.length);
   const reminders = useAppStore((s) => s.reminders);
   const setReminders = useAppStore((s) => s.setReminders);
+  const rememberFx = useAppStore((s) => s.rememberFx);
+  const setRememberFx = useAppStore((s) => s.setRememberFx);
   // Re-read when the screen regains focus, e.g. after signing in.
   const [email, setEmail] = useState<string | null>(null);
   useFocusEffect(
@@ -62,6 +64,16 @@ export default function SettingsScreen() {
             );
           })}
         </View>
+      </Card>
+      <Card title={t('settings.rememberFx')}>
+        <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.rememberFxBody')}</Text>
+        <Chips
+          label={t('settings.rememberFx')}
+          options={['on', 'off'] as const}
+          value={rememberFx ? 'on' : 'off'}
+          labelOf={(v) => t(v === 'on' ? 'settings.rememberFxOn' : 'settings.rememberFxOff')}
+          onChange={(v) => setRememberFx(v === 'on')}
+        />
       </Card>
       <Card title={t('settings.company')}>
         <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.companyBody')}</Text>

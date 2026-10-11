@@ -21,7 +21,7 @@ import { useTracker } from '../../features/mileage/useTracker';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
-import { fxKey, useActiveTrip, useAppStore } from '../../store/useAppStore';
+import { rememberedRate, useActiveTrip, useAppStore } from '../../store/useAppStore';
 import { spacing, type, usePalette } from '../../theme/tokens';
 
 const AMOUNT = /^\d+(\.\d+)?$/;
@@ -42,12 +42,16 @@ export default function ExpenseScreen() {
   const existing = useAppStore((s) => s.expenses.find((e) => e.id === params.id));
   const activeTrip = useActiveTrip();
   const lastFxRates = useAppStore((s) => s.lastFxRates);
+  const rememberFx = useAppStore((s) => s.rememberFx);
+  const trips = useAppStore((s) => s.trips);
   const upsertExpense = useAppStore((s) => s.upsertExpense);
   const deleteExpense = useAppStore((s) => s.deleteExpense);
   const allExpenses = useAppStore((s) => s.expenses);
 
   const baseCurrency = existing?.baseCurrency ?? activeTrip?.baseCurrency ?? 'KRW';
   const receiptId = existing?.receiptId ?? params.receiptId ?? null;
+  const trip = existing ? trips.find((x) => x.id === existing.tripId) : activeTrip;
+  const rateFor = (c: string) => rememberedRate({ rememberFx, lastFxRates }, trip, c, baseCurrency);
 
   const [merchant, setMerchant] = useState(existing?.merchantName ?? params.merchant ?? '');
   const [amount, setAmount] = useState(existing?.split?.fullTotal ?? existing?.total ?? params.amount ?? '');
@@ -128,9 +132,19 @@ export default function ExpenseScreen() {
   }, [receiptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const needsRate = currency !== baseCurrency;
-  // Offer the last rate used for this currency pair when switching currency on a new entry.
+  // A rate filled from memory shows as one line instead of a question; "change" opens the field.
+  const [rateFromMemory, setRateFromMemory] = useState(false);
+  const firstCurrency = useRef(true);
+  // Fill in the rate remembered for this currency whenever the currency changes (not when an
+  // existing expense first opens with its own saved rate).
   useEffect(() => {
-    if (needsRate && fxRate === '') setFxRate(lastFxRates[fxKey(currency, baseCurrency)] ?? '');
+    if (firstCurrency.current) {
+      firstCurrency.current = false;
+      if (existing) return;
+    }
+    const remembered = needsRate ? rateFor(currency) : undefined;
+    setFxRate(remembered ?? '');
+    setRateFromMemory(!!remembered);
   }, [currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isMileage = mode === 'mileage';
@@ -268,7 +282,7 @@ export default function ExpenseScreen() {
         fallbackDate: date,
         fallbackCurrency: currency,
         baseCurrency,
-        rateFor: (c) => (c === currency ? expense.fxRate : lastFxRates[fxKey(c, baseCurrency)]),
+        rateFor: (c) => (c === currency ? expense.fxRate : rateFor(c)),
         payment,
         receiptId,
         existing: [...allExpenses, expense],
@@ -391,7 +405,19 @@ export default function ExpenseScreen() {
               error={show(errors.amount)}
             />
             <Chips label={t('expense.currency')} options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
-            {needsRate ? (
+            {needsRate && rateFromMemory && !errors.fxRate ? (
+              <View style={styles.rememberedRate}>
+                <View style={styles.flex}>
+                  <Text style={[type.label, { color: palette.text }]}>
+                    {t('expense.rateRemembered', { currency, rate: rateClean, base: baseCurrency })}
+                  </Text>
+                  <Text style={[type.caption, { color: palette.textMuted }]}>{t('expense.rateRememberedHint')}</Text>
+                </View>
+                <Pressable onPress={() => setRateFromMemory(false)} accessibilityRole="button" hitSlop={8}>
+                  <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>{t('expense.rateChange')}</Text>
+                </Pressable>
+              </View>
+            ) : needsRate ? (
               <TextField
                 label={t('expense.rate', { currency, base: baseCurrency })}
                 value={fxRate}
@@ -501,6 +527,7 @@ const styles = StyleSheet.create({
   customChoice: { gap: 4 },
   dup: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.sm },
   flex: { flex: 1 },
+  rememberedRate: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   content: { padding: spacing.lg, gap: spacing.lg },
   receipt: { width: '100%', height: 280, borderRadius: 12, borderWidth: 1 },
   check: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
