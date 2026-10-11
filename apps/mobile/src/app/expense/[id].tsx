@@ -10,8 +10,10 @@ import { uuidv7 } from '../../domain/id';
 import type { Expense } from '../../domain/models';
 import { convertMinor, formatMoney, fromMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../../domain/schemas';
+import { findDuplicate } from '../../domain/duplicates';
 import { localToday } from '../../domain/trip';
-import { readReceipt, type ReadReceiptOutcome } from '../../features/capture/readReceipt';
+import { buildExtraExpenses } from '../../features/capture/extras';
+import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
 import { fxKey, useActiveTrip, useAppStore } from '../../store/useAppStore';
@@ -37,6 +39,7 @@ export default function ExpenseScreen() {
   const lastFxRates = useAppStore((s) => s.lastFxRates);
   const upsertExpense = useAppStore((s) => s.upsertExpense);
   const deleteExpense = useAppStore((s) => s.deleteExpense);
+  const allExpenses = useAppStore((s) => s.expenses);
 
   const baseCurrency = existing?.baseCurrency ?? activeTrip?.baseCurrency ?? 'KRW';
   const receiptId = existing?.receiptId ?? params.receiptId ?? null;
@@ -53,7 +56,8 @@ export default function ExpenseScreen() {
   const [submitted, setSubmitted] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'reading' | ReadReceiptOutcome['kind']>('idle');
-  const [extraTransactions, setExtraTransactions] = useState(0);
+  const [extras, setExtras] = useState<ReceiptPrefill[]>([]);
+  const [addExtras, setAddExtras] = useState(true);
   const [aiFailure, setAiFailure] = useState('');
   // Fields the user has typed into; AI results never overwrite them.
   const edited = useRef(new Set<string>());
@@ -85,7 +89,7 @@ export default function ExpenseScreen() {
       fill('date', p.localDate, setDate);
       fill('category', p.category, setCategory);
       fill('payment', p.paymentMethod, setPayment);
-      setExtraTransactions(outcome.extraTransactions);
+      setExtras(outcome.extras);
     });
     return () => {
       alive = false;
@@ -117,6 +121,17 @@ export default function ExpenseScreen() {
     const to = toCurrencyCode(baseCurrency);
     return convertMinor(toMinor(amountClean, from), from, to, needsRate ? rateClean : '1');
   }, [amountClean, rateClean, currency, baseCurrency, needsRate, errors.amount, errors.fxRate]);
+
+  // A new entry that matches one already recorded, e.g. a receipt for a card line entered earlier.
+  const duplicate = isNew && amountClean
+    ? findDuplicate(allExpenses, { localDate: date, currency, total: amountClean, merchantName: merchant })
+    : null;
+
+  const attachToDuplicate = () => {
+    if (!duplicate || !receiptId) return;
+    upsertExpense({ ...duplicate, receiptId, updatedAt: new Date().toISOString() });
+    router.replace('/expenses');
+  };
 
   if (!isNew && !existing) {
     return (
@@ -150,6 +165,20 @@ export default function ExpenseScreen() {
       updatedAt: now,
     };
     upsertExpense(expense);
+    if (isNew && addExtras && extras.length) {
+      const rest = buildExtraExpenses(extras, {
+        tripId: expense.tripId,
+        fallbackDate: date,
+        fallbackCurrency: currency,
+        baseCurrency,
+        rateFor: (c) => (c === currency ? expense.fxRate : lastFxRates[fxKey(c, baseCurrency)]),
+        payment,
+        receiptId,
+        existing: [...allExpenses, expense],
+        now,
+      });
+      rest.expenses.forEach(upsertExpense);
+    }
     if (isNew) router.replace('/expenses');
     else router.back();
   };
@@ -175,9 +204,25 @@ export default function ExpenseScreen() {
         {aiState !== 'idle' ? (
           <Text style={[type.label, { color: aiState === 'read' || aiState === 'reading' ? palette.textMuted : palette.warn }]}>
             {t(AI_MESSAGES[aiState])}
-            {aiState === 'read' && extraTransactions > 0 ? t('ai.more', { n: extraTransactions }) : ''}
             {aiState === 'failed' && aiFailure ? ` (${aiFailure})` : ''}
           </Text>
+        ) : null}
+        {isNew && extras.length > 0 ? (
+          <Chips
+            label={t('extras.found', { n: extras.length })}
+            options={['yes', 'no'] as const}
+            value={addExtras ? 'yes' : 'no'}
+            labelOf={(v) => t(v === 'yes' ? 'extras.add' : 'extras.skip', { n: extras.length })}
+            onChange={(v) => setAddExtras(v === 'yes')}
+          />
+        ) : null}
+        {duplicate ? (
+          <View style={[styles.dup, { borderColor: palette.warn }]}>
+            <Text style={[type.label, { color: palette.warn }]}>
+              {t('dup.found', { merchant: duplicate.merchantName || t('expense.noMerchant'), date: duplicate.localDate })}
+            </Text>
+            {receiptId && !duplicate.receiptId ? <Button title={t('dup.attach')} variant="secondary" onPress={attachToDuplicate} /> : null}
+          </View>
         ) : null}
 
         <Card title={activeTrip && !existing ? t('expense.trip', { trip: activeTrip.title }) : t('expense.amount')}>
@@ -227,6 +272,7 @@ export default function ExpenseScreen() {
 }
 
 const styles = StyleSheet.create({
+  dup: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.sm },
   flex: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
   receipt: { width: '100%', height: 280, borderRadius: 12, borderWidth: 1 },
