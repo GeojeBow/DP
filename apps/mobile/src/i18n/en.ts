@@ -190,7 +190,7 @@ export const en: Record<MessageKey, string> = {
   'reports.formats': 'Report formats',
   'reports.newPreset': 'New format',
   'reports.edit': 'Edit',
-  'reports.export': 'Export as {format}',
+  'reports.export': 'Share as {format}',
   'reports.exporting': 'Preparing…',
   'reports.empty': 'This trip has no expenses yet.',
   'reports.failed': 'Could not create the report. ({error})',

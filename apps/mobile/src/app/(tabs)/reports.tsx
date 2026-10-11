@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -169,6 +170,7 @@ export default function ReportsScreen() {
         title={busy ? t('reports.exporting') : t('reports.export', { format: t(`format.${exportFormat}`) })}
         onPress={exportNow}
         disabled={busy || expenses.length === 0}
+        icon={<Ionicons name="share-social" size={20} color={palette.onBrand} />}
       />
       {Platform.OS === 'web' && exportFormat === 'pdf' ? (
         <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.webPdfHint')}</Text>

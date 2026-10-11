@@ -188,7 +188,7 @@ export const ko = {
   'reports.formats': '보고서 양식',
   'reports.newPreset': '새 양식 만들기',
   'reports.edit': '편집',
-  'reports.export': '{format}로 내보내기',
+  'reports.export': '{format}로 공유하기',
   'reports.exporting': '만드는 중…',
   'reports.empty': '이 출장에는 아직 지출이 없습니다.',
   'reports.failed': '보고서를 만들지 못했습니다. ({error})',
