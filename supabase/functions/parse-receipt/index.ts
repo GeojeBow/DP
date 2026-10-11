@@ -13,6 +13,11 @@ const FAST_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
 const STRONG_MODEL = Deno.env.get('GEMINI_STRONG_MODEL') ?? 'gemini-3.8-pro';
 const ESCALATE_BELOW = 0.8;
 const MAX_IMAGE_BASE64 = 6_000_000;
+// Edge Functions stop at 150 s; leave room so the app gets an answer instead of a dropped connection.
+const FIRST_READ_TIMEOUT_MS = 60_000;
+const TOTAL_BUDGET_MS = 110_000;
+// Receipts need reading, not reasoning: keep the model's thinking short so a read takes seconds, not a minute.
+const THINKING: Record<string, string> = { fast: 'minimal', strong: 'low' };
 const MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const CATEGORIES = ['airfare', 'lodging', 'meals', 'ground_transport', 'car_rental', 'fuel', 'parking',
@@ -94,15 +99,32 @@ interface Parsed {
   transactions: { total: string | null; confidence: Record<string, number> }[];
 }
 
-async function readWithModel(model: string, image: string, mediaType: string): Promise<Parsed> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+async function callModel(model: string, image: string, mediaType: string, thinkingLevel: string | null, timeoutMs: number) {
+  return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'x-goog-api-key': Deno.env.get('GEMINI_API_KEY') ?? '', 'content-type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mediaType, data: image } }, { text: PROMPT }] }],
-      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseJsonSchema: RECEIPT_SCHEMA,
+        temperature: 0,
+        ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
+      },
     }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+}
+
+async function readWithModel(model: string, image: string, mediaType: string, thinkingLevel: string, timeoutMs: number): Promise<Parsed> {
+  const started = Date.now();
+  let res = await callModel(model, image, mediaType, thinkingLevel, timeoutMs);
+  // A model that doesn't take this thinking setting answers 400; ask again without it.
+  if (res.status === 400) {
+    const detail = await res.text();
+    if (!/thinking/i.test(detail)) throw new Error(`Vision API 400: ${detail.slice(0, 300)}`);
+    res = await callModel(model, image, mediaType, null, Math.max(timeoutMs - (Date.now() - started), 5_000));
+  }
   if (!res.ok) throw new Error(`Vision API ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const body = await res.json();
   const text = body.candidates?.[0]?.content?.parts?.find((p: { text?: string }) => p.text)?.text;
@@ -147,18 +169,21 @@ Deno.serve(async (req) => {
   if (creditsLeft < 0) return json(429, { error: 'quota_exceeded', limit: FREE_MONTHLY_CREDITS });
 
   try {
+    const started = Date.now();
     let model = FAST_MODEL;
-    let result = await readWithModel(model, image, mediaType);
-    if (needsSecondLook(result)) {
-      // Keep the first reading if the stronger model is unavailable (e.g. outside the free tier).
-      const second = await readWithModel(STRONG_MODEL, image, mediaType).catch((e) => console.error(e));
+    let result = await readWithModel(model, image, mediaType, THINKING.fast, FIRST_READ_TIMEOUT_MS);
+    const left = TOTAL_BUDGET_MS - (Date.now() - started);
+    if (needsSecondLook(result) && left > 15_000) {
+      // Keep the first reading if the stronger model is unavailable (e.g. outside the free tier) or too slow.
+      const second = await readWithModel(STRONG_MODEL, image, mediaType, THINKING.strong, left).catch((e) => console.error(e));
       if (second) [model, result] = [STRONG_MODEL, second];
     }
-    return json(200, { result, model, creditsLeft });
+    return json(200, { result, model, creditsLeft, ms: Date.now() - started });
   } catch (e) {
     console.error(e);
     await admin.rpc('ocr_credit_refund', { p_user: user.id });
     // A short upstream reason (e.g. "Vision API 400: ...") so testers can report what went wrong.
-    return json(502, { error: 'read_failed', detail: String(e instanceof Error ? e.message : e).slice(0, 200) });
+    const detail = e instanceof Error && e.name === 'TimeoutError' ? 'Vision API timed out' : String(e instanceof Error ? e.message : e);
+    return json(502, { error: 'read_failed', detail: detail.slice(0, 200) });
   }
 });
