@@ -4,7 +4,7 @@ import { allKeys, applyRemote, changedKeys, type Collections } from '../records'
 const trip = { id: 't1', title: 'Tokyo' } as Trip;
 const expense = (id: string, receiptId: string | null = null) => ({ id, receiptId, tripId: 't1' }) as Expense;
 const state = (over: Partial<Collections> = {}): Collections => ({
-  trips: [trip], expenses: [expense('e1', 'r1')], companyRules: [], customFields: [], reportPresets: [], companyTemplates: [], ...over,
+  trips: [trip], expenses: [expense('e1', 'r1')], companyRules: [], policies: [], customFields: [], reportPresets: [], companyTemplates: [], ...over,
 });
 
 describe('sync records', () => {

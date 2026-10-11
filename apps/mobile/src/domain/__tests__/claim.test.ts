@@ -19,6 +19,14 @@ describe('per diem', () => {
     expect(perDiemTotal({ ...trip, perDiem: { amount: '30000', days: 2 } })).toBe(60000n);
     expect(perDiemTotal({ ...trip, perDiem: undefined })).toBe(0n);
   });
+
+  it('pays the travel-day share on the first and last day', () => {
+    // 3 days at 30,000: one full day plus two half days.
+    expect(perDiemTotal({ ...trip, perDiem: { amount: '30000', travelDayPercent: 50 } })).toBe(60000n);
+    expect(perDiemTotal({ ...trip, perDiem: { amount: '30000', travelDayPercent: 0 } })).toBe(30000n);
+    // Days set by hand are paid in full.
+    expect(perDiemTotal({ ...trip, perDiem: { amount: '30000', days: 2, travelDayPercent: 50 } })).toBe(60000n);
+  });
 });
 
 describe('summarizeClaim', () => {

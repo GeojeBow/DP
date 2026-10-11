@@ -4,6 +4,15 @@ import type { ExpenseCategory, PaymentMethod } from './schemas';
 
 /** Local (on-device) shapes. They map 1:1 onto the Supabase rows once sync lands in Phase 2. */
 
+/** Daily allowance (일비). Amount is a decimal string in the trip's base currency. */
+export interface PerDiem {
+  amount: string;
+  /** Overrides the number of days paid (default: the whole trip) */
+  days?: number;
+  /** Share of the allowance paid on the departure and return days, in percent (default 100) */
+  travelDayPercent?: number;
+}
+
 export interface Trip {
   id: string;
   title: string;
@@ -13,13 +22,16 @@ export interface Trip {
   baseCurrency: string;
   /** Amounts are decimal strings in baseCurrency */
   budget: BudgetRule;
-  /** Daily allowance (일비) in baseCurrency; `days` overrides the trip length */
-  perDiem?: { amount: string; days?: number };
+  /** Daily allowance (일비) in baseCurrency */
+  perDiem?: PerDiem;
   /** Set when the company has paid the traveller back */
   reimbursedAt?: string;
   /** Exchange rates remembered for this trip: currency → units of baseCurrency */
   fxRates?: Record<string, string>;
-  /** 'trip' = this trip uses its own `rules` instead of the company defaults */
+  /**
+   * 'company' = budget, allowance and rules follow the company policy (copied in when it changes);
+   * 'trip' = this trip keeps its own.
+   */
   ruleMode?: 'company' | 'trip';
   rules?: CompanyRule[];
   createdAt: string;

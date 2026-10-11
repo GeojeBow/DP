@@ -83,7 +83,7 @@ export default function SettingsScreen() {
         <Text style={[type.body, { color: palette.textMuted }]}>
           {ruleCount ? t('settings.rulesCount', { n: ruleCount }) : t('settings.rulesBody')}
         </Text>
-        <Button title={t('settings.rulesOpen')} variant="secondary" onPress={() => router.push('/rules')} />
+        <Button title={t('settings.rulesOpen')} variant="secondary" onPress={() => router.push({ pathname: '/rules', params: { scope: 'company' } })} />
       </Card>
       <Card title={t('settings.fields')}>
         <Text style={[type.body, { color: palette.textMuted }]}>
