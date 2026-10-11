@@ -13,6 +13,8 @@ const table: ReportTable = {
   total: 'KRW 29,184',
   totalNumber: 29184,
   receipts: [],
+  summary: [],
+  affidavits: [],
 };
 
 describe('reportToXlsx', () => {

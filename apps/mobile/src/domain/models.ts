@@ -12,8 +12,16 @@ export interface Trip {
   baseCurrency: string;
   /** Amounts are decimal strings in baseCurrency */
   budget: BudgetRule;
+  /** Daily allowance (일비) in baseCurrency; `days` overrides the trip length */
+  perDiem?: { amount: string; days?: number };
+  /** Set when the company has paid the traveller back */
+  reimbursedAt?: string;
   createdAt: string;
 }
+
+/** Kind of proof a receipt is, for the accounting team (적격증빙 구분). */
+export const PROOF_TYPES = ['card_slip', 'tax_invoice', 'cash_receipt', 'simple_receipt', 'foreign_receipt', 'none'] as const;
+export type ProofType = (typeof PROOF_TYPES)[number];
 
 export interface Expense {
   id: string;
@@ -32,6 +40,13 @@ export interface Expense {
   totalBase: string;
   receiptId: string | null;
   memo: string;
+  /** VAT shown on the receipt, decimal string in `currency` */
+  vat?: string;
+  proof?: ProofType;
+  /** Own-car travel: total = km × rate in baseCurrency */
+  mileage?: { km: string; rate: string; route: string };
+  /** Signed statement standing in for a lost receipt */
+  missingReceipt?: { reason: string; signer: string; signedAt: string };
   /** Company custom fields: field id → value as typed */
   custom?: Record<string, string>;
   createdAt: string;

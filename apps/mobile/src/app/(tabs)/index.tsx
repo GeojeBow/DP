@@ -9,6 +9,7 @@ import { ExpenseRow } from '../../components/ExpenseRow';
 import { Button } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { formatMoney, toCurrencyCode } from '../../domain/money';
+import { ClaimCard } from '../../features/claim/ClaimCard';
 import { dailySpend, localToday, summarizeTrip } from '../../domain/trip';
 import { useT } from '../../i18n';
 import { useActiveTrip, useAppStore } from '../../store/useAppStore';
@@ -124,6 +125,8 @@ export default function HomeScreen() {
           </View>
         ))}
       </View>
+
+      <ClaimCard trip={trip} />
 
       <Card title={t('home.dailyChart')}>
         <View style={styles.chart}>

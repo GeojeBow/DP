@@ -21,6 +21,17 @@ export async function runExport(
     category: (c) => t(`category.${c}`),
     payment: (p) => t(`payment.${p}`),
     receiptNo: (n) => `#${n}`,
+    missingReceipt: t('report.missingReceipt'),
+    proof: (p) => t(`proof.${p}`),
+    claim: {
+      spent: t('claim.spent'),
+      companyPaid: t('claim.companyPaid'),
+      personal: t('claim.personal'),
+      perDiem: (days, perDay) => t('claim.perDiem', { days, perDay }),
+      claim: t('claim.total'),
+      vatDeductible: t('claim.vatDeductible'),
+      vatForeign: t('claim.vatForeign'),
+    },
     none: '',
   }, customFields);
   const fileTitle = `${trip.title} ${trip.startDate}`;
@@ -36,6 +47,16 @@ export async function runExport(
     receipts: t('report.receipts'),
     receiptNo: (n) => t('report.receiptNo', { n }),
     generated: t('report.generated', { date: localToday() }),
+    affidavit: {
+      title: t('affidavit.title'),
+      date: t('affidavit.date'),
+      merchant: t('affidavit.merchant'),
+      amount: t('affidavit.amount'),
+      reason: t('affidavit.reason'),
+      statement: t('affidavit.statement'),
+      signer: t('affidavit.signer'),
+      signedAt: t('affidavit.signedAt'),
+    },
   });
   await sharePdf(html, fileTitle);
 }

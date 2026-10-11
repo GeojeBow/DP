@@ -39,6 +39,7 @@ interface AppState {
   setLanguage: (language: Language) => void;
   setTheme: (theme: ThemeId) => void;
   addTrip: (trip: Trip) => void;
+  updateTrip: (trip: Trip) => void;
   setActiveTrip: (id: string | null) => void;
   upsertExpense: (expense: Expense) => void;
   deleteExpense: (id: string) => Promise<void>;
@@ -88,6 +89,7 @@ export const useAppStore = create<AppState>()(
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),
+      updateTrip: (trip) => set((s) => ({ trips: s.trips.map((x) => (x.id === trip.id ? trip : x)) })),
       setActiveTrip: (id) => set({ activeTripId: id }),
       upsertExpense: (expense) =>
         set((s) => {

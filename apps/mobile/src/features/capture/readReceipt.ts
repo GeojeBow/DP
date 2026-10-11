@@ -12,6 +12,7 @@ export interface ReceiptPrefill {
   localDate?: string;
   category?: ExpenseCategory;
   paymentMethod?: PaymentMethod;
+  vat?: string;
 }
 
 export type ReadReceiptOutcome =
@@ -32,6 +33,7 @@ function prefillOf(tx: Transaction): ReceiptPrefill {
   if (tx.currency) prefill.currency = tx.currency;
   if (tx.date) prefill.localDate = tx.date;
   if (tx.category) prefill.category = tx.category;
+  if (tx.tax && !tx.tax.startsWith('-') && Number(tx.tax) > 0) prefill.vat = tx.tax;
   // A receipt can't tell a corporate card from a personal one, so keep the user's default for cards.
   if (tx.payment_method_hint && !CARD_HINTS.has(tx.payment_method_hint)) {
     prefill.paymentMethod = tx.payment_method_hint;

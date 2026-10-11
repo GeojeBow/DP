@@ -83,6 +83,14 @@ export default function SettingsScreen() {
                   {trip.startDate} ~ {trip.endDate} · {trip.baseCurrency}
                   {active ? t('settings.active') : ''}
                 </Text>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/trip/new', params: { id: trip.id } })}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  style={styles.tripEdit}
+                >
+                  <Text style={[type.label, { color: palette.brand }]}>{t('settings.editTrip')}</Text>
+                </Pressable>
               </Pressable>
             );
           })}
@@ -102,4 +110,5 @@ const styles = StyleSheet.create({
   swatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#FFFFFF' },
   swatchOverlap: { marginLeft: -8 },
   trip: { borderWidth: 1, borderRadius: 10, padding: spacing.md, gap: 2 },
+  tripEdit: { position: 'absolute', right: spacing.md, top: spacing.md },
 });
