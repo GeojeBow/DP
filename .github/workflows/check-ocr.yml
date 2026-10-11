@@ -12,10 +12,9 @@ jobs:
       URL: https://sxkembehrqovjmovagwy.supabase.co
       KEY: sb_publishable_eu98CP8qgSb6JHi3bOBZbA_XvGJWFU1
     steps:
+      - uses: actions/checkout@v4
       - run: |
-          convert -size 400x300 xc:white -fill black -pointsize 22 \
-            -annotate +20+40 'STARBUCKS TOKYO' -annotate +20+90 '2026-10-10 12:31' \
-            -annotate +20+140 'Latte        650' -annotate +20+190 'TOTAL  JPY  650' receipt.jpg
+          cp .github/sample-receipt.jpg receipt.jpg
           token=$(curl -fsS -X POST "$URL/auth/v1/signup" -H "apikey: $KEY" \
             -H 'Content-Type: application/json' -d '{}' | jq -r .access_token)
           jq -n --arg img "$(base64 -w0 receipt.jpg)" '{mediaType:"image/jpeg",image:$img}' > body.json
