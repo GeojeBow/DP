@@ -40,7 +40,11 @@ export default function FieldsScreen() {
 
   return (
     <ScrollView style={{ backgroundColor: palette.background }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Card title={t('screen.fields')}>
+      <View style={[styles.intro, { backgroundColor: palette.brandSoft }]}>
+        <Text style={[type.body, { color: palette.text, fontWeight: '700' }]}>{t('field.introTitle')}</Text>
+        <Text style={[type.caption, { color: palette.text }]}>{t('field.intro')}</Text>
+      </View>
+      <Card title={t('field.list')}>
         {fields.length === 0 ? <Text style={[type.body, { color: palette.textMuted }]}>{t('field.empty')}</Text> : null}
         {fields.map((f) => (
           <View key={f.id} style={[styles.row, { borderColor: palette.border }]}>
@@ -87,6 +91,7 @@ export default function FieldsScreen() {
 }
 
 const styles = StyleSheet.create({
+  intro: { padding: spacing.md, borderRadius: 16, gap: spacing.xs },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl * 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   flex: { flex: 1, gap: 2 },
