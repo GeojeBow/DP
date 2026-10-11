@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
 import type { ReportPreset } from '../domain/report';
+import type { CompanyRule } from '../features/policy/rules';
 import type { CompanyTemplate } from '../features/template/mapping';
 import { deleteTemplateFile } from '../features/template/storage';
 import type { ThemeId } from '../theme/tokens';
@@ -22,6 +23,10 @@ interface AppState {
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
   companyTemplates: CompanyTemplate[];
+  /** Company expense rules, checked on the device */
+  companyRules: CompanyRule[];
+  addRule: (rule: CompanyRule) => void;
+  deleteRule: (id: string) => void;
   saveTemplate: (template: CompanyTemplate) => void;
   deleteTemplate: (id: string) => Promise<void>;
   savePreset: (preset: ReportPreset) => void;
@@ -47,6 +52,9 @@ export const useAppStore = create<AppState>()(
       theme: 'peach',
       reportPresets: [],
       companyTemplates: [],
+      companyRules: [],
+      addRule: (rule) => set((s) => ({ companyRules: [...s.companyRules, rule] })),
+      deleteRule: (id) => set((s) => ({ companyRules: s.companyRules.filter((r) => r.id !== id) })),
       saveTemplate: (template) =>
         set((s) => ({
           companyTemplates: s.companyTemplates.some((x) => x.id === template.id)

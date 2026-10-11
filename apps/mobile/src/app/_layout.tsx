@@ -33,6 +33,7 @@ export default function RootLayout() {
         <Stack.Screen name="expense/[id]" options={{ title: t('screen.expense') }} />
         <Stack.Screen name="report/[id]" options={{ title: t('screen.preset') }} />
         <Stack.Screen name="template/[id]" options={{ title: t('screen.template') }} />
+        <Stack.Screen name="rules" options={{ title: t('screen.rules') }} />
       </Stack>
     </>
   );

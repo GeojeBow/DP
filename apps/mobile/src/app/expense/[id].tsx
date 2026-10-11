@@ -13,6 +13,8 @@ import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type Payment
 import { findDuplicate } from '../../domain/duplicates';
 import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
+import { checkExpenses } from '../../features/policy/rules';
+import { useFlagMessages } from '../../features/policy/usePolicy';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
@@ -127,6 +129,23 @@ export default function ExpenseScreen() {
     ? findDuplicate(allExpenses, { localDate: date, currency, total: amountClean, merchantName: merchant })
     : null;
 
+  // Company rules, checked live against the trip's other expenses as the user types.
+  const companyRules = useAppStore((s) => s.companyRules);
+  const draftId = existing?.id ?? 'draft';
+  const draftTripId = existing?.tripId ?? activeTrip?.id ?? null;
+  const draftFlags = useMemo(() => {
+    if (totalBase === null || companyRules.length === 0) return undefined;
+    const base = toCurrencyCode(baseCurrency);
+    const draft: Expense = {
+      id: draftId, tripId: draftTripId, localDate: date, merchantName: merchant, category, paymentMethod: payment,
+      currency, total: amountClean, fxRate: '1', baseCurrency, totalBase: fromMinor(totalBase, base), receiptId, memo,
+      createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: '',
+    };
+    const others = allExpenses.filter((e) => e.id !== draftId && e.tripId === draftTripId);
+    return checkExpenses([...others, draft], companyRules).get(draftId);
+  }, [totalBase, companyRules, allExpenses, date, category, receiptId, baseCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ruleMessages = useFlagMessages(draftFlags);
+
   const attachToDuplicate = () => {
     if (!duplicate || !receiptId) return;
     upsertExpense({ ...duplicate, receiptId, updatedAt: new Date().toISOString() });
@@ -222,6 +241,16 @@ export default function ExpenseScreen() {
               {t('dup.found', { merchant: duplicate.merchantName || t('expense.noMerchant'), date: duplicate.localDate })}
             </Text>
             {receiptId && !duplicate.receiptId ? <Button title={t('dup.attach')} variant="secondary" onPress={attachToDuplicate} /> : null}
+          </View>
+        ) : null}
+
+        {ruleMessages.length ? (
+          <View style={[styles.dup, { borderColor: palette.warn }]}>
+            <Text style={[type.label, { color: palette.warn, fontWeight: '700' }]}>{t('policy.broken')}</Text>
+            {ruleMessages.map((m) => (
+              <Text key={m} style={[type.body, { color: palette.text }]}>· {m}</Text>
+            ))}
+            <Text style={[type.caption, { color: palette.textMuted }]}>{t('policy.brokenHint')}</Text>
           </View>
         ) : null}
 
