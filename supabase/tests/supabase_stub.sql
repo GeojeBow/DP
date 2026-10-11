@@ -2,6 +2,7 @@
 -- so migrations can be checked on plain Postgres in CI.
 create role authenticated;
 create role anon;
+create role service_role;
 create schema auth;
 create table auth.users (id uuid primary key, email text);
 create function auth.uid() returns uuid language sql stable as $$
