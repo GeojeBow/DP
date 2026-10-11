@@ -8,9 +8,11 @@ import { CategoryIcon, useCategoryColor } from '../../components/CategoryIcon';
 import { ExpenseRow } from '../../components/ExpenseRow';
 import { Button } from '../../components/Form';
 import { Screen } from '../../components/Screen';
+import { currencyBreakdown, submissionChecks } from '../../domain/insights';
 import { formatMoney, toCurrencyCode } from '../../domain/money';
 import { ClaimCard } from '../../features/claim/ClaimCard';
 import { dailySpend, localToday, summarizeTrip } from '../../domain/trip';
+import { usePolicyFlags } from '../../features/policy/usePolicy';
 import { useT } from '../../i18n';
 import { useActiveTrip, useAppStore } from '../../store/useAppStore';
 import { radius, spacing, type, usePalette } from '../../theme/tokens';
@@ -23,6 +25,7 @@ export default function HomeScreen() {
   const trip = useActiveTrip();
   const expenses = useAppStore((s) => s.expenses);
   const categoryColor = useCategoryColor();
+  const flags = usePolicyFlags();
 
   if (!trip) {
     return (
@@ -55,6 +58,15 @@ export default function HomeScreen() {
       ? t('home.spent')
       : t(`home.available.${status.kind === 'daily_pooled' ? 'pooled' : status.kind === 'daily' ? 'daily' : 'total'}`);
   const heroAmount = status.available ?? summary.spent;
+
+  const checks = submissionChecks(own, flags);
+  const checkRows: Array<{ icon: IconName; key: keyof typeof checks; color: string }> = [
+    { icon: 'alert-circle', key: 'ruleBroken', color: palette.warn },
+    { icon: 'receipt-outline', key: 'noReceipt', color: palette.warn },
+    { icon: 'help-circle-outline', key: 'noMerchant', color: palette.textMuted },
+  ];
+  const currencies = currencyBreakdown(own, trip.baseCurrency);
+  const rate = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   const stats: Array<{ icon: IconName; label: string; value: string }> = [
     { icon: 'today-outline', label: t('home.stat.today'), value: money(spentToday) },
@@ -126,6 +138,28 @@ export default function HomeScreen() {
         ))}
       </View>
 
+      {own.length > 0 ? (
+        <Card title={t('home.checks')}>
+          {checkRows.every((c) => checks[c.key] === 0) ? (
+            <View style={styles.checkRow}>
+              <Ionicons name="checkmark-circle" size={20} color={palette.ok} />
+              <Text style={[type.body, { color: palette.text }]}>{t('home.checksOk')}</Text>
+            </View>
+          ) : (
+            checkRows
+              .filter((c) => checks[c.key] > 0)
+              .map((c) => (
+                <Pressable key={c.key} onPress={() => router.push('/expenses')} accessibilityRole="link" style={styles.checkRow}>
+                  <Ionicons name={c.icon} size={20} color={c.color} />
+                  <Text style={[type.body, styles.catName, { color: palette.text }]}>{t(`home.check.${c.key}`)}</Text>
+                  <Text style={[type.body, type.numeric, { color: c.color, fontWeight: '700' }]}>{t('home.count', { n: checks[c.key] })}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
+                </Pressable>
+              ))
+          )}
+        </Card>
+      ) : null}
+
       <ClaimCard trip={trip} />
 
       <Card title={t('home.dailyChart')}>
@@ -178,6 +212,32 @@ export default function HomeScreen() {
         </Card>
       ) : null}
 
+      {currencies.length > 0 ? (
+        <Card title={t('home.currencies')}>
+          {currencies.map((c) => {
+            const code = toCurrencyCode(c.currency);
+            return (
+              <View key={c.currency} style={styles.catRow}>
+                <View style={[styles.ccy, { backgroundColor: palette.brandSoft }]}>
+                  <Text style={[type.caption, { color: palette.brand, fontWeight: '800' }]}>{c.currency}</Text>
+                </View>
+                <View style={styles.catName}>
+                  <Text style={[type.body, type.numeric, { color: palette.text }]}>
+                    {t('home.currencyLine', { amount: formatMoney(c.local, code), n: c.count })}
+                  </Text>
+                  <Text style={[type.caption, type.numeric, { color: palette.textMuted }]}>
+                    {c.minRate === c.maxRate
+                      ? t('home.rateLine', { avg: rate(c.avgRate) })
+                      : t('home.rateRange', { avg: rate(c.avgRate), min: rate(c.minRate), max: rate(c.maxRate) })}
+                  </Text>
+                </View>
+                <Text style={[type.body, type.numeric, styles.catAmount, { color: palette.text }]}>{money(c.base)}</Text>
+              </View>
+            );
+          })}
+        </Card>
+      ) : null}
+
       <Card
         title={t('home.recent')}
         action={
@@ -220,6 +280,8 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 }
 
 const styles = StyleSheet.create({
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
+  ccy: { width: 44, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' },
   glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.75 },
   glowSmall: { width: 160, height: 160, borderRadius: 80, opacity: 0.45 },

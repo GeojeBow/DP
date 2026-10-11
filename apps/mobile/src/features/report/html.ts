@@ -11,7 +11,13 @@ export interface HtmlLabels {
   affidavit: {
     title: string; date: string; merchant: string; amount: string; reason: string; statement: string; signer: string; signedAt: string;
   };
+  /** Summary chart titles; the summary is left out when absent */
+  byCategory?: string;
+  byDay?: string;
 }
+
+// Chart colours that read well in print, one per category in order.
+const PALETTE = ['#1F3A5F', '#3E7CB1', '#81A4CD', '#F2A65A', '#E86A58', '#7FB685', '#B39CD0', '#C9CED6'];
 
 /** Print-ready HTML for the PDF report; receipt photos are data URIs. */
 export function reportToHtml(table: ReportTable, images: Record<string, string | null>, labels: HtmlLabels): string {
@@ -28,6 +34,21 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     ${s.title ? `<tr class="sub"><td colspan="${at}">${esc(labels.subtotal)}</td><td class="num">${esc(s.subtotal)}</td>${tail}</tr>` : ''}
   `).join('');
 
+  const cats = table.summary.byCategory;
+  const days = table.summary.byDay;
+  const maxDay = Math.max(...days.map((d) => d.number), 0);
+  const summary = labels.byCategory && labels.byDay && cats.length
+    ? `<section class="summary">
+    <div class="panel"><h2>${esc(labels.byCategory)}</h2>
+      <div class="stack">${cats.map((c, i) => `<span style="width:${c.share}%;background:${PALETTE[i % PALETTE.length]}"></span>`).join('')}</div>
+      <table class="legend">${cats.map((c, i) => `<tr><td><i style="background:${PALETTE[i % PALETTE.length]}"></i>${esc(c.label)}</td><td class="num">${c.share}%</td><td class="num">${esc(c.text)}</td></tr>`).join('')}</table>
+    </div>
+    <div class="panel"><h2>${esc(labels.byDay)}</h2>
+      <div class="bars">${days.map((d) => `<div class="col"><div class="bar" style="height:${maxDay ? Math.max((d.number / maxDay) * 100, 2) : 0}%"></div><small>${esc(d.date.slice(5).replace('-', '/'))}</small></div>`).join('')}</div>
+    </div>
+  </section>`
+    : '';
+
   const appendix = table.receipts.filter((r) => images[r.receiptId]);
   const receiptPages = appendix.length
     ? `<section class="receipts"><h2>${esc(labels.receipts)}</h2><div class="grid">${appendix
@@ -36,8 +57,8 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     : '';
 
   // Shown only when it says more than the grand total already does.
-  const summary = table.summary.length > 1
-    ? `<table class="summary">${table.summary
+  const claim = table.claim.length > 1
+    ? `<table class="claim">${table.claim
         .map((l) => `<tr${l.strong ? ' class="strong"' : ''}><td>${esc(l.label)}</td><td class="num">${esc(l.text)}</td></tr>`)
         .join('')}</table>`
     : '';
@@ -68,6 +89,16 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   tr.group td { font-weight: 600; background: #f6f7f9; padding-top: 8px; }
   tr.sub td { font-weight: 600; border-bottom: 1px solid #c9ced6; }
   tr.grand td { font-weight: 700; font-size: 11.5pt; border-top: 2px solid #1F3A5F; border-bottom: none; }
+  .summary { display: flex; gap: 16px; margin-bottom: 16px; break-inside: avoid; }
+  .panel { flex: 1; border: 1px solid #e3e6ea; border-radius: 6px; padding: 10px 12px; }
+  .panel h2 { margin: 0 0 8px; font-size: 11pt; }
+  .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #e3e6ea; margin-bottom: 6px; }
+  .legend td { border: none; padding: 2px 4px; font-size: 9pt; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .bar { width: 70%; background: #3E7CB1; border-radius: 3px 3px 0 0; }
+  .col small { font-size: 7pt; color: #5b6470; margin-top: 2px; }
   .receipts { page-break-before: always; }
   h2 { font-size: 13pt; color: #1F3A5F; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -75,9 +106,9 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   figure img { width: 100%; max-height: 110mm; object-fit: contain; }
   figcaption { text-align: center; font-size: 9pt; color: #5b6470; margin-top: 4px; }
   footer { margin-top: 14px; color: #8a929c; font-size: 8pt; }
-  table.summary { width: 60%; margin: 16px 0 0 auto; }
-  table.summary td { border-bottom: 1px solid #e3e6ea; }
-  table.summary tr.strong td { font-weight: 700; font-size: 12pt; color: #1F3A5F; border-top: 2px solid #1F3A5F; }
+  table.claim { width: 60%; margin: 16px 0 0 auto; }
+  table.claim td { border-bottom: 1px solid #e3e6ea; }
+  table.claim tr.strong td { font-weight: 700; font-size: 12pt; color: #1F3A5F; border-top: 2px solid #1F3A5F; }
   .affidavit { page-break-before: always; }
   .affidavit table th { width: 28%; background: #f6f7f9; border-bottom: 1px solid #e3e6ea; }
   .affidavit p { margin: 18px 0; line-height: 1.6; }
@@ -88,13 +119,14 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     <h1>${esc(table.title)}</h1>
     <div class="meta">${esc(table.period)} · ${esc(table.baseCurrency)}</div>
   </header>
+  ${summary}
   <table>
     <thead><tr>${table.headers.map((h, i) => `<th${align[i]}>${esc(h)}</th>`).join('')}</tr></thead>
     <tbody>${body}
       <tr class="grand"><td colspan="${at}">${esc(labels.total)}</td><td class="num">${esc(table.total)}</td>${tail}</tr>
     </tbody>
   </table>
-  ${summary}
+  ${claim}
   <footer>${esc(labels.generated)}</footer>
   ${receiptPages}
   ${affidavits}

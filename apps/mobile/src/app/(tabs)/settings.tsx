@@ -1,9 +1,11 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
 import { Button, Chips } from '../../components/Form';
 import { Screen } from '../../components/Screen';
+import { currentEmail } from '../../features/sync/account';
 import { LANGUAGE_NAMES, LANGUAGES, useT } from '../../i18n';
 import { useAppStore } from '../../store/useAppStore';
 import { radius, spacing, THEME_IDS, THEMES, type, usePalette } from '../../theme/tokens';
@@ -22,6 +24,13 @@ export default function SettingsScreen() {
   const fieldCount = useAppStore((s) => s.customFields.length);
   const reminders = useAppStore((s) => s.reminders);
   const setReminders = useAppStore((s) => s.setReminders);
+  // Re-read when the screen regains focus, e.g. after signing in.
+  const [email, setEmail] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      currentEmail().then(setEmail);
+    }, []),
+  );
 
   return (
     <Screen title={t('tab.settings')} subtitle={t('settings.subtitle')}>
@@ -51,6 +60,10 @@ export default function SettingsScreen() {
             );
           })}
         </View>
+      </Card>
+      <Card title={t('settings.company')}>
+        <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.companyBody')}</Text>
+        <Button title={t('settings.companyOpen')} variant="secondary" onPress={() => router.push('/company')} />
       </Card>
       <Card title={t('settings.rules')}>
         <Text style={[type.body, { color: palette.textMuted }]}>
@@ -110,8 +123,11 @@ export default function SettingsScreen() {
           })}
         <Button title={t('settings.newTrip')} variant="secondary" onPress={() => router.push('/trip/new')} />
       </Card>
-      <Card title={t('settings.data')}>
-        <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.dataBody')}</Text>
+      <Card title={t('settings.account')}>
+        <Text style={[type.body, { color: palette.textMuted }]}>
+          {email ? t('settings.accountOn', { email }) : t('settings.accountGuest')}
+        </Text>
+        <Button title={email ? t('settings.accountManage') : t('settings.accountOpen')} variant="secondary" onPress={() => router.push('/account')} />
       </Card>
     </Screen>
   );

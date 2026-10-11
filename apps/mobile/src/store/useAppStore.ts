@@ -39,6 +39,21 @@ interface AppState {
   deleteTemplate: (id: string) => Promise<void>;
   savePreset: (preset: ReportPreset) => void;
   deletePreset: (id: string) => void;
+  /** Sync keys ("expense:<id>") changed here and not yet on the server */
+  outbox: string[];
+  /** Server time of the newest row pulled */
+  lastPulledAt: string | null;
+  /** When this device last finished a sync */
+  syncedAt: string | null;
+  enqueue: (keys: readonly string[]) => void;
+  /** Drops keys that reached the server */
+  markPushed: (keys: readonly string[]) => void;
+  setSynced: (patch: { lastPulledAt?: string | null; syncedAt?: string | null }) => void;
+  /** Removes everything that belongs to an account, e.g. on sign-out */
+  clearAccountData: () => void;
+  /** The company picked on the company screen, when the account belongs to several */
+  companyId: string | null;
+  setCompany: (id: string | null) => void;
   setLanguage: (language: Language) => void;
   setTheme: (theme: ThemeId) => void;
   addTrip: (trip: Trip) => void;
@@ -91,6 +106,23 @@ export const useAppStore = create<AppState>()(
             : [...s.reportPresets, preset],
         })),
       deletePreset: (id) => set((s) => ({ reportPresets: s.reportPresets.filter((p) => p.id !== id) })),
+      outbox: [],
+      lastPulledAt: null,
+      syncedAt: null,
+      enqueue: (keys) =>
+        set((s) => {
+          const add = keys.filter((k) => !s.outbox.includes(k));
+          return add.length ? { outbox: [...s.outbox, ...add] } : {};
+        }),
+      markPushed: (keys) => set((s) => ({ outbox: s.outbox.filter((k) => !keys.includes(k)) })),
+      setSynced: (patch) => set(patch),
+      clearAccountData: () =>
+        set({
+          trips: [], expenses: [], activeTripId: null, companyRules: [], customFields: [], reportPresets: [], companyTemplates: [],
+          outbox: [], lastPulledAt: null, syncedAt: null, companyId: null,
+        }),
+      companyId: null,
+      setCompany: (companyId) => set({ companyId }),
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),

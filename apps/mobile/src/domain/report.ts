@@ -67,10 +67,15 @@ export interface ReportTable {
   sections: ReportSection[];
   total: string;
   totalNumber: number;
+  /** Totals for the summary charts, largest category first, days in order */
+  summary: {
+    byCategory: Array<{ label: string; text: string; number: number; share: number }>;
+    byDay: Array<{ date: string; text: string; number: number }>;
+  };
   /** Receipt ids in table order, numbered from 1 */
   receipts: Array<{ no: number; receiptId: string }>;
   /** Spent / company-paid / personal / allowance / claim lines under the table */
-  summary: Array<{ label: string; text: string; number: number; strong?: boolean }>;
+  claim: Array<{ label: string; text: string; number: number; strong?: boolean }>;
   /** Signed lost-receipt statements, one page each in the PDF */
   affidavits: Array<{ date: string; merchant: string; amount: string; reason: string; signer: string; signedAt: string }>;
 }
@@ -135,6 +140,22 @@ export function buildReport(
   }
   const sumBase = (list: readonly Expense[]) => sumMinor(list.map((e) => toMinor(e.totalBase, base)));
   const total = sumBase(sorted);
+  const totalsBy = (key: (e: Expense) => string) => {
+    const m = new Map<string, Expense[]>();
+    for (const e of sorted) m.set(key(e), [...(m.get(key(e)) ?? []), e]);
+    return [...m.entries()].map(([k, list]) => ({ k, sum: sumBase(list) }));
+  };
+  const summary: ReportTable['summary'] = {
+    byCategory: totalsBy((e) => labels.category(e.category))
+      .sort((a, b) => (b.sum > a.sum ? 1 : b.sum < a.sum ? -1 : 0))
+      .map(({ k, sum }) => ({
+        label: k,
+        text: formatMoney(sum, base),
+        number: Number(fromMinor(sum, base)),
+        share: total > 0n ? Math.round((Number(sum) / Number(total)) * 1000) / 10 : 0,
+      })),
+    byDay: totalsBy((e) => e.localDate).map(({ k, sum }) => ({ date: k, text: formatMoney(sum, base), number: Number(fromMinor(sum, base)) })),
+  };
 
   return {
     title: trip.title,
@@ -149,8 +170,9 @@ export function buildReport(
     })),
     total: formatMoney(total, base),
     totalNumber: Number(fromMinor(total, base)),
+    summary,
     receipts: preset.receiptAppendix ? receipts : [],
-    summary: claimLines(trip, summarizeClaim(trip, sorted), labels.claim),
+    claim: claimLines(trip, summarizeClaim(trip, sorted), labels.claim),
     affidavits: sorted.flatMap((e) =>
       e.missingReceipt
         ? [{

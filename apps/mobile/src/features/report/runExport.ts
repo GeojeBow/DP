@@ -36,7 +36,16 @@ export async function runExport(
   }, customFields);
   const fileTitle = `${trip.title} ${trip.startDate}`;
   if (preset.format === 'xlsx') {
-    await shareXlsx(reportToXlsx(table, { subtotal: t('report.subtotal'), total: t('report.total') }), fileTitle);
+    const xlsxLabels = {
+      subtotal: t('report.subtotal'),
+      total: t('report.total'),
+      summary: t('report.summary'),
+      byCategory: t('report.byCategory'),
+      byDay: t('report.byDay'),
+      share: t('report.share'),
+      amount: t('report.amount'),
+    };
+    await shareXlsx(reportToXlsx(table, xlsxLabels), fileTitle);
     return;
   }
   const images: Record<string, string | null> = {};
@@ -57,6 +66,8 @@ export async function runExport(
       signer: t('affidavit.signer'),
       signedAt: t('affidavit.signedAt'),
     },
+    byCategory: t('report.byCategory'),
+    byDay: t('report.byDay'),
   });
   await sharePdf(html, fileTitle);
 }

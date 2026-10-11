@@ -55,8 +55,8 @@ describe('summarizeClaim', () => {
       },
     };
     const r = buildReport(trip, expenses.filter((e) => e.tripId === 't'), { ...BUILTIN_PRESETS[1]!, columns: ['merchant', 'receipt', 'vat', 'proof'] }, labels);
-    expect(r.summary.map((l) => l.label)).toEqual(['spent', 'company', 'personal', 'perDiem 3 x KRW 30,000', 'claim', 'vatD', 'vatF']);
-    expect(r.summary.find((l) => l.label === 'claim')).toMatchObject({ number: 121900, strong: true });
+    expect(r.claim.map((l) => l.label)).toEqual(['spent', 'company', 'personal', 'perDiem 3 x KRW 30,000', 'claim', 'vatD', 'vatF']);
+    expect(r.claim.find((l) => l.label === 'claim')).toMatchObject({ number: 121900, strong: true });
     expect(r.affidavits).toEqual([{ date: '2026-10-01', merchant: 'd', amount: 'KRW 11,000', reason: 'lost', signer: 'Harry', signedAt: '2026-10-02T00:00:00Z' }]);
     const row = r.sections.flatMap((s) => s.rows).find((cells) => cells[0]!.text === 'd')!;
     expect(row[1]!.text).toBe('lost');
