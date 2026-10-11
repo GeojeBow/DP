@@ -1,0 +1,81 @@
+name: Android app
+
+# build:  makes an installable APK on Expo's build servers (run by hand, or
+#         when native dependencies change).
+# update: publishes the latest JS to installed apps over the air on every
+#         app change to main, so testers don't reinstall.
+on:
+  push:
+    branches: [main]
+    paths: ['apps/mobile/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build a new APK
+        type: boolean
+        default: true
+
+concurrency:
+  group: android-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Check credentials
+        id: creds
+        working-directory: .
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::EXPO_TOKEN not set; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install and link the EAS project
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          npm ci
+          eas init --non-interactive --force
+          node scripts/link-eas-project.mjs
+      - name: Decide whether a new APK is needed
+        if: steps.creds.outputs.ready == 'true'
+        id: plan
+        working-directory: .
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "build=${{ inputs.build }}" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD~1 HEAD | grep -qE '^apps/mobile/(package\.json|app\.json|eas\.json)$'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build APK
+        if: steps.creds.outputs.ready == 'true' && steps.plan.outputs.build == 'true'
+        run: |
+          eas build --platform android --profile preview --non-interactive --wait --json > build.json
+          node -e "const b=require('./build.json')[0];console.log('APK: '+b.artifacts.buildUrl);console.log('Install page: https://expo.dev/accounts/geojebow/projects/trip-expense/builds/'+b.id)"
+      - name: Publish over-the-air update
+        if: steps.creds.outputs.ready == 'true' && steps.plan.outputs.build != 'true'
+        run: eas update --channel preview --platform android --message "$(git log -1 --pretty=%s)" --non-interactive
