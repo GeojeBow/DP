@@ -1,13 +1,16 @@
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { Platform, Pressable, Text } from 'react-native';
 
+import { startSync } from '../features/sync/engine';
 import { useT } from '../i18n';
 import { spacing, type, usePalette } from '../theme/tokens';
 
 export default function RootLayout() {
   const palette = usePalette();
   const t = useT();
+  useEffect(() => startSync(), []);
   return (
     <>
       <StatusBar style={palette.dark ? 'light' : 'dark'} />
@@ -35,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="template/[id]" options={{ title: t('screen.template') }} />
         <Stack.Screen name="rules" options={{ title: t('screen.rules') }} />
         <Stack.Screen name="fields" options={{ title: t('screen.fields') }} />
+        <Stack.Screen name="account" options={{ title: t('screen.account') }} />
       </Stack>
     </>
   );
