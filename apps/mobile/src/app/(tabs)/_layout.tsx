@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router/tabs';
 
+import { useT } from '../../i18n';
 import { usePalette } from '../../theme/tokens';
 
 export default function TabsLayout() {
   const palette = usePalette();
+  const t = useT();
   return (
     <Tabs
       screenOptions={{
@@ -18,11 +20,11 @@ export default function TabsLayout() {
         tabBarItemStyle: { justifyContent: 'center' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: '홈' }} />
-      <Tabs.Screen name="expenses" options={{ title: '지출' }} />
-      <Tabs.Screen name="capture" options={{ title: '캡처' }} />
-      <Tabs.Screen name="reports" options={{ title: '리포트' }} />
-      <Tabs.Screen name="settings" options={{ title: '설정' }} />
+      <Tabs.Screen name="index" options={{ title: t('tab.home') }} />
+      <Tabs.Screen name="expenses" options={{ title: t('tab.expenses') }} />
+      <Tabs.Screen name="capture" options={{ title: t('tab.capture') }} />
+      <Tabs.Screen name="reports" options={{ title: t('tab.reports') }} />
+      <Tabs.Screen name="settings" options={{ title: t('tab.settings') }} />
     </Tabs>
   );
 }

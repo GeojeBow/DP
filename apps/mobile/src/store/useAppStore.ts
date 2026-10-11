@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { Expense, Trip } from '../domain/models';
+import type { Language } from '../i18n';
 import { deleteReceiptImage } from './receiptImages';
 
 interface AppState {
@@ -11,6 +12,8 @@ interface AppState {
   activeTripId: string | null;
   /** Last rate used per "FROM>TO" pair, offered as the default next time */
   lastFxRates: Record<string, string>;
+  language: Language;
+  setLanguage: (language: Language) => void;
   addTrip: (trip: Trip) => void;
   setActiveTrip: (id: string | null) => void;
   upsertExpense: (expense: Expense) => void;
@@ -26,6 +29,8 @@ export const useAppStore = create<AppState>()(
       expenses: [],
       activeTripId: null,
       lastFxRates: {},
+      language: 'ko',
+      setLanguage: (language) => set({ language }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),
       setActiveTrip: (id) => set({ activeTripId: id }),
       upsertExpense: (expense) =>
@@ -47,8 +52,21 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'trip-expense-store',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => AsyncStorage),
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 2) {
+          // v1 trips had `budgetTotal: string | null`.
+          const trips = (state.trips as Array<Trip & { budgetTotal?: string | null }>) ?? [];
+          state.trips = trips.map(({ budgetTotal, ...trip }) => ({
+            ...trip,
+            budget: budgetTotal ? { kind: 'total', amount: budgetTotal } : { kind: 'none' },
+          }));
+          state.language ??= 'ko';
+        }
+        return state as unknown as AppState;
+      },
     },
   ),
 );

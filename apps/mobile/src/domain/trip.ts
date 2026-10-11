@@ -1,3 +1,4 @@
+import { type BudgetStatus, budgetStatus } from './budget';
 import { type MinorUnits, sumMinor, toCurrencyCode, toMinor } from './money';
 import type { Expense, Trip } from './models';
 import type { ExpenseCategory } from './schemas';
@@ -26,7 +27,9 @@ export function isValidIsoDate(value: string): boolean {
 
 export interface TripSummary {
   spent: MinorUnits;
+  /** Whole-trip limit implied by the budget rule */
   budget: MinorUnits | null;
+  budgetStatus: BudgetStatus;
   /** 0..1+, null without a budget */
   burnRatio: number | null;
   totalDays: number;
@@ -34,7 +37,7 @@ export interface TripSummary {
   dayOfTrip: number;
   /** Days left including today; the whole trip before it starts, 0 after it ends */
   daysRemaining: number;
-  /** (budget - spent) / daysRemaining, null without a budget or with no days left */
+  /** Total budgets only: (budget - spent) / daysRemaining; null otherwise or with no days left */
   remainingPerDay: MinorUnits | null;
   byCategory: Array<{ category: ExpenseCategory; amount: MinorUnits }>;
 }
@@ -43,7 +46,8 @@ export function summarizeTrip(trip: Trip, expenses: readonly Expense[], today: s
   const base = toCurrencyCode(trip.baseCurrency);
   const own = expenses.filter((e) => e.tripId === trip.id);
   const spent = sumMinor(own.map((e) => toMinor(e.totalBase, base)));
-  const budget = trip.budgetTotal ? toMinor(trip.budgetTotal, base) : null;
+  const status = budgetStatus(trip.budget, trip, own, base, today);
+  const budget = status.tripLimit;
 
   const start = dayNumber(trip.startDate);
   const end = dayNumber(trip.endDate);
@@ -53,7 +57,7 @@ export function summarizeTrip(trip: Trip, expenses: readonly Expense[], today: s
   const daysRemaining = now < start ? totalDays : Math.max(end - now + 1, 0);
 
   const remainingPerDay =
-    budget !== null && daysRemaining > 0 ? (budget - spent) / BigInt(daysRemaining) : null;
+    trip.budget.kind === 'total' && budget !== null && daysRemaining > 0 ? (budget - spent) / BigInt(daysRemaining) : null;
 
   const totals = new Map<ExpenseCategory, MinorUnits>();
   for (const e of own) totals.set(e.category, (totals.get(e.category) ?? 0n) + toMinor(e.totalBase, base));
@@ -64,6 +68,7 @@ export function summarizeTrip(trip: Trip, expenses: readonly Expense[], today: s
   return {
     spent,
     budget,
+    budgetStatus: status,
     burnRatio: budget && budget > 0n ? Number((spent * 10_000n) / budget) / 10_000 : null,
     totalDays,
     dayOfTrip,

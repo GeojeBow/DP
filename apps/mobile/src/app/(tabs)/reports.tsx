@@ -1,11 +1,13 @@
 import { Card, PlannedNote } from '../../components/Card';
 import { Screen } from '../../components/Screen';
+import { useT } from '../../i18n';
 
 export default function ReportsScreen() {
+  const t = useT();
   return (
-    <Screen title="리포트" subtitle="Executive PDF · Modern Excel">
-      <Card title="원클릭 리포트">
-        <PlannedNote>출장을 고르면 제출 준비 상태를 점검하고 서식을 선택합니다.</PlannedNote>
+    <Screen title={t('tab.reports')} subtitle="Executive PDF · Modern Excel">
+      <Card title={t('reports.cardTitle')}>
+        <PlannedNote>{t('reports.planned')}</PlannedNote>
       </Card>
     </Screen>
   );

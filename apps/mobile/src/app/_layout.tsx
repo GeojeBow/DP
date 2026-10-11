@@ -2,10 +2,12 @@ import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, Pressable, Text } from 'react-native';
 
+import { useT } from '../i18n';
 import { spacing, type, usePalette } from '../theme/tokens';
 
 export default function RootLayout() {
   const palette = usePalette();
+  const t = useT();
   return (
     <>
       <StatusBar style="auto" />
@@ -19,7 +21,7 @@ export default function RootLayout() {
             ? {
                 headerLeft: () => (
                   <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button" style={{ paddingHorizontal: spacing.md }}>
-                    <Text style={[type.body, { color: palette.brand }]}>← 뒤로</Text>
+                    <Text style={[type.body, { color: palette.brand }]}>{t('common.back')}</Text>
                   </Pressable>
                 ),
               }
@@ -27,8 +29,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="trip/new" options={{ title: '새 출장' }} />
-        <Stack.Screen name="expense/[id]" options={{ title: '지출 확인' }} />
+        <Stack.Screen name="trip/new" options={{ title: t('screen.newTrip') }} />
+        <Stack.Screen name="expense/[id]" options={{ title: t('screen.expense') }} />
       </Stack>
     </>
   );
