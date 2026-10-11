@@ -211,6 +211,9 @@ export default function ReportsScreen() {
         disabled={busy || expenses.length === 0}
         icon={<Ionicons name="share-social" size={20} color={palette.onBrand} />}
       />
+      {exportFormat === 'xlsx' ? (
+        <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.receiptsPdfHint')}</Text>
+      ) : null}
       {Platform.OS === 'web' && exportFormat === 'pdf' ? (
         <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.webPdfHint')}</Text>
       ) : null}
