@@ -26,7 +26,7 @@ describe('toPrefill', () => {
     const out = toPrefill(parse({ is_receipt: true, document_kind: 'receipt', transactions: [tx] }));
     expect(out).toEqual({
       kind: 'read',
-      extraTransactions: 0,
+      extras: [],
       prefill: {
         merchantName: 'Ichiran Shibuya',
         total: '3200',
@@ -46,8 +46,10 @@ describe('toPrefill', () => {
     }));
     expect(out).toEqual({
       kind: 'read',
-      extraTransactions: 1,
       prefill: { currency: 'JPY', localDate: '2026-10-03', category: 'meals' },
+      extras: [
+        { merchantName: 'Ichiran Shibuya', total: '3200', currency: 'JPY', localDate: '2026-10-03', category: 'meals', paymentMethod: 'cash' },
+      ],
     });
   });
 

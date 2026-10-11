@@ -1,12 +1,13 @@
 import { useAppStore } from '../store/useAppStore';
 import { en } from './en';
+import { ja } from './ja';
 import { ko, type MessageKey } from './ko';
 
-export const LANGUAGES = ['ko', 'en'] as const;
+export const LANGUAGES = ['ko', 'en', 'ja'] as const;
 export type Language = (typeof LANGUAGES)[number];
-export const LANGUAGE_NAMES: Record<Language, string> = { ko: '한국어', en: 'English' };
+export const LANGUAGE_NAMES: Record<Language, string> = { ko: '한국어', en: 'English', ja: '日本語' };
 
-const dictionaries: Record<Language, Record<MessageKey, string>> = { ko, en };
+const dictionaries: Record<Language, Record<MessageKey, string>> = { ko, en, ja };
 
 export type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
 

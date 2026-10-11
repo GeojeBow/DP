@@ -92,6 +92,11 @@ export const ko = {
   'template.column.fxRate': '환율',
   'template.column.amountBase': '정산 금액',
   'template.column.memo': '메모',
+  'extras.found': '이 사진에 결제가 {n}건 더 있어요',
+  'extras.add': '{n}건도 함께 저장',
+  'extras.skip': '이것만 저장',
+  'dup.found': '이미 같은 지출이 있어요: {merchant} ({date}). 중복이 아닌지 확인해 주세요.',
+  'dup.attach': '기존 지출에 이 영수증만 붙이기',
   'home.addReceipt': '영수증 추가',
 
   'expenses.unassigned': '출장 미지정 지출',

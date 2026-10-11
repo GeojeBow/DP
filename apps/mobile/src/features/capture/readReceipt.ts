@@ -15,27 +15,34 @@ export interface ReceiptPrefill {
 }
 
 export type ReadReceiptOutcome =
-  | { kind: 'read'; prefill: ReceiptPrefill; extraTransactions: number }
+  /** `extras`: the other payments on the same image, e.g. a card statement's other lines */
+  | { kind: 'read'; prefill: ReceiptPrefill; extras: ReceiptPrefill[] }
   | { kind: 'not_receipt' }
   | { kind: 'quota_exceeded' }
   | { kind: 'failed'; reason?: string };
 
 const CARD_HINTS = new Set<PaymentMethod>(['corporate_card', 'personal_card']);
 
+type Transaction = ReceiptParseResult['transactions'][number];
+
+function prefillOf(tx: Transaction): ReceiptPrefill {
+  const prefill: ReceiptPrefill = {};
+  if (tx.merchant_name) prefill.merchantName = tx.merchant_name;
+  if (tx.total && !tx.total.startsWith('-')) prefill.total = tx.total;
+  if (tx.currency) prefill.currency = tx.currency;
+  if (tx.date) prefill.localDate = tx.date;
+  if (tx.category) prefill.category = tx.category;
+  // A receipt can't tell a corporate card from a personal one, so keep the user's default for cards.
+  if (tx.payment_method_hint && !CARD_HINTS.has(tx.payment_method_hint)) {
+    prefill.paymentMethod = tx.payment_method_hint;
+  }
+  return prefill;
+}
+
 export function toPrefill(result: ReceiptParseResult): ReadReceiptOutcome {
   const [first, ...rest] = result.transactions;
   if (!result.is_receipt || !first) return { kind: 'not_receipt' };
-  const prefill: ReceiptPrefill = {};
-  if (first.merchant_name) prefill.merchantName = first.merchant_name;
-  if (first.total && !first.total.startsWith('-')) prefill.total = first.total;
-  if (first.currency) prefill.currency = first.currency;
-  if (first.date) prefill.localDate = first.date;
-  if (first.category) prefill.category = first.category;
-  // A receipt can't tell a corporate card from a personal one, so keep the user's default for cards.
-  if (first.payment_method_hint && !CARD_HINTS.has(first.payment_method_hint)) {
-    prefill.paymentMethod = first.payment_method_hint;
-  }
-  return { kind: 'read', prefill, extraTransactions: rest.length };
+  return { kind: 'read', prefill: prefillOf(first), extras: rest.map(prefillOf) };
 }
 
 /** Sends a receipt image (data URI) to the parse-receipt Edge Function. */

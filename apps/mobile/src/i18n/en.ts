@@ -94,6 +94,11 @@ export const en: Record<MessageKey, string> = {
   'template.column.fxRate': 'FX rate',
   'template.column.amountBase': 'Report amount',
   'template.column.memo': 'Memo',
+  'extras.found': 'This photo has {n} more payments',
+  'extras.add': 'Save all {n} too',
+  'extras.skip': 'Save just this one',
+  'dup.found': 'This looks like an expense you already have: {merchant} ({date}). Check it isn\'t a duplicate.',
+  'dup.attach': 'Attach this receipt to that expense instead',
   'home.addReceipt': 'Add a receipt',
 
   'expenses.unassigned': 'Expenses without a trip',

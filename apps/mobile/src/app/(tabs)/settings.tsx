@@ -49,7 +49,7 @@ export default function SettingsScreen() {
         </View>
       </Card>
       <Card title={t('settings.language')}>
-        <Chips label="Language / 언어" options={LANGUAGES} value={language} labelOf={(l) => LANGUAGE_NAMES[l]} onChange={setLanguage} />
+        <Chips label="Language / 언어 / 言語" options={LANGUAGES} value={language} labelOf={(l) => LANGUAGE_NAMES[l]} onChange={setLanguage} />
       </Card>
       <Card title={t('settings.myTrips')}>
         {[...trips]
