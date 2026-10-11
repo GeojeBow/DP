@@ -72,21 +72,45 @@ export interface ReportTable {
     byCategory: Array<{ label: string; text: string; number: number; share: number }>;
     byDay: Array<{ date: string; text: string; number: number }>;
   };
-  /** Receipt ids in table order, numbered from 1 */
-  receipts: Array<{ no: number; receiptId: string }>;
+  /**
+   * One page per line of the table, in the same order and with the same tag, so the receipts
+   * at the back match the list at a glance. Lines without a photo get a page saying why.
+   */
+  attachments: ReportAttachment[];
   /** Spent / company-paid / personal / allowance / claim lines under the table */
   claim: Array<{ label: string; text: string; number: number; strong?: boolean }>;
   /** Signed lost-receipt statements, one page each in the PDF */
-  affidavits: Array<{ date: string; merchant: string; amount: string; reason: string; signer: string; signedAt: string }>;
+  affidavits: Array<{ tag: string; date: string; merchant: string; amount: string; reason: string; signer: string; signedAt: string }>;
+}
+
+export interface ReportAttachment {
+  /** Tags of the lines this page covers: one, or several when one receipt was split into lines */
+  tags: string[];
+  date: string;
+  merchant: string;
+  amount: string;
+  category: string;
+  receiptId: string | null;
+  /** Why there is no photo: added without one, a signed lost-receipt statement, or a car trip */
+  missing: null | 'none' | 'affidavit' | 'mileage';
+  /** Extra line for the page, e.g. the lost-receipt reason or the route */
+  note: string;
 }
 
 export interface ReportLabels {
   column: (c: ReportColumn) => string;
   category: (c: Expense['category']) => string;
   payment: (p: Expense['paymentMethod']) => string;
-  receiptNo: (n: number) => string;
+  /** Header of the tag column that ties each line to its receipt page */
+  tagColumn: string;
+  /** Receipt cell for a line whose photo is attached, given its tag */
+  receiptNo: (tag: string) => string;
   /** Receipt cell for an expense with a signed lost-receipt statement */
   missingReceipt: string;
+  /** Receipt cell for an expense added without a receipt */
+  noReceipt: string;
+  /** Receipt cell for a car trip, which has no receipt */
+  mileage: string;
   proof: (p: NonNullable<Expense['proof']>) => string;
   claim: ClaimLabels;
   none: string;
@@ -103,13 +127,39 @@ export function buildReport(
 ): ReportTable {
   const base = toCurrencyCode(trip.baseCurrency);
   const sorted = [...expenses].sort((a, b) => a.localDate.localeCompare(b.localDate) || a.createdAt.localeCompare(b.createdAt));
-  const receipts: ReportTable['receipts'] = [];
-  const receiptNo = new Map<string, number>();
+  const money = (e: Expense) => formatMoney(toMinor(e.total, toCurrencyCode(e.currency)), toCurrencyCode(e.currency));
+
+  const groups = new Map<string, Expense[]>();
   for (const e of sorted) {
-    if (e.receiptId && !receiptNo.has(e.id)) {
-      receiptNo.set(e.id, receipts.length + 1);
-      receipts.push({ no: receipts.length + 1, receiptId: e.receiptId });
+    const key = preset.groupBy === 'date' ? e.localDate : preset.groupBy === 'category' ? labels.category(e.category) : '';
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+  // Tags follow the order lines appear in the table, so the pages at the back read in the same order.
+  const ordered = [...groups.values()].flat();
+  const width = Math.max(2, String(ordered.length).length);
+  const tags = new Map(ordered.map((e, i) => [e.id, `#${String(i + 1).padStart(width, '0')}`]));
+  const tagOf = (e: Expense) => tags.get(e.id)!;
+
+  const attachments: ReportAttachment[] = [];
+  const byReceipt = new Map<string, ReportAttachment>();
+  for (const e of ordered) {
+    const shared = e.receiptId ? byReceipt.get(e.receiptId) : undefined;
+    if (shared) {
+      shared.tags.push(tagOf(e));
+      continue;
     }
+    const page: ReportAttachment = {
+      tags: [tagOf(e)],
+      date: e.localDate,
+      merchant: e.merchantName || labels.none,
+      amount: money(e),
+      category: labels.category(e.category),
+      receiptId: e.receiptId,
+      missing: e.receiptId ? null : e.mileage ? 'mileage' : e.missingReceipt ? 'affidavit' : 'none',
+      note: e.receiptId ? '' : e.mileage ? [e.mileage.route, `${e.mileage.km} km`].filter(Boolean).join(' · ') : e.missingReceipt?.reason ?? e.memo,
+    };
+    if (e.receiptId) byReceipt.set(e.receiptId, page);
+    attachments.push(page);
   }
 
   const cell = (e: Expense, c: ReportColumn): ReportCell => {
@@ -124,20 +174,15 @@ export function buildReport(
       case 'fxRate': return { text: e.fxRate, number: Number(e.fxRate) };
       case 'amountBase': return { text: formatMoney(toMinor(e.totalBase, base), base), number: Number(e.totalBase) };
       case 'memo': return { text: e.memo };
-      case 'receipt': {
-        const no = receiptNo.get(e.id);
-        return { text: no ? labels.receiptNo(no) : e.missingReceipt ? labels.missingReceipt : labels.none };
-      }
+      case 'receipt':
+        return {
+          text: e.receiptId ? labels.receiptNo(tagOf(e)) : e.mileage ? labels.mileage : e.missingReceipt ? labels.missingReceipt : labels.noReceipt,
+        };
       case 'vat': return e.vat ? { text: formatMoney(toMinor(e.vat, local), local), number: Number(e.vat) } : { text: labels.none };
       case 'proof': return { text: e.proof ? labels.proof(e.proof) : labels.none };
     }
   };
 
-  const groups = new Map<string, Expense[]>();
-  for (const e of sorted) {
-    const key = preset.groupBy === 'date' ? e.localDate : preset.groupBy === 'category' ? labels.category(e.category) : '';
-    groups.set(key, [...(groups.get(key) ?? []), e]);
-  }
   const sumBase = (list: readonly Expense[]) => sumMinor(list.map((e) => toMinor(e.totalBase, base)));
   const total = sumBase(sorted);
   const totalsBy = (key: (e: Expense) => string) => {
@@ -157,28 +202,32 @@ export function buildReport(
     byDay: totalsBy((e) => e.localDate).map(({ k, sum }) => ({ date: k, text: formatMoney(sum, base), number: Number(fromMinor(sum, base)) })),
   };
 
+  // A PDF with receipts at the back always says, line by line, what is attached.
+  const columns = preset.receiptAppendix && !preset.columns.includes('receipt') ? [...preset.columns, 'receipt' as const] : preset.columns;
+
   return {
     title: trip.title,
     period: `${trip.startDate} ~ ${trip.endDate}`,
     baseCurrency: trip.baseCurrency,
-    headers: [...preset.columns.map(labels.column), ...customFields.map((f) => f.name)],
-    totalColumn: preset.columns.includes('amountBase') ? preset.columns.indexOf('amountBase') : Math.max(0, preset.columns.length - 1),
+    headers: [labels.tagColumn, ...columns.map(labels.column), ...customFields.map((f) => f.name)],
+    totalColumn: 1 + (columns.includes('amountBase') ? columns.indexOf('amountBase') : Math.max(0, columns.length - 1)),
     sections: [...groups.entries()].map(([key, list]) => ({
       title: preset.groupBy === 'none' ? null : key,
-      rows: list.map((e) => [...preset.columns.map((c) => cell(e, c)), ...customFields.map((f) => customCell(f, e.custom?.[f.id]))]),
+      rows: list.map((e) => [{ text: tagOf(e) }, ...columns.map((c) => cell(e, c)), ...customFields.map((f) => customCell(f, e.custom?.[f.id]))]),
       subtotal: formatMoney(sumBase(list), base),
     })),
     total: formatMoney(total, base),
     totalNumber: Number(fromMinor(total, base)),
     summary,
-    receipts: preset.receiptAppendix ? receipts : [],
+    attachments: preset.receiptAppendix ? attachments : [],
     claim: claimLines(trip, summarizeClaim(trip, sorted), labels.claim),
-    affidavits: sorted.flatMap((e) =>
-      e.missingReceipt
+    affidavits: ordered.flatMap((e) =>
+      e.missingReceipt && !e.receiptId
         ? [{
+            tag: tagOf(e),
             date: e.localDate,
             merchant: e.merchantName || labels.none,
-            amount: formatMoney(toMinor(e.total, toCurrencyCode(e.currency)), toCurrencyCode(e.currency)),
+            amount: money(e),
             ...e.missingReceipt,
           }]
         : []),

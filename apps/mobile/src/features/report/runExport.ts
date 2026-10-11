@@ -20,8 +20,11 @@ export async function runExport(
     column: (c) => t(`column.${c}`),
     category: (c) => t(`category.${c}`),
     payment: (p) => t(`payment.${p}`),
-    receiptNo: (n) => `#${n}`,
+    tagColumn: t('report.tagColumn'),
+    receiptNo: (tag) => t('report.attached', { tag }),
     missingReceipt: t('report.missingReceipt'),
+    noReceipt: t('report.noReceipt'),
+    mileage: t('report.mileageNoReceipt'),
     proof: (p) => t(`proof.${p}`),
     claim: {
       spent: t('claim.spent'),
@@ -49,12 +52,18 @@ export async function runExport(
     return;
   }
   const images: Record<string, string | null> = {};
-  for (const r of table.receipts) images[r.receiptId] = await loadReceiptImage(r.receiptId);
+  for (const a of table.attachments) if (a.receiptId) images[a.receiptId] = await loadReceiptImage(a.receiptId);
   const html = reportToHtml(table, images, {
     subtotal: t('report.subtotal'),
     total: t('report.total'),
     receipts: t('report.receipts'),
-    receiptNo: (n) => t('report.receiptNo', { n }),
+    receiptsHint: (photos, missing) => t('report.receiptsHint', { photos, missing }),
+    noPhoto: {
+      none: t('report.noPhoto.none'),
+      affidavit: t('report.noPhoto.affidavit'),
+      mileage: t('report.noPhoto.mileage'),
+      failed: t('report.noPhoto.failed'),
+    },
     generated: t('report.generated', { date: localToday() }),
     affidavit: {
       title: t('affidavit.title'),
