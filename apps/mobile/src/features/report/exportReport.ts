@@ -47,6 +47,22 @@ export async function shareXlsx(bytes: Uint8Array, title: string): Promise<void>
   await Sharing.shareAsync(file.uri, { mimeType: XLSX_MIME, UTI: 'org.openxmlformats.spreadsheetml.sheet', dialogTitle: filename });
 }
 
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Opens the share sheet (phone, phone browsers) or downloads (desktop) a .docx file. */
+export async function shareDocx(bytes: Uint8Array, title: string): Promise<void> {
+  const filename = `${safeName(title)}.docx`;
+  if (Platform.OS === 'web') {
+    await shareOnWeb(bytes, filename, DOCX_MIME);
+    return;
+  }
+  const file = new File(Paths.cache, filename);
+  if (file.exists) file.delete();
+  file.create();
+  file.write(bytes);
+  await Sharing.shareAsync(file.uri, { mimeType: DOCX_MIME, UTI: 'org.openxmlformats.wordprocessingml.document', dialogTitle: filename });
+}
+
 /** Renders HTML to PDF and shares it (phone), or opens the print dialog to save as PDF (web). */
 export async function sharePdf(html: string, title: string): Promise<void> {
   if (Platform.OS === 'web') {

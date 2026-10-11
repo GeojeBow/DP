@@ -13,7 +13,7 @@ export type ReportColumn = (typeof REPORT_COLUMNS)[number];
 export const REPORT_GROUPINGS = ['date', 'category', 'none'] as const;
 export type ReportGrouping = (typeof REPORT_GROUPINGS)[number];
 
-export const REPORT_FORMATS = ['xlsx', 'pdf'] as const;
+export const REPORT_FORMATS = ['pdf', 'xlsx', 'docx'] as const;
 export type ReportFormat = (typeof REPORT_FORMATS)[number];
 
 export interface ReportPreset {
@@ -22,7 +22,7 @@ export interface ReportPreset {
   format: ReportFormat;
   columns: ReportColumn[];
   groupBy: ReportGrouping;
-  /** PDF only: append receipt photos after the table */
+  /** PDF and Word: append receipt photos after the table */
   receiptAppendix: boolean;
   builtin?: boolean;
 }

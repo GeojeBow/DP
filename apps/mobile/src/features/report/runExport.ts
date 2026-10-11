@@ -1,11 +1,12 @@
 import type { CustomField } from '../../domain/customFields';
-import { buildReport, type ReportPreset } from '../../domain/report';
+import { buildReport, type ReportFormat, type ReportPreset } from '../../domain/report';
 import type { Expense, Trip } from '../../domain/models';
 import { localToday } from '../../domain/trip';
 import type { Translate } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
-import { sharePdf, shareXlsx } from './exportReport';
-import { reportToHtml } from './html';
+import { reportToDocx } from './docx';
+import { shareDocx, sharePdf, shareXlsx } from './exportReport';
+import { type HtmlLabels, reportToHtml } from './html';
 import { reportToXlsx } from './xlsx';
 
 /** Builds the report for a trip in the preset's format and hands it to the OS. */
@@ -15,8 +16,12 @@ export async function runExport(
   preset: ReportPreset,
   t: Translate,
   customFields: readonly CustomField[] = [],
+  /** File type to write; defaults to the preset's own */
+  format: ReportFormat = preset.format,
 ): Promise<void> {
-  const table = buildReport(trip, expenses, preset, {
+  // A spreadsheet preset turned into a PDF or Word file still gets its receipts at the back.
+  const receiptAppendix = format !== 'xlsx' && (preset.format === 'xlsx' || preset.receiptAppendix);
+  const table = buildReport(trip, expenses, { ...preset, receiptAppendix }, {
     column: (c) => t(`column.${c}`),
     category: (c) => t(`category.${c}`),
     payment: (p) => t(`payment.${p}`),
@@ -39,7 +44,7 @@ export async function runExport(
     none: '',
   }, customFields);
   const fileTitle = `${trip.title} ${trip.startDate}`;
-  if (preset.format === 'xlsx') {
+  if (format === 'xlsx') {
     const xlsxLabels = {
       subtotal: t('report.subtotal'),
       total: t('report.total'),
@@ -54,7 +59,7 @@ export async function runExport(
   }
   const images: Record<string, string | null> = {};
   for (const a of table.attachments) if (a.receiptId) images[a.receiptId] = await loadReceiptImage(a.receiptId);
-  const html = reportToHtml(table, images, {
+  const docLabels: HtmlLabels = {
     subtotal: t('report.subtotal'),
     total: t('report.total'),
     receipts: t('report.receipts'),
@@ -78,6 +83,10 @@ export async function runExport(
     },
     byCategory: t('report.byCategory'),
     byDay: t('report.byDay'),
-  });
-  await sharePdf(html, fileTitle);
+  };
+  if (format === 'docx') {
+    await shareDocx(reportToDocx(table, images, docLabels), fileTitle);
+    return;
+  }
+  await sharePdf(reportToHtml(table, images, docLabels), fileTitle);
 }

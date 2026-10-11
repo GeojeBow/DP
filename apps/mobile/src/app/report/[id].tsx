@@ -58,7 +58,7 @@ export default function PresetScreen() {
       format,
       groupBy,
       columns,
-      receiptAppendix: format === 'pdf' && appendix,
+      receiptAppendix: format !== 'xlsx' && appendix,
     });
     router.back();
   };
@@ -103,7 +103,7 @@ export default function PresetScreen() {
         {submitted && errors.columns ? <Text style={[type.caption, { color: palette.block }]}>{errors.columns}</Text> : null}
       </View>
 
-      {format === 'pdf' ? (
+      {format !== 'xlsx' ? (
         <Chips
           label={t('preset.appendix')}
           options={['yes', 'no'] as const}

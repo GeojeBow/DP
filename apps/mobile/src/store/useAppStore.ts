@@ -10,6 +10,7 @@ import type { CompanyRule } from '../features/policy/rules';
 import type { CompanyTemplate } from '../features/template/mapping';
 import { deleteTemplateFile } from '../features/template/storage';
 import type { ThemeId } from '../theme/tokens';
+import type { ReportFormat } from '../domain/report';
 import { deleteReceiptImage } from './receiptImages';
 
 interface AppState {
@@ -29,6 +30,9 @@ interface AppState {
   /** Report format or company template picked last, preselected next time */
   lastFormatId: string | null;
   setLastFormatId: (id: string) => void;
+  /** File type picked on the reports tab (PDF, Excel, Word); null = the format's own */
+  fileFormat: ReportFormat | null;
+  setFileFormat: (format: ReportFormat) => void;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
@@ -86,6 +90,8 @@ export const useAppStore = create<AppState>()(
       setRememberFx: (rememberFx) => set({ rememberFx }),
       lastFormatId: null,
       setLastFormatId: (lastFormatId) => set({ lastFormatId }),
+      fileFormat: null,
+      setFileFormat: (fileFormat) => set({ fileFormat }),
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
