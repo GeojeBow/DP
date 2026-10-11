@@ -1,3 +1,4 @@
+import { type CustomField, customCell } from '../../domain/customFields';
 import { formatMoney, fromMinor, sumMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import type { Expense, Trip } from '../../domain/models';
 import { type CellValue, columnIndex, columnLetters, type FillPlan, type ParsedTemplate, splitRef } from './xlsxTemplate';
@@ -16,7 +17,12 @@ export interface TemplateMapping {
   /** Field → cell address, e.g. traveler → "B3" */
   fields: Partial<Record<TemplateField, string>>;
   /** First empty item row and column letter per value; null when the template has no item table */
-  table: { firstRow: number; columns: Partial<Record<TemplateColumn, string>> } | null;
+  table: {
+    firstRow: number;
+    columns: Partial<Record<TemplateColumn, string>>;
+    /** Custom field id → column letter */
+    custom?: Record<string, string>;
+  } | null;
 }
 
 /** A saved company template: the original file plus where things go. */
@@ -154,6 +160,7 @@ export function planFill(
   expenses: readonly Expense[],
   template: Pick<CompanyTemplate, 'mapping' | 'values'>,
   labels: FillLabels,
+  customFields: readonly CustomField[] = [],
 ): FillPlan {
   const base = toCurrencyCode(trip.baseCurrency);
   const own = expenses
@@ -194,6 +201,12 @@ export function planFill(
         };
         const row: Record<string, CellValue> = {};
         for (const [key, col] of Object.entries(table.columns) as Array<[TemplateColumn, string]>) row[col.toUpperCase()] = values[key];
+        for (const f of customFields) {
+          const col = table.custom?.[f.id];
+          if (!col) continue;
+          const c = customCell(f, e.custom?.[f.id]);
+          row[col.toUpperCase()] = c.number ?? c.text;
+        }
         return row;
       })
     : [];

@@ -25,6 +25,7 @@ export default function ReportsScreen() {
   const trips = useAppStore((s) => s.trips);
   const activeTripId = useAppStore((s) => s.activeTripId);
   const allExpenses = useAppStore((s) => s.expenses);
+  const customFields = useAppStore((s) => s.customFields);
   const custom = useAppStore((s) => s.reportPresets);
   const templates = useAppStore((s) => s.companyTemplates);
   const saveTemplate = useAppStore((s) => s.saveTemplate);
@@ -80,8 +81,8 @@ export default function ReportsScreen() {
     setBusy(true);
     setError(null);
     try {
-      if (companyTemplate) await runTemplateExport(trip, expenses, companyTemplate, t);
-      else await runExport(trip, expenses, preset, t);
+      if (companyTemplate) await runTemplateExport(trip, expenses, companyTemplate, t, customFields);
+      else await runExport(trip, expenses, preset, t, customFields);
     } catch (e) {
       setError(t('reports.failed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {

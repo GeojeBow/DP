@@ -1,3 +1,4 @@
+import type { CustomField } from '../../domain/customFields';
 import { buildReport, type ReportPreset } from '../../domain/report';
 import type { Expense, Trip } from '../../domain/models';
 import { localToday } from '../../domain/trip';
@@ -8,14 +9,20 @@ import { reportToHtml } from './html';
 import { reportToXlsx } from './xlsx';
 
 /** Builds the report for a trip in the preset's format and hands it to the OS. */
-export async function runExport(trip: Trip, expenses: readonly Expense[], preset: ReportPreset, t: Translate): Promise<void> {
+export async function runExport(
+  trip: Trip,
+  expenses: readonly Expense[],
+  preset: ReportPreset,
+  t: Translate,
+  customFields: readonly CustomField[] = [],
+): Promise<void> {
   const table = buildReport(trip, expenses, preset, {
     column: (c) => t(`column.${c}`),
     category: (c) => t(`category.${c}`),
     payment: (p) => t(`payment.${p}`),
     receiptNo: (n) => `#${n}`,
     none: '',
-  });
+  }, customFields);
   const fileTitle = `${trip.title} ${trip.startDate}`;
   if (preset.format === 'xlsx') {
     await shareXlsx(reportToXlsx(table, { subtotal: t('report.subtotal'), total: t('report.total') }), fileTitle);

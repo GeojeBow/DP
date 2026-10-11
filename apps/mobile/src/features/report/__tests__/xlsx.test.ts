@@ -8,6 +8,7 @@ const table: ReportTable = {
   period: '2026-10-01 ~ 2026-10-03',
   baseCurrency: 'KRW',
   headers: ['Date', 'Merchant', 'KRW'],
+  totalColumn: 2,
   sections: [{ title: '2026-10-01', rows: [[{ text: '2026-10-01' }, { text: 'Ichiran' }, { text: 'KRW 29,184', number: 29184 }]], subtotal: 'KRW 29,184' }],
   total: 'KRW 29,184',
   totalNumber: 29184,

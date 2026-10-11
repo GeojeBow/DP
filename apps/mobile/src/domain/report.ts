@@ -1,3 +1,4 @@
+import { type CustomField, customCell } from './customFields';
 import { formatMoney, fromMinor, sumMinor, toCurrencyCode, toMinor } from './money';
 import type { Expense, Trip } from './models';
 
@@ -59,6 +60,8 @@ export interface ReportTable {
   period: string;
   baseCurrency: string;
   headers: string[];
+  /** Column the subtotals and total sit under: the base amount if shown, else the last preset column */
+  totalColumn: number;
   sections: ReportSection[];
   total: string;
   totalNumber: number;
@@ -75,7 +78,14 @@ export interface ReportLabels {
 }
 
 /** Turns a trip's expenses into the table every exporter renders. */
-export function buildReport(trip: Trip, expenses: readonly Expense[], preset: ReportPreset, labels: ReportLabels): ReportTable {
+export function buildReport(
+  trip: Trip,
+  expenses: readonly Expense[],
+  preset: ReportPreset,
+  labels: ReportLabels,
+  /** Company custom fields, added as columns after the preset's own */
+  customFields: readonly CustomField[] = [],
+): ReportTable {
   const base = toCurrencyCode(trip.baseCurrency);
   const sorted = [...expenses].sort((a, b) => a.localDate.localeCompare(b.localDate) || a.createdAt.localeCompare(b.createdAt));
   const receipts: ReportTable['receipts'] = [];
@@ -118,10 +128,11 @@ export function buildReport(trip: Trip, expenses: readonly Expense[], preset: Re
     title: trip.title,
     period: `${trip.startDate} ~ ${trip.endDate}`,
     baseCurrency: trip.baseCurrency,
-    headers: preset.columns.map(labels.column),
+    headers: [...preset.columns.map(labels.column), ...customFields.map((f) => f.name)],
+    totalColumn: preset.columns.includes('amountBase') ? preset.columns.indexOf('amountBase') : Math.max(0, preset.columns.length - 1),
     sections: [...groups.entries()].map(([key, list]) => ({
       title: preset.groupBy === 'none' ? null : key,
-      rows: list.map((e) => preset.columns.map((c) => cell(e, c))),
+      rows: list.map((e) => [...preset.columns.map((c) => cell(e, c)), ...customFields.map((f) => customCell(f, e.custom?.[f.id]))]),
       subtotal: formatMoney(sumBase(list), base),
     })),
     total: formatMoney(total, base),
