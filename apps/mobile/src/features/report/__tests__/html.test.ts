@@ -35,6 +35,12 @@ describe('reportToHtml receipt pages', () => {
     expect(html).toContain('<th>Memo</th><td>airport taxi</td>');
   });
 
+  it('can make a receipts-only file to go with a spreadsheet', () => {
+    const html = reportToHtml(table, { r1: 'data:image/png;base64,AA' }, labels, { receiptsOnly: true });
+    expect(html).toContain('<img src="data:image/png;base64,AA"/>');
+    expect(html).not.toContain('<thead>');
+  });
+
   it('keeps the page when the photo cannot be loaded', () => {
     expect(reportToHtml(table, { r1: null }, labels)).toContain('FAILED');
   });

@@ -23,7 +23,13 @@ export interface HtmlLabels {
 const PALETTE = ['#1F3A5F', '#3E7CB1', '#81A4CD', '#F2A65A', '#E86A58', '#7FB685', '#B39CD0', '#C9CED6'];
 
 /** Print-ready HTML for the PDF report; receipt photos are data URIs. */
-export function reportToHtml(table: ReportTable, images: Record<string, string | null>, labels: HtmlLabels): string {
+export function reportToHtml(
+  table: ReportTable,
+  images: Record<string, string | null>,
+  labels: HtmlLabels,
+  /** receiptsOnly: just the numbered receipt pages and statements, to go with a spreadsheet */
+  options: { receiptsOnly?: boolean } = {},
+): string {
   const numeric = (i: number) => table.sections.some((s) => s.rows.some((r) => r[i]?.number !== undefined));
   const align = table.headers.map((_, i) => (numeric(i) ? ' class="num"' : ''));
   const span = table.headers.length;
@@ -118,6 +124,7 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   .bar { width: 70%; background: #3E7CB1; border-radius: 3px 3px 0 0; }
   .col small { font-size: 7pt; color: #5b6470; margin-top: 2px; }
   .receipts { page-break-before: always; }
+  .receipts.first { page-break-before: auto; }
   h2 { font-size: 13pt; color: #1F3A5F; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .hint { color: #5b6470; margin: -6px 0 10px; }
@@ -150,7 +157,7 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     <h1>${esc(table.title)}</h1>
     <div class="meta">${esc(table.period)} · ${esc(table.baseCurrency)}</div>
   </header>
-  ${summary}
+  ${options.receiptsOnly ? '' : `${summary}
   <table>
     <thead><tr>${table.headers.map((h, i) => `<th${align[i]}>${esc(h)}</th>`).join('')}</tr></thead>
     <tbody>${body}
@@ -158,8 +165,8 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
     </tbody>
   </table>
   ${claim}
-  <footer>${esc(labels.generated)}</footer>
-  ${receiptPages}
+  <footer>${esc(labels.generated)}</footer>`}
+  ${options.receiptsOnly ? receiptPages.replace('<section class="receipts">', '<section class="receipts first">') : receiptPages}
   ${affidavits}
   </body></html>`;
 }
