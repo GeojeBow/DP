@@ -5,23 +5,24 @@ import { Card } from '../../components/Card';
 import { ExpenseRow } from '../../components/ExpenseRow';
 import { Button, ProgressBar } from '../../components/Form';
 import { Screen } from '../../components/Screen';
-import { CATEGORY_LABELS } from '../../domain/models';
 import { formatMoney, toCurrencyCode } from '../../domain/money';
 import { localToday, summarizeTrip } from '../../domain/trip';
+import { useT } from '../../i18n';
 import { useActiveTrip, useAppStore } from '../../store/useAppStore';
 import { spacing, type, usePalette } from '../../theme/tokens';
 
 export default function HomeScreen() {
   const palette = usePalette();
+  const t = useT();
   const trip = useActiveTrip();
   const expenses = useAppStore((s) => s.expenses);
 
   if (!trip) {
     return (
-      <Screen title="홈" subtitle="출장을 만들면 예산과 지출을 한눈에 볼 수 있어요.">
-        <Card title="시작하기">
-          <Button title="출장 만들기" onPress={() => router.push('/trip/new')} />
-          <Button title="출장 없이 영수증 찍기" variant="secondary" onPress={() => router.push('/capture')} />
+      <Screen title={t('tab.home')} subtitle={t('home.empty.subtitle')}>
+        <Card title={t('home.start')}>
+          <Button title={t('home.createTrip')} onPress={() => router.push('/trip/new')} />
+          <Button title={t('home.captureWithoutTrip')} variant="secondary" onPress={() => router.push('/capture')} />
         </Card>
       </Screen>
     );
@@ -29,56 +30,72 @@ export default function HomeScreen() {
 
   const base = toCurrencyCode(trip.baseCurrency);
   const summary = summarizeTrip(trip, expenses, localToday());
+  const status = summary.budgetStatus;
   const recent = expenses
     .filter((e) => e.tripId === trip.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 5);
+  const money = (v: bigint) => formatMoney(v, base);
 
   return (
-    <Screen title={trip.title} subtitle={`${trip.startDate} ~ ${trip.endDate} · ${summary.dayOfTrip}/${summary.totalDays}일차`}>
-      <Card title="사용액 / 예산">
-        <Text style={[type.title, type.numeric, { color: palette.text }]}>
-          {formatMoney(summary.spent, base)}
-          {summary.budget !== null ? (
-            <Text style={{ color: palette.textMuted }}> / {formatMoney(summary.budget, base)}</Text>
+    <Screen
+      title={trip.title}
+      subtitle={`${trip.startDate} ~ ${trip.endDate} · ${t('home.dayOfTrip', { day: summary.dayOfTrip, total: summary.totalDays })}`}
+    >
+      {status.available !== null ? (
+        <Card title={t(`home.available.${status.kind === 'daily_pooled' ? 'pooled' : status.kind === 'daily' ? 'daily' : 'total'}`)}>
+          <Text style={[type.display, type.numeric, { color: status.available < 0n ? palette.block : palette.text }]}>
+            {money(status.available)}
+          </Text>
+          {status.kind === 'daily' ? (
+            <Text style={[type.caption, { color: palette.textMuted }]}>{t('home.daily.spentToday', { amount: money(status.periodSpent) })}</Text>
           ) : null}
+          {status.kind === 'daily_pooled' ? (
+            <Text style={[type.caption, { color: palette.textMuted }]}>
+              {t(status.resetsInDays === 0 ? 'home.pooled.lastDay' : 'home.pooled.period', {
+                start: status.periodStart.slice(5),
+                end: status.periodEnd.slice(5),
+                days: status.resetsInDays ?? 0,
+              })}
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <Card title={summary.budget !== null ? t('home.spentOfBudget') : t('home.spent')}>
+        <Text style={[type.title, type.numeric, { color: palette.text }]}>
+          {money(summary.spent)}
+          {summary.budget !== null ? <Text style={{ color: palette.textMuted }}> / {money(summary.budget)}</Text> : null}
         </Text>
         {summary.burnRatio !== null ? <ProgressBar ratio={summary.burnRatio} /> : null}
       </Card>
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Card title="남은 일일 가용액">
-            <Text style={[type.label, type.numeric, { color: summary.remainingPerDay !== null && summary.remainingPerDay < 0n ? palette.block : palette.text }]}>
-              {summary.remainingPerDay === null ? '—' : formatMoney(summary.remainingPerDay, base)}
-            </Text>
-          </Card>
-        </View>
-        <View style={styles.half}>
-          <Card title="남은 일수">
-            <Text style={[type.label, { color: palette.text }]}>{summary.daysRemaining}일</Text>
+          <Card title={t('home.daysLeft')}>
+            <Text style={[type.label, { color: palette.text }]}>{t('home.days', { n: summary.daysRemaining })}</Text>
           </Card>
         </View>
       </View>
 
       {summary.byCategory.length > 0 ? (
-        <Card title="분류별 지출">
+        <Card title={t('home.byCategory')}>
           {summary.byCategory.map((c) => (
             <View key={c.category} style={styles.catRow}>
-              <Text style={[type.body, { color: palette.text }]}>{CATEGORY_LABELS[c.category]}</Text>
-              <Text style={[type.body, type.numeric, { color: palette.text }]}>{formatMoney(c.amount, base)}</Text>
+              <Text style={[type.body, { color: palette.text }]}>{t(`category.${c.category}`)}</Text>
+              <Text style={[type.body, type.numeric, { color: palette.text }]}>{money(c.amount)}</Text>
             </View>
           ))}
         </Card>
       ) : null}
 
-      <Card title="최근 지출">
+      <Card title={t('home.recent')}>
         {recent.length === 0 ? (
-          <Text style={[type.body, { color: palette.textMuted }]}>아직 지출이 없습니다.</Text>
+          <Text style={[type.body, { color: palette.textMuted }]}>{t('home.noExpenses')}</Text>
         ) : (
           recent.map((e) => <ExpenseRow key={e.id} expense={e} />)
         )}
-        <Button title="영수증 추가" onPress={() => router.push('/capture')} />
+        <Button title={t('home.addReceipt')} onPress={() => router.push('/capture')} />
       </Card>
     </Screen>
   );

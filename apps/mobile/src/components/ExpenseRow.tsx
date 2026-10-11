@@ -2,11 +2,13 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatMoney, toCurrencyCode, toMinor } from '../domain/money';
-import { CATEGORY_LABELS, type Expense } from '../domain/models';
+import type { Expense } from '../domain/models';
+import { useT } from '../i18n';
 import { spacing, type, usePalette } from '../theme/tokens';
 
 export function ExpenseRow({ expense }: { expense: Expense }) {
   const palette = usePalette();
+  const t = useT();
   const local = toCurrencyCode(expense.currency);
   const base = toCurrencyCode(expense.baseCurrency);
   return (
@@ -17,11 +19,11 @@ export function ExpenseRow({ expense }: { expense: Expense }) {
     >
         <View style={styles.left}>
           <Text style={[type.body, { color: palette.text }]} numberOfLines={1}>
-            {expense.merchantName || '가맹점 미입력'}
+            {expense.merchantName || t('expense.noMerchant')}
           </Text>
           <Text style={[type.caption, { color: palette.textMuted }]}>
-            {CATEGORY_LABELS[expense.category]}
-            {expense.receiptId ? ' · 영수증 있음' : ' · 영수증 없음'}
+            {t(`category.${expense.category}`)}
+            {expense.receiptId ? t('expense.hasReceipt') : t('expense.noReceipt')}
           </Text>
         </View>
         <View style={styles.right}>

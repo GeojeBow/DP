@@ -8,7 +8,7 @@ const trip: Trip = {
   startDate: '2026-10-05',
   endDate: '2026-10-09',
   baseCurrency: 'KRW',
-  budgetTotal: '1000000',
+  budget: { kind: 'total', amount: '1000000' },
   createdAt: '2026-10-01T00:00:00Z',
 };
 
@@ -55,7 +55,7 @@ describe('summarizeTrip', () => {
     expect(after.daysRemaining).toBe(0);
     expect(after.remainingPerDay).toBeNull();
     expect(after.dayOfTrip).toBe(5);
-    expect(summarizeTrip({ ...trip, budgetTotal: null }, [], '2026-10-06').burnRatio).toBeNull();
+    expect(summarizeTrip({ ...trip, budget: { kind: 'none' } }, [], '2026-10-06').burnRatio).toBeNull();
   });
 });
 

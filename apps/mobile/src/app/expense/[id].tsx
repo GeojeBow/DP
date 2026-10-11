@@ -3,30 +3,33 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
+import { DateField } from '../../components/DateField';
 import { Button, Chips, TextField } from '../../components/Form';
 import { QUICK_CURRENCIES } from '../../constants';
 import { uuidv7 } from '../../domain/id';
-import { CATEGORY_LABELS, type Expense, PAYMENT_LABELS } from '../../domain/models';
+import type { Expense } from '../../domain/models';
 import { convertMinor, formatMoney, fromMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../../domain/schemas';
-import { isValidIsoDate, localToday } from '../../domain/trip';
+import { localToday } from '../../domain/trip';
 import { readReceipt, type ReadReceiptOutcome } from '../../features/capture/readReceipt';
+import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
 import { fxKey, useActiveTrip, useAppStore } from '../../store/useAppStore';
 import { spacing, type, usePalette } from '../../theme/tokens';
 
 const AMOUNT = /^\d+(\.\d+)?$/;
-const AI_MESSAGES: Record<'reading' | ReadReceiptOutcome['kind'], string> = {
-  reading: 'AI가 영수증을 읽는 중이에요…',
-  read: 'AI가 읽은 내용으로 채웠어요. 맞는지 확인해 주세요.',
-  not_receipt: '영수증으로 보이지 않아요. 직접 입력해 주세요.',
-  quota_exceeded: '이번 달 무료 자동 읽기 30장을 모두 썼어요. 직접 입력해 주세요.',
-  failed: '자동으로 읽지 못했어요. 직접 입력해 주세요.',
+const AI_MESSAGES: Record<'reading' | ReadReceiptOutcome['kind'], MessageKey> = {
+  reading: 'ai.reading',
+  read: 'ai.read',
+  not_receipt: 'ai.not_receipt',
+  quota_exceeded: 'ai.quota_exceeded',
+  failed: 'ai.failed',
 };
 const RATE = /^\d+(\.\d+)?$/;
 
 export default function ExpenseScreen() {
   const palette = usePalette();
+  const t = useT();
   const params = useLocalSearchParams<{ id: string; receiptId?: string }>();
   const isNew = params.id === 'new';
   const existing = useAppStore((s) => s.expenses.find((e) => e.id === params.id));
@@ -101,9 +104,8 @@ export default function ExpenseScreen() {
   );
 
   const errors = {
-    amount: AMOUNT.test(amountClean) && Number(amountClean) > 0 ? null : '금액을 숫자로 입력해 주세요.',
-    date: isValidIsoDate(date) ? null : 'YYYY-MM-DD 형식으로 입력해 주세요.',
-    fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : '환율을 입력해 주세요.',
+    amount: AMOUNT.test(amountClean) && Number(amountClean) > 0 ? null : t('expense.err.amount'),
+    fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : t('expense.err.rate'),
   };
   const valid = Object.values(errors).every((e) => e === null);
 
@@ -117,7 +119,7 @@ export default function ExpenseScreen() {
   if (!isNew && !existing) {
     return (
       <View style={styles.content}>
-        <Text style={[type.body, { color: palette.textMuted }]}>지출을 찾을 수 없습니다.</Text>
+        <Text style={[type.body, { color: palette.textMuted }]}>{t('expense.notFound')}</Text>
       </View>
     );
   }
@@ -166,55 +168,55 @@ export default function ExpenseScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {image ? (
-          <Image source={{ uri: image }} style={[styles.receipt, { borderColor: palette.border }]} resizeMode="contain" accessibilityLabel="영수증 사진" />
+          <Image source={{ uri: image }} style={[styles.receipt, { borderColor: palette.border }]} resizeMode="contain" accessibilityLabel={t('expense.receiptPhoto')} />
         ) : null}
         {aiState !== 'idle' ? (
           <Text style={[type.label, { color: aiState === 'read' || aiState === 'reading' ? palette.textMuted : palette.warn }]}>
-            {AI_MESSAGES[aiState]}
-            {aiState === 'read' && extraTransactions > 0 ? ` 이 사진에 결제가 ${extraTransactions}건 더 있어요. 나머지는 따로 입력해 주세요.` : ''}
+            {t(AI_MESSAGES[aiState])}
+            {aiState === 'read' && extraTransactions > 0 ? t('ai.more', { n: extraTransactions }) : ''}
           </Text>
         ) : null}
 
-        <Card title={activeTrip && !existing ? `출장: ${activeTrip.title}` : '금액'}>
+        <Card title={activeTrip && !existing ? t('expense.trip', { trip: activeTrip.title }) : t('expense.amount')}>
           <Text style={[type.display, type.numeric, { color: palette.text }]}>
             {totalBase === null ? '—' : formatMoney(totalBase, toCurrencyCode(baseCurrency))}
           </Text>
           {needsRate && totalBase !== null ? (
             <Text style={[type.caption, { color: palette.textMuted }]}>
-              {currency} {amountClean} × {rateClean} = {baseCurrency} 환산
+              {t('expense.converted', { currency, amount: amountClean, rate: rateClean, base: baseCurrency })}
             </Text>
           ) : null}
         </Card>
 
-        <TextField label="가맹점" value={merchant} onChangeText={edit('merchant', setMerchant)} placeholder="예: Ichiran Shibuya" />
+        <TextField label={t('expense.merchant')} value={merchant} onChangeText={edit('merchant', setMerchant)} placeholder={t('expense.merchantPlaceholder')} />
         <TextField
-          label={`금액 (${currency})`}
+          label={t('expense.amountIn', { currency })}
           value={amount}
           onChangeText={edit('amount', setAmount)}
           keyboardType="decimal-pad"
           placeholder="0"
           error={show(errors.amount)}
         />
-        <Chips label="통화" options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
+        <Chips label={t('expense.currency')} options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
         {needsRate ? (
           <TextField
-            label={`환율 (1 ${currency} = ? ${baseCurrency})`}
+            label={t('expense.rate', { currency, base: baseCurrency })}
             value={fxRate}
             onChangeText={edit('fxRate', setFxRate)}
             keyboardType="decimal-pad"
-            placeholder="카드 명세서의 환율을 입력하세요"
-            hint="자동 환율은 서버 연결 후 채워집니다. 지금은 직접 입력해 주세요."
+            placeholder={t('expense.ratePlaceholder')}
+            hint={t('expense.rateHint')}
             error={show(errors.fxRate)}
           />
         ) : null}
-        <TextField label="사용일" value={date} onChangeText={edit('date', setDate)} placeholder="YYYY-MM-DD" error={show(errors.date)} />
-        <Chips label="분류" options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => CATEGORY_LABELS[c]} onChange={edit('category', setCategory)} />
-        <Chips label="결제 수단" options={PAYMENT_METHODS} value={payment} labelOf={(p) => PAYMENT_LABELS[p]} onChange={edit('payment', setPayment)} />
-        <TextField label="메모 (선택)" value={memo} onChangeText={setMemo} placeholder="동석자, 목적 등" multiline />
+        <DateField label={t('expense.date')} value={date} onChange={edit('date', setDate)} />
+        <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
+        <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+        <TextField label={t('expense.memo')} value={memo} onChangeText={setMemo} placeholder={t('expense.memoPlaceholder')} multiline />
 
-        <Button title={isNew ? '확인하고 저장' : '수정 저장'} onPress={save} />
+        <Button title={isNew ? t('expense.saveNew') : t('expense.saveEdit')} onPress={save} />
         {!isNew ? (
-          <Button title={confirmDelete ? '한 번 더 누르면 삭제됩니다' : '삭제'} variant="danger" onPress={remove} />
+          <Button title={confirmDelete ? t('expense.deleteConfirm') : t('expense.delete')} variant="danger" onPress={remove} />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
