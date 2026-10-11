@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -54,6 +55,7 @@ export default function SettingsScreen() {
                   <View style={[styles.swatch, { backgroundColor: p.brand }]} />
                   <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.accent }]} />
                   <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.blobs[0] }]} />
+                  <Ionicons name={p.doodles[0]} size={18} color={p.brand} style={styles.swatchIcon} />
                 </View>
                 <Text style={[type.caption, { color: p.text, fontWeight: '700' }]}>{t(`theme.${id}`)}</Text>
               </Pressable>
@@ -136,7 +138,8 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   themes: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   theme: { flexBasis: '30%', flexGrow: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.control },
-  swatches: { flexDirection: 'row' },
+  swatches: { flexDirection: 'row', alignItems: 'center' },
+  swatchIcon: { marginLeft: spacing.xs },
   swatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#FFFFFF' },
   swatchOverlap: { marginLeft: -8 },
   trip: { borderWidth: 1, borderRadius: 10, padding: spacing.md, gap: 2 },

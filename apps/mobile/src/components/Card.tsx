@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { radius, shadow, spacing, type, usePalette } from '../theme/tokens';
+import { shadow, spacing, type, usePalette } from '../theme/tokens';
 
 interface CardProps {
   title?: string;
@@ -13,7 +13,15 @@ interface CardProps {
 export function Card({ title, action, children }: CardProps) {
   const palette = usePalette();
   return (
-    <View style={[styles.card, shadow, { backgroundColor: `${palette.surface}EB`, borderColor: palette.border }]}>
+    <View
+      style={[
+        styles.card,
+        shadow,
+        palette.glow ? { shadowColor: palette.glow, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } } : null,
+        { backgroundColor: `${palette.surface}EB`, borderColor: palette.glow ? `${palette.glow}55` : palette.border },
+        { borderRadius: palette.cardRadius, borderWidth: palette.cardBorder },
+      ]}
+    >
       {title ? (
         <View style={styles.head}>
           <Text style={[type.label, styles.title, { color: palette.text }]}>{title}</Text>
@@ -27,8 +35,6 @@ export function Card({ title, action, children }: CardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.card,
     padding: spacing.lg,
     gap: spacing.md,
   },
