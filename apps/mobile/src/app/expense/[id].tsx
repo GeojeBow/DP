@@ -54,6 +54,7 @@ export default function ExpenseScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'reading' | ReadReceiptOutcome['kind']>('idle');
   const [extraTransactions, setExtraTransactions] = useState(0);
+  const [aiFailure, setAiFailure] = useState('');
   // Fields the user has typed into; AI results never overwrite them.
   const edited = useRef(new Set<string>());
   const edit = <T,>(field: string, set: (v: T) => void) => (v: T) => {
@@ -72,6 +73,7 @@ export default function ExpenseScreen() {
       const outcome = await readReceipt(uri);
       if (!alive) return;
       setAiState(outcome.kind);
+      if (outcome.kind === 'failed') setAiFailure(outcome.reason ?? '');
       if (outcome.kind !== 'read') return;
       const p = outcome.prefill;
       const fill = <T,>(field: string, value: T | undefined, set: (v: T) => void) => {
@@ -174,6 +176,7 @@ export default function ExpenseScreen() {
           <Text style={[type.label, { color: aiState === 'read' || aiState === 'reading' ? palette.textMuted : palette.warn }]}>
             {t(AI_MESSAGES[aiState])}
             {aiState === 'read' && extraTransactions > 0 ? t('ai.more', { n: extraTransactions }) : ''}
+            {aiState === 'failed' && aiFailure ? ` (${aiFailure})` : ''}
           </Text>
         ) : null}
 

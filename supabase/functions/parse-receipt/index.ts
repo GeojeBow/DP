@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error(e);
     await admin.rpc('ocr_credit_refund', { p_user: user.id });
-    return json(502, { error: 'read_failed' });
+    // A short upstream reason (e.g. "Vision API 400: ...") so testers can report what went wrong.
+    return json(502, { error: 'read_failed', detail: String(e instanceof Error ? e.message : e).slice(0, 200) });
   }
 });

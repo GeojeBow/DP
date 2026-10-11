@@ -1,0 +1,24 @@
+name: Check receipt reading
+
+# Sends a sample receipt to the live parse-receipt function as a guest user
+# (public key only) and prints the answer, to check AI reading end to end.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      URL: https://sxkembehrqovjmovagwy.supabase.co
+      KEY: sb_publishable_eu98CP8qgSb6JHi3bOBZbA_XvGJWFU1
+    steps:
+      - run: |
+          convert -size 400x300 xc:white -fill black -pointsize 22 \
+            -annotate +20+40 'STARBUCKS TOKYO' -annotate +20+90 '2026-10-10 12:31' \
+            -annotate +20+140 'Latte        650' -annotate +20+190 'TOTAL  JPY  650' receipt.jpg
+          token=$(curl -fsS -X POST "$URL/auth/v1/signup" -H "apikey: $KEY" \
+            -H 'Content-Type: application/json' -d '{}' | jq -r .access_token)
+          jq -n --arg img "$(base64 -w0 receipt.jpg)" '{mediaType:"image/jpeg",image:$img}' > body.json
+          curl -sS -w '\nHTTP %{http_code}\n' -X POST "$URL/functions/v1/parse-receipt" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' --data @body.json

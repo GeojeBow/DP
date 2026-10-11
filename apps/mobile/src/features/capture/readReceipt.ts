@@ -18,7 +18,7 @@ export type ReadReceiptOutcome =
   | { kind: 'read'; prefill: ReceiptPrefill; extraTransactions: number }
   | { kind: 'not_receipt' }
   | { kind: 'quota_exceeded' }
-  | { kind: 'failed' };
+  | { kind: 'failed'; reason?: string };
 
 const CARD_HINTS = new Set<PaymentMethod>(['corporate_card', 'personal_card']);
 
@@ -51,11 +51,19 @@ export async function readReceipt(dataUri: string): Promise<ReadReceiptOutcome> 
       if (error instanceof FunctionsHttpError && error.context instanceof Response && error.context.status === 429) {
         return { kind: 'quota_exceeded' };
       }
-      return { kind: 'failed' };
+      return { kind: 'failed', reason: await failureReason(error) };
     }
     const parsed = receiptParseResultSchema.safeParse(data?.result);
     return parsed.success ? toPrefill(parsed.data) : { kind: 'failed' };
-  } catch {
-    return { kind: 'failed' };
+  } catch (e) {
+    return { kind: 'failed', reason: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Status and server detail of a failed call, shown so testers can report it. */
+async function failureReason(error: Error): Promise<string> {
+  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response)) return error.message;
+  const res = error.context;
+  const body = await res.json().catch(() => null);
+  return [res.status, body?.error, body?.detail].filter(Boolean).join(' ');
 }
