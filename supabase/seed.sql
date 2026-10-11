@@ -1,0 +1,25 @@
+-- Built-in export presets, available to every organization.
+insert into export_presets (id, org_id, name, format, is_builtin, template_key, config) values
+  ('00000000-0000-4000-8000-000000000001', null, 'Executive PDF', 'pdf', true, 'executive_pdf_v1',
+   '{"locale":"ko-KR","group_by":"date",
+     "columns":[{"source":"local_date","header":"일자","format":"yyyy-MM-dd"},
+                {"source":"merchant_name","header":"사용처"},
+                {"source":"category","header":"분류"},
+                {"source":"total","header":"현지 금액","with_currency":true},
+                {"source":"total_base","header":"원화 환산","sum":true}],
+     "sections":{"cover":true,"charts":["category_donut","daily_burn"],"policy_violations":true,"receipt_appendix":"grid_4"},
+     "branding":{"logo_path":null,"accent":"#1F3A5F"},
+     "signatures":["신청자","승인자"]}'),
+  ('00000000-0000-4000-8000-000000000002', null, 'Modern Excel', 'xlsx', true, 'modern_xlsx_v1',
+   '{"locale":"ko-KR","group_by":"date",
+     "columns":[{"source":"local_date","header":"일자","format":"yyyy-MM-dd"},
+                {"source":"merchant_name","header":"사용처"},
+                {"source":"category","header":"분류"},
+                {"source":"currency","header":"통화"},
+                {"source":"total","header":"현지 금액"},
+                {"source":"fx_rate","header":"적용 환율"},
+                {"source":"total_base","header":"원화 환산","sum":true},
+                {"source":"payment_method","header":"결제 수단"}],
+     "sections":{"summary_sheet":true,"fx_sheet":true,"policy_sheet":true},
+     "branding":{"accent":"#1F3A5F"}}')
+on conflict (id) do nothing;
