@@ -13,7 +13,7 @@ const table: ReportTable = {
   sections: [{ title: '2026-10-01', rows: [[{ text: '2026-10-01' }, { text: 'Ichiran' }, { text: 'KRW 29,184', number: 29184 }]], subtotal: 'KRW 29,184' }],
   total: 'KRW 29,184',
   totalNumber: 29184,
-  receipts: [],
+  attachments: [],
   claim: [],
   affidavits: [],
 };

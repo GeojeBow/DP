@@ -33,7 +33,15 @@ export default function ReportsScreen() {
   const presets = [...BUILTIN_PRESETS, ...custom];
 
   const [tripId, setTripId] = useState(activeTripId ?? trips[0]?.id ?? '');
-  const [presetId, setPresetId] = useState(presets[0]!.id);
+  const lastFormatId = useAppStore((s) => s.lastFormatId);
+  const setLastFormatId = useAppStore((s) => s.setLastFormatId);
+  // Open on the format used last time; a saved company template beats the built-in ones.
+  const known = (id: string | null) => !!id && (presets.some((p) => p.id === id) || templates.some((x) => x.id === id));
+  const [presetId, setPresetIdState] = useState(known(lastFormatId) ? lastFormatId! : templates[0]?.id ?? presets[0]!.id);
+  const setPresetId = (id: string) => {
+    setPresetIdState(id);
+    setLastFormatId(id);
+  };
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +108,38 @@ export default function ReportsScreen() {
         </Text>
       </Card>
 
+      <Card title={t('template.section')}>
+        <Text style={[type.caption, { color: palette.textMuted }]}>{t('template.hint')}</Text>
+        {templates.map((x) => {
+          const selected = x.id === companyTemplate?.id;
+          return (
+            <Pressable
+              key={x.id}
+              onPress={() => setPresetId(x.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              style={[styles.preset, { borderColor: selected ? palette.brand : palette.border, borderWidth: selected ? 2 : 1 }]}
+            >
+              <View style={styles.presetText}>
+                <Text style={[type.body, { color: palette.text, fontWeight: '600' }]}>
+                  {x.name}
+                  <Text style={[type.caption, { color: palette.textMuted }]}>
+                    {'  '}{t('template.badge')}{x.id === lastFormatId ? ` · ${t('template.lastUsed')}` : ''}
+                  </Text>
+                </Text>
+                <Text style={[type.caption, { color: palette.textMuted }]} numberOfLines={1}>
+                  {x.fileName}
+                </Text>
+              </View>
+              <Pressable onPress={() => router.push({ pathname: '/template/[id]', params: { id: x.id } })} accessibilityRole="button" hitSlop={8}>
+                <Text style={[type.label, { color: palette.brand }]}>{t('reports.edit')}</Text>
+              </Pressable>
+            </Pressable>
+          );
+        })}
+        <Button title={uploading ? t('template.reading') : t('template.upload')} variant="secondary" onPress={upload} disabled={uploading} />
+      </Card>
+
       <Card title={t('reports.formats')}>
         {presets.map((p) => {
           const selected = !companyTemplate && p.id === preset.id;
@@ -133,36 +173,6 @@ export default function ReportsScreen() {
           );
         })}
         <Button title={t('reports.newPreset')} variant="secondary" onPress={() => router.push({ pathname: '/report/[id]', params: { id: 'new' } })} />
-      </Card>
-
-      <Card title={t('template.section')}>
-        <Text style={[type.caption, { color: palette.textMuted }]}>{t('template.hint')}</Text>
-        {templates.map((x) => {
-          const selected = x.id === companyTemplate?.id;
-          return (
-            <Pressable
-              key={x.id}
-              onPress={() => setPresetId(x.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              style={[styles.preset, { borderColor: selected ? palette.brand : palette.border, borderWidth: selected ? 2 : 1 }]}
-            >
-              <View style={styles.presetText}>
-                <Text style={[type.body, { color: palette.text, fontWeight: '600' }]}>
-                  {x.name}
-                  <Text style={[type.caption, { color: palette.textMuted }]}>{'  '}{t('template.badge')}</Text>
-                </Text>
-                <Text style={[type.caption, { color: palette.textMuted }]} numberOfLines={1}>
-                  {x.fileName}
-                </Text>
-              </View>
-              <Pressable onPress={() => router.push({ pathname: '/template/[id]', params: { id: x.id } })} accessibilityRole="button" hitSlop={8}>
-                <Text style={[type.label, { color: palette.brand }]}>{t('reports.edit')}</Text>
-              </Pressable>
-            </Pressable>
-          );
-        })}
-        <Button title={uploading ? t('template.reading') : t('template.upload')} variant="secondary" onPress={upload} disabled={uploading} />
       </Card>
 
       {expenses.length === 0 ? (

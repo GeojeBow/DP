@@ -18,6 +18,7 @@ import { buildExtraExpenses } from '../../features/capture/extras';
 import { checkExpenses } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
 import { useTracker } from '../../features/mileage/useTracker';
+import { pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
@@ -49,7 +50,19 @@ export default function ExpenseScreen() {
   const allExpenses = useAppStore((s) => s.expenses);
 
   const baseCurrency = existing?.baseCurrency ?? activeTrip?.baseCurrency ?? 'KRW';
-  const receiptId = existing?.receiptId ?? params.receiptId ?? null;
+  // A receipt found later can be attached to an expense saved without one.
+  const [receiptId, setReceiptId] = useState<string | null>(existing?.receiptId ?? params.receiptId ?? null);
+  const [attachMessage, setAttachMessage] = useState<string | null>(null);
+  const attachReceipt = async (source: PickSource) => {
+    setAttachMessage(null);
+    try {
+      const result = await pickReceipt(source);
+      if (result.status === 'picked') setReceiptId(result.receiptId);
+      else if (result.status === 'denied') setAttachMessage(t(source === 'camera' ? 'capture.deniedCamera' : 'capture.deniedGallery'));
+    } catch (error) {
+      setAttachMessage(t('capture.failed', { error: error instanceof Error ? error.message : String(error) }));
+    }
+  };
   const trip = existing ? trips.find((x) => x.id === existing.tripId) : activeTrip;
   const rateFor = (c: string) => rememberedRate({ rememberFx, lastFxRates }, trip, c, baseCurrency);
 
@@ -311,6 +324,18 @@ export default function ExpenseScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {image ? (
           <Image source={{ uri: image }} style={[styles.receipt, { borderColor: palette.border }]} resizeMode="contain" accessibilityLabel={t('expense.receiptPhoto')} />
+        ) : null}
+        {existing && !receiptId && !isMileage ? (
+          <View style={[styles.dup, { borderColor: palette.brand, backgroundColor: palette.brandSoft }]}>
+            <Text style={[type.label, { color: palette.text, fontWeight: '700' }]}>{t('attach.title')}</Text>
+            <Text style={[type.caption, { color: palette.textMuted }]}>{t('attach.body')}</Text>
+            <Button title={t('capture.camera')} onPress={() => attachReceipt('camera')} />
+            <Button title={t('capture.gallery')} variant="secondary" onPress={() => attachReceipt('gallery')} />
+            {attachMessage ? <Text style={[type.caption, { color: palette.block }]}>{attachMessage}</Text> : null}
+          </View>
+        ) : null}
+        {existing && receiptId && !existing.receiptId ? (
+          <Text style={[type.label, { color: palette.ok }]}>{t('attach.done')}</Text>
         ) : null}
         {aiState !== 'idle' ? (
           <Text style={[type.label, { color: aiState === 'read' || aiState === 'reading' ? palette.textMuted : palette.warn }]}>
