@@ -16,6 +16,8 @@ export interface Trip {
   perDiem?: { amount: string; days?: number };
   /** Set when the company has paid the traveller back */
   reimbursedAt?: string;
+  /** Exchange rates remembered for this trip: currency → units of baseCurrency */
+  fxRates?: Record<string, string>;
   createdAt: string;
 }
 

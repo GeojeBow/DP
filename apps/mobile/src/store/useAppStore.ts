@@ -23,6 +23,9 @@ interface AppState {
   /** Evening and end-of-trip reminders */
   reminders: boolean;
   setReminders: (on: boolean) => void;
+  /** Reuse the exchange rate entered once for the rest of the trip */
+  rememberFx: boolean;
+  setRememberFx: (on: boolean) => void;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
@@ -76,6 +79,8 @@ export const useAppStore = create<AppState>()(
       theme: 'peach',
       reminders: true,
       setReminders: (reminders) => set({ reminders }),
+      rememberFx: true,
+      setRememberFx: (rememberFx) => set({ rememberFx }),
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
@@ -131,7 +136,15 @@ export const useAppStore = create<AppState>()(
       upsertExpense: (expense) =>
         set((s) => {
           const exists = s.expenses.some((e) => e.id === expense.id);
+          const foreign = expense.currency !== expense.baseCurrency;
+          const trips = foreign && s.rememberFx
+            ? s.trips.map((t) =>
+              t.id === expense.tripId && t.baseCurrency === expense.baseCurrency && t.fxRates?.[expense.currency] !== expense.fxRate
+                ? { ...t, fxRates: { ...t.fxRates, [expense.currency]: expense.fxRate } }
+                : t)
+            : s.trips;
           return {
+            trips,
             expenses: exists ? s.expenses.map((e) => (e.id === expense.id ? expense : e)) : [...s.expenses, expense],
             lastFxRates:
               expense.currency === expense.baseCurrency
@@ -165,6 +178,17 @@ export const useAppStore = create<AppState>()(
     },
   ),
 );
+
+/**
+ * The rate to fill in for a currency: the one remembered for this trip, else the last one used
+ * anywhere for the same pair. Nothing when the user turned remembering off.
+ */
+export function rememberedRate(
+  s: Pick<AppState, 'rememberFx' | 'lastFxRates'>, trip: Trip | null | undefined, currency: string, base: string,
+): string | undefined {
+  if (!s.rememberFx || currency === base) return undefined;
+  return (trip?.baseCurrency === base ? trip.fxRates?.[currency] : undefined) ?? s.lastFxRates[fxKey(currency, base)];
+}
 
 export function useActiveTrip(): Trip | null {
   return useAppStore((s) => s.trips.find((t) => t.id === s.activeTripId) ?? null);
