@@ -48,6 +48,9 @@ interface AppState {
   setSynced: (patch: { lastPulledAt?: string | null; syncedAt?: string | null }) => void;
   /** Removes everything that belongs to an account, e.g. on sign-out */
   clearAccountData: () => void;
+  /** The company picked on the company screen, when the account belongs to several */
+  companyId: string | null;
+  setCompany: (id: string | null) => void;
   setLanguage: (language: Language) => void;
   setTheme: (theme: ThemeId) => void;
   addTrip: (trip: Trip) => void;
@@ -110,8 +113,10 @@ export const useAppStore = create<AppState>()(
       clearAccountData: () =>
         set({
           trips: [], expenses: [], activeTripId: null, companyRules: [], customFields: [], reportPresets: [], companyTemplates: [],
-          outbox: [], lastPulledAt: null, syncedAt: null,
+          outbox: [], lastPulledAt: null, syncedAt: null, companyId: null,
         }),
+      companyId: null,
+      setCompany: (companyId) => set({ companyId }),
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),

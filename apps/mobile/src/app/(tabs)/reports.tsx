@@ -9,6 +9,7 @@ import { Screen } from '../../components/Screen';
 import { formatMoney, sumMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { BUILTIN_PRESETS } from '../../domain/report';
 import { uuidv7 } from '../../domain/id';
+import { SubmitCard } from '../../features/company/SubmitCard';
 import { runExport } from '../../features/report/runExport';
 import { pickTemplate } from '../../features/template/pickTemplate';
 import { runTemplateExport } from '../../features/template/runTemplateExport';
@@ -177,6 +178,8 @@ export default function ReportsScreen() {
         <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.webPdfHint')}</Text>
       ) : null}
       {error ? <Text style={[type.caption, { color: palette.block }]}>{error}</Text> : null}
+
+      <SubmitCard trip={trip} expenses={expenses} />
     </Screen>
   );
 }

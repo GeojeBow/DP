@@ -59,6 +59,10 @@ export default function SettingsScreen() {
           })}
         </View>
       </Card>
+      <Card title={t('settings.company')}>
+        <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.companyBody')}</Text>
+        <Button title={t('settings.companyOpen')} variant="secondary" onPress={() => router.push('/company')} />
+      </Card>
       <Card title={t('settings.rules')}>
         <Text style={[type.body, { color: palette.textMuted }]}>
           {ruleCount ? t('settings.rulesCount', { n: ruleCount }) : t('settings.rulesBody')}
