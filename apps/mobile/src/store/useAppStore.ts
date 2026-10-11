@@ -5,6 +5,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
 import type { ReportPreset } from '../domain/report';
+import type { CompanyTemplate } from '../features/template/mapping';
+import { deleteTemplateFile } from '../features/template/storage';
 import type { ThemeId } from '../theme/tokens';
 import { deleteReceiptImage } from './receiptImages';
 
@@ -18,6 +20,10 @@ interface AppState {
   theme: ThemeId;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
+  /** Uploaded company Excel templates; files live in storage.ts */
+  companyTemplates: CompanyTemplate[];
+  saveTemplate: (template: CompanyTemplate) => void;
+  deleteTemplate: (id: string) => Promise<void>;
   savePreset: (preset: ReportPreset) => void;
   deletePreset: (id: string) => void;
   setLanguage: (language: Language) => void;
@@ -40,6 +46,17 @@ export const useAppStore = create<AppState>()(
       language: 'ko',
       theme: 'peach',
       reportPresets: [],
+      companyTemplates: [],
+      saveTemplate: (template) =>
+        set((s) => ({
+          companyTemplates: s.companyTemplates.some((x) => x.id === template.id)
+            ? s.companyTemplates.map((x) => (x.id === template.id ? template : x))
+            : [...s.companyTemplates, template],
+        })),
+      deleteTemplate: async (id) => {
+        set((s) => ({ companyTemplates: s.companyTemplates.filter((x) => x.id !== id) }));
+        await deleteTemplateFile(id);
+      },
       savePreset: (preset) =>
         set((s) => ({
           reportPresets: s.reportPresets.some((p) => p.id === preset.id)
