@@ -1,0 +1,41 @@
+name: Deploy web preview
+
+# Publishes the web build to GitHub Pages (https://geojebow.github.io/DP/)
+# so the app can be tried in a browser against the live Supabase project.
+on:
+  push:
+    branches: [main]
+    paths: ['apps/mobile/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Build for the /DP base path
+        run: |
+          node -e "const f='app.json',j=require('./'+f);j.expo.experiments={...j.expo.experiments,baseUrl:'/DP'};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+          npx expo export --platform web --output-dir dist
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: apps/mobile/dist
+          force_orphan: true
