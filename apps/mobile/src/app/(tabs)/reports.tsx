@@ -7,7 +7,7 @@ import { Card } from '../../components/Card';
 import { Button, Chips } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { formatMoney, sumMinor, toCurrencyCode, toMinor } from '../../domain/money';
-import { BUILTIN_PRESETS } from '../../domain/report';
+import { BUILTIN_PRESETS, REPORT_FORMATS, type ReportFormat } from '../../domain/report';
 import { uuidv7 } from '../../domain/id';
 import { SubmitCard } from '../../features/company/SubmitCard';
 import { runExport } from '../../features/report/runExport';
@@ -49,7 +49,10 @@ export default function ReportsScreen() {
   const trip = trips.find((x) => x.id === tripId) ?? trips[0];
   const companyTemplate = templates.find((x) => x.id === presetId) ?? null;
   const preset = presets.find((p) => p.id === presetId) ?? presets[0]!;
-  const exportFormat = companyTemplate ? 'xlsx' : preset.format;
+  const fileFormat = useAppStore((s) => s.fileFormat);
+  const setFileFormat = useAppStore((s) => s.setFileFormat);
+  // A company template is always filled in as Excel; other formats can come out as PDF, Excel or Word.
+  const exportFormat: ReportFormat = companyTemplate ? 'xlsx' : fileFormat ?? preset.format;
 
   const upload = async () => {
     setError(null);
@@ -91,7 +94,7 @@ export default function ReportsScreen() {
     setError(null);
     try {
       if (companyTemplate) await runTemplateExport(trip, expenses, companyTemplate, t, customFields);
-      else await runExport(trip, expenses, preset, t, customFields);
+      else await runExport(trip, expenses, preset, t, customFields, exportFormat);
     } catch (e) {
       setError(t('reports.failed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
@@ -175,6 +178,30 @@ export default function ReportsScreen() {
         <Button title={t('reports.newPreset')} variant="secondary" onPress={() => router.push({ pathname: '/report/[id]', params: { id: 'new' } })} />
       </Card>
 
+      <Card title={t('reports.fileType')}>
+        {companyTemplate ? (
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.fileTypeTemplate')}</Text>
+        ) : (
+          <View style={styles.fileTypes}>
+            {REPORT_FORMATS.map((f) => {
+              const selected = f === exportFormat;
+              return (
+                <Pressable
+                  key={f}
+                  onPress={() => setFileFormat(f)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  style={[styles.fileType, { borderColor: selected ? palette.brand : palette.border, backgroundColor: selected ? palette.brandSoft : 'transparent' }]}
+                >
+                  <Ionicons name={FILE_ICONS[f]} size={26} color={selected ? palette.brand : palette.textMuted} />
+                  <Text style={[type.label, { color: selected ? palette.brand : palette.text, fontWeight: '700' }]}>{t(`format.${f}`)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </Card>
+
       {expenses.length === 0 ? (
         <Text style={[type.body, { color: palette.textMuted }]}>{t('reports.empty')}</Text>
       ) : null}
@@ -194,7 +221,11 @@ export default function ReportsScreen() {
   );
 }
 
+const FILE_ICONS = { pdf: 'document-text', xlsx: 'grid', docx: 'document' } as const;
+
 const styles = StyleSheet.create({
+  fileTypes: { flexDirection: 'row', gap: spacing.sm },
+  fileType: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: spacing.md, borderWidth: 1.5, borderRadius: radius.control },
   preset: { borderRadius: radius.card, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   presetText: { flex: 1, gap: 2 },
 });
