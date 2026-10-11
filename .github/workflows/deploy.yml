@@ -43,9 +43,11 @@ jobs:
       - name: Deploy Edge Functions
         if: steps.creds.outputs.ready == 'true'
         run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
-      - name: Allow anonymous sign-in (guest use until accounts exist)
+      # Guests use the app anonymously; accounts sign up with email and password.
+      # Email confirmation stays off until a custom SMTP sender is set up before launch.
+      - name: Configure sign-in
         if: steps.creds.outputs.ready == 'true'
         run: |
           curl -fsS -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
-            -d '{"external_anonymous_users_enabled": true}' > /dev/null
+            -d '{"external_anonymous_users_enabled": true, "external_email_enabled": true, "mailer_autoconfirm": true, "password_min_length": 6}' > /dev/null
