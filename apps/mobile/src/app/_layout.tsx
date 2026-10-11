@@ -35,6 +35,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="trip/new" options={{ title: t('screen.newTrip') }} />
+        <Stack.Screen name="trip/settings" options={{ title: t('screen.tripSettings') }} />
         <Stack.Screen name="expense/[id]" options={{ title: t('screen.expense') }} />
         <Stack.Screen name="report/[id]" options={{ title: t('screen.preset') }} />
         <Stack.Screen name="template/[id]" options={{ title: t('screen.template') }} />

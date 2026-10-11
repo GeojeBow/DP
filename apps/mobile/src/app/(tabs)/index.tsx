@@ -81,6 +81,17 @@ export default function HomeScreen() {
     <Screen
       eyebrow={t('home.greeting')}
       title={trip.title}
+      action={
+        <Pressable
+          onPress={() => router.push({ pathname: '/trip/settings', params: { id: trip.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={t('home.tripSettings')}
+          style={[styles.tripSettings, { backgroundColor: palette.brandSoft, borderColor: palette.brand }]}
+        >
+          <Ionicons name="briefcase-outline" size={18} color={palette.brand} />
+          <Text style={[type.caption, { color: palette.brand, fontWeight: '700' }]}>{t('home.tripSettings')}</Text>
+        </Pressable>
+      }
       subtitle={`${trip.startDate} ~ ${trip.endDate} · ${t('home.dayOfTrip', { day: summary.dayOfTrip, total: summary.totalDays })}`}
     >
       {trips.length > 1 ? (
@@ -314,6 +325,7 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 }
 
 const styles = StyleSheet.create({
+  tripSettings: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
   tripRow: { gap: spacing.sm, paddingVertical: 2 },
   tripChip: { borderWidth: 1, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxWidth: 180 },
   tripAdd: { justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
