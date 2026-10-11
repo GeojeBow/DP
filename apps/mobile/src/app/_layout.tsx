@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform, Pressable, Text } from 'react-native';
 
+import { useReminders } from '../features/reminders/useReminders';
 import { startSync } from '../features/sync/engine';
 import { useT } from '../i18n';
 import { spacing, type, usePalette } from '../theme/tokens';
@@ -10,6 +11,7 @@ import { spacing, type, usePalette } from '../theme/tokens';
 export default function RootLayout() {
   const palette = usePalette();
   const t = useT();
+  useReminders();
   useEffect(() => startSync(), []);
   return (
     <>

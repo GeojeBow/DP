@@ -10,6 +10,7 @@ import { Button } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { currencyBreakdown, submissionChecks } from '../../domain/insights';
 import { formatMoney, toCurrencyCode } from '../../domain/money';
+import { ClaimCard } from '../../features/claim/ClaimCard';
 import { dailySpend, localToday, summarizeTrip } from '../../domain/trip';
 import { usePolicyFlags } from '../../features/policy/usePolicy';
 import { useT } from '../../i18n';
@@ -158,6 +159,8 @@ export default function HomeScreen() {
           )}
         </Card>
       ) : null}
+
+      <ClaimCard trip={trip} />
 
       <Card title={t('home.dailyChart')}>
         <View style={styles.chart}>

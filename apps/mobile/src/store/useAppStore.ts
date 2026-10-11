@@ -20,6 +20,9 @@ interface AppState {
   lastFxRates: Record<string, string>;
   language: Language;
   theme: ThemeId;
+  /** Evening and end-of-trip reminders */
+  reminders: boolean;
+  setReminders: (on: boolean) => void;
   /** User-made report formats; built-ins live in code */
   reportPresets: ReportPreset[];
   /** Uploaded company Excel templates; files live in storage.ts */
@@ -54,6 +57,7 @@ interface AppState {
   setLanguage: (language: Language) => void;
   setTheme: (theme: ThemeId) => void;
   addTrip: (trip: Trip) => void;
+  updateTrip: (trip: Trip) => void;
   setActiveTrip: (id: string | null) => void;
   upsertExpense: (expense: Expense) => void;
   deleteExpense: (id: string) => Promise<void>;
@@ -70,6 +74,8 @@ export const useAppStore = create<AppState>()(
       lastFxRates: {},
       language: 'ko',
       theme: 'peach',
+      reminders: true,
+      setReminders: (reminders) => set({ reminders }),
       reportPresets: [],
       companyTemplates: [],
       companyRules: [],
@@ -120,6 +126,7 @@ export const useAppStore = create<AppState>()(
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
       addTrip: (trip) => set((s) => ({ trips: [...s.trips, trip], activeTripId: trip.id })),
+      updateTrip: (trip) => set((s) => ({ trips: s.trips.map((x) => (x.id === trip.id ? trip : x)) })),
       setActiveTrip: (id) => set({ activeTripId: id }),
       upsertExpense: (expense) =>
         set((s) => {

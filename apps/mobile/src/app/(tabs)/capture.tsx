@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { Card } from '../../components/Card';
-import { Button } from '../../components/Form';
+import { Button, TextField } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
+import { parseQuickEntry } from '../../features/capture/quickEntry';
 import { useT } from '../../i18n';
 import { useActiveTrip } from '../../store/useAppStore';
 import { type, usePalette } from '../../theme/tokens';
@@ -16,6 +17,23 @@ export default function CaptureScreen() {
   const trip = useActiveTrip();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [line, setLine] = useState('');
+
+  const quickAdd = () => {
+    if (!line.trim()) return;
+    const q = parseQuickEntry(line);
+    setLine('');
+    router.push({
+      pathname: '/expense/[id]',
+      params: {
+        id: 'new',
+        ...(q.merchantName ? { merchant: q.merchantName } : {}),
+        ...(q.total ? { amount: q.total } : {}),
+        ...(q.currency ? { currency: q.currency } : {}),
+        ...(q.category ? { category: q.category } : {}),
+      },
+    });
+  };
 
   const capture = async (source: PickSource) => {
     setBusy(true);
@@ -46,6 +64,18 @@ export default function CaptureScreen() {
           disabled={busy}
         />
         {message ? <Text style={[type.caption, { color: palette.block }]}>{message}</Text> : null}
+      </Card>
+      <Card title={t('quick.title')}>
+        <TextField
+          label={t('quick.label')}
+          value={line}
+          onChangeText={setLine}
+          placeholder={t('quick.placeholder')}
+          hint={t('quick.hint')}
+          returnKeyType="done"
+          onSubmitEditing={quickAdd}
+        />
+        <Button title={t('quick.add')} variant="secondary" onPress={quickAdd} disabled={!line.trim()} />
       </Card>
       <Card title={t('capture.ai.title')}>
         <Text style={[type.body, { color: palette.textMuted }]}>{t('capture.ai.body')}</Text>

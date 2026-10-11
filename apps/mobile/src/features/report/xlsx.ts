@@ -61,6 +61,15 @@ export function reportToXlsx(table: ReportTable, labels: XlsxLabels): Uint8Array
     if (section.title) totalRow(labels.subtotal, undefined, section.subtotal);
   }
   totalRow(labels.total, table.totalNumber, table.total);
+  if (table.claim.length > 1) {
+    addRow([], S.plain);
+    for (const line of table.claim) {
+      const cells: ReportCell[] = table.headers.map(() => ({ text: '' }));
+      cells[0] = { text: line.label };
+      cells[lastCol] = { text: line.text, number: line.number };
+      addRow(cells, line.strong ? S.bold : S.plain);
+    }
+  }
 
   const cols = Array.from({ length: width }, (_, i) => {
     const longest = Math.max(

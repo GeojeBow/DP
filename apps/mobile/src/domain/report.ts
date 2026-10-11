@@ -1,3 +1,4 @@
+import { type ClaimLabels, claimLines, summarizeClaim } from './claim';
 import { type CustomField, customCell } from './customFields';
 import { formatMoney, fromMinor, sumMinor, toCurrencyCode, toMinor } from './money';
 import type { Expense, Trip } from './models';
@@ -5,6 +6,7 @@ import type { Expense, Trip } from './models';
 /** Columns a report can show, in the user's chosen order. */
 export const REPORT_COLUMNS = [
   'date', 'merchant', 'category', 'payment', 'currency', 'amount', 'fxRate', 'amountBase', 'memo', 'receipt',
+  'vat', 'proof',
 ] as const;
 export type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
@@ -72,6 +74,10 @@ export interface ReportTable {
   };
   /** Receipt ids in table order, numbered from 1 */
   receipts: Array<{ no: number; receiptId: string }>;
+  /** Spent / company-paid / personal / allowance / claim lines under the table */
+  claim: Array<{ label: string; text: string; number: number; strong?: boolean }>;
+  /** Signed lost-receipt statements, one page each in the PDF */
+  affidavits: Array<{ date: string; merchant: string; amount: string; reason: string; signer: string; signedAt: string }>;
 }
 
 export interface ReportLabels {
@@ -79,6 +85,10 @@ export interface ReportLabels {
   category: (c: Expense['category']) => string;
   payment: (p: Expense['paymentMethod']) => string;
   receiptNo: (n: number) => string;
+  /** Receipt cell for an expense with a signed lost-receipt statement */
+  missingReceipt: string;
+  proof: (p: NonNullable<Expense['proof']>) => string;
+  claim: ClaimLabels;
   none: string;
 }
 
@@ -106,7 +116,7 @@ export function buildReport(
     const local = toCurrencyCode(e.currency);
     switch (c) {
       case 'date': return { text: e.localDate };
-      case 'merchant': return { text: e.merchantName || labels.none };
+      case 'merchant': return { text: (e.merchantName || labels.none) + (e.split ? ` (1/${e.split.people})` : '') };
       case 'category': return { text: labels.category(e.category) };
       case 'payment': return { text: labels.payment(e.paymentMethod) };
       case 'currency': return { text: e.currency };
@@ -116,8 +126,10 @@ export function buildReport(
       case 'memo': return { text: e.memo };
       case 'receipt': {
         const no = receiptNo.get(e.id);
-        return { text: no ? labels.receiptNo(no) : labels.none };
+        return { text: no ? labels.receiptNo(no) : e.missingReceipt ? labels.missingReceipt : labels.none };
       }
+      case 'vat': return e.vat ? { text: formatMoney(toMinor(e.vat, local), local), number: Number(e.vat) } : { text: labels.none };
+      case 'proof': return { text: e.proof ? labels.proof(e.proof) : labels.none };
     }
   };
 
@@ -160,5 +172,15 @@ export function buildReport(
     totalNumber: Number(fromMinor(total, base)),
     summary,
     receipts: preset.receiptAppendix ? receipts : [],
+    claim: claimLines(trip, summarizeClaim(trip, sorted), labels.claim),
+    affidavits: sorted.flatMap((e) =>
+      e.missingReceipt
+        ? [{
+            date: e.localDate,
+            merchant: e.merchantName || labels.none,
+            amount: formatMoney(toMinor(e.total, toCurrencyCode(e.currency)), toCurrencyCode(e.currency)),
+            ...e.missingReceipt,
+          }]
+        : []),
   };
 }

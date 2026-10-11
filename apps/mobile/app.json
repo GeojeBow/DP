@@ -26,7 +26,19 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5C8A"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Records the distance of business trips by car while you keep the app open."
+        }
+      ]
     ],
     "scheme": "tripexpense",
     "owner": "geojebow",

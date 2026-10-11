@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
 import { Button, Chips } from '../../components/Form';
@@ -22,6 +22,8 @@ export default function SettingsScreen() {
   const setActiveTrip = useAppStore((s) => s.setActiveTrip);
   const ruleCount = useAppStore((s) => s.companyRules.length);
   const fieldCount = useAppStore((s) => s.customFields.length);
+  const reminders = useAppStore((s) => s.reminders);
+  const setReminders = useAppStore((s) => s.setReminders);
   // Re-read when the screen regains focus, e.g. after signing in.
   const [email, setEmail] = useState<string | null>(null);
   useFocusEffect(
@@ -75,6 +77,18 @@ export default function SettingsScreen() {
         </Text>
         <Button title={t('settings.fieldsOpen')} variant="secondary" onPress={() => router.push('/fields')} />
       </Card>
+      {Platform.OS !== 'web' ? (
+        <Card title={t('settings.reminders')}>
+          <Text style={[type.body, { color: palette.textMuted }]}>{t('settings.remindersBody')}</Text>
+          <Chips
+            label={t('settings.reminders')}
+            options={['on', 'off'] as const}
+            value={reminders ? 'on' : 'off'}
+            labelOf={(v) => t(v === 'on' ? 'settings.remindersOn' : 'settings.remindersOff')}
+            onChange={(v) => setReminders(v === 'on')}
+          />
+        </Card>
+      ) : null}
       <Card title={t('settings.language')}>
         <Chips label="Language / 언어 / 言語" options={LANGUAGES} value={language} labelOf={(l) => LANGUAGE_NAMES[l]} onChange={setLanguage} />
       </Card>
@@ -96,6 +110,14 @@ export default function SettingsScreen() {
                   {trip.startDate} ~ {trip.endDate} · {trip.baseCurrency}
                   {active ? t('settings.active') : ''}
                 </Text>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/trip/new', params: { id: trip.id } })}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  style={styles.tripEdit}
+                >
+                  <Text style={[type.label, { color: palette.brand }]}>{t('settings.editTrip')}</Text>
+                </Pressable>
               </Pressable>
             );
           })}
@@ -118,4 +140,5 @@ const styles = StyleSheet.create({
   swatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#FFFFFF' },
   swatchOverlap: { marginLeft: -8 },
   trip: { borderWidth: 1, borderRadius: 10, padding: spacing.md, gap: 2 },
+  tripEdit: { position: 'absolute', right: spacing.md, top: spacing.md },
 });

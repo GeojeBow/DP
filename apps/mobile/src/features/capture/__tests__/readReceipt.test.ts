@@ -34,6 +34,7 @@ describe('toPrefill', () => {
         localDate: '2026-10-03',
         category: 'meals',
         paymentMethod: 'cash',
+        vat: '290',
       },
     });
   });
@@ -46,9 +47,9 @@ describe('toPrefill', () => {
     }));
     expect(out).toEqual({
       kind: 'read',
-      prefill: { currency: 'JPY', localDate: '2026-10-03', category: 'meals' },
+      prefill: { currency: 'JPY', localDate: '2026-10-03', category: 'meals', vat: '290' },
       extras: [
-        { merchantName: 'Ichiran Shibuya', total: '3200', currency: 'JPY', localDate: '2026-10-03', category: 'meals', paymentMethod: 'cash' },
+        { merchantName: 'Ichiran Shibuya', total: '3200', currency: 'JPY', localDate: '2026-10-03', category: 'meals', paymentMethod: 'cash', vat: '290' },
       ],
     });
   });

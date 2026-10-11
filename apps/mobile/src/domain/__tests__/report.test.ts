@@ -11,6 +11,11 @@ const expense = (id: string, localDate: string, total: string, totalBase: string
 });
 const labels: ReportLabels = {
   column: (c) => c, category: (c) => c, payment: (p) => p, receiptNo: (n) => `#${n}`, none: '-',
+  missingReceipt: 'lost', proof: (p) => p,
+  claim: {
+    spent: 'spent', companyPaid: 'company', personal: 'personal', perDiem: (d, p) => `perDiem ${d}x${p}`,
+    claim: 'claim', vatDeductible: 'vatD', vatForeign: 'vatF',
+  },
 };
 
 describe('buildReport', () => {

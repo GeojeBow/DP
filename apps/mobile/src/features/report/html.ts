@@ -8,6 +8,9 @@ export interface HtmlLabels {
   receipts: string;
   receiptNo: (n: number) => string;
   generated: string;
+  affidavit: {
+    title: string; date: string; merchant: string; amount: string; reason: string; statement: string; signer: string; signedAt: string;
+  };
   /** Summary chart titles; the summary is left out when absent */
   byCategory?: string;
   byDay?: string;
@@ -53,6 +56,24 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
         .join('')}</div></section>`
     : '';
 
+  // Shown only when it says more than the grand total already does.
+  const claim = table.claim.length > 1
+    ? `<table class="claim">${table.claim
+        .map((l) => `<tr${l.strong ? ' class="strong"' : ''}><td>${esc(l.label)}</td><td class="num">${esc(l.text)}</td></tr>`)
+        .join('')}</table>`
+    : '';
+
+  const a = labels.affidavit;
+  const affidavits = table.affidavits
+    .map((x) => `<section class="affidavit"><h2>${esc(a.title)}</h2><table>
+      <tr><th>${esc(a.date)}</th><td>${esc(x.date)}</td></tr>
+      <tr><th>${esc(a.merchant)}</th><td>${esc(x.merchant)}</td></tr>
+      <tr><th>${esc(a.amount)}</th><td>${esc(x.amount)}</td></tr>
+      <tr><th>${esc(a.reason)}</th><td>${esc(x.reason)}</td></tr>
+    </table><p>${esc(a.statement)}</p>
+    <div class="sign"><span>${esc(a.signedAt)}: ${esc(x.signedAt.slice(0, 10))}</span><span>${esc(a.signer)}: <strong>${esc(x.signer)}</strong></span></div></section>`)
+    .join('');
+
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(table.title)}</title><style>
   @page { margin: 16mm 14mm; }
   body { font-family: -apple-system, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif; color: #1a1d21; font-size: 10.5pt; }
@@ -85,6 +106,13 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
   figure img { width: 100%; max-height: 110mm; object-fit: contain; }
   figcaption { text-align: center; font-size: 9pt; color: #5b6470; margin-top: 4px; }
   footer { margin-top: 14px; color: #8a929c; font-size: 8pt; }
+  table.claim { width: 60%; margin: 16px 0 0 auto; }
+  table.claim td { border-bottom: 1px solid #e3e6ea; }
+  table.claim tr.strong td { font-weight: 700; font-size: 12pt; color: #1F3A5F; border-top: 2px solid #1F3A5F; }
+  .affidavit { page-break-before: always; }
+  .affidavit table th { width: 28%; background: #f6f7f9; border-bottom: 1px solid #e3e6ea; }
+  .affidavit p { margin: 18px 0; line-height: 1.6; }
+  .sign { display: flex; justify-content: space-between; margin-top: 28px; }
   </style></head><body>
   <header>
     <div class="total">${esc(labels.total)}<strong>${esc(table.total)}</strong></div>
@@ -98,7 +126,9 @@ export function reportToHtml(table: ReportTable, images: Record<string, string |
       <tr class="grand"><td colspan="${at}">${esc(labels.total)}</td><td class="num">${esc(table.total)}</td>${tail}</tr>
     </tbody>
   </table>
+  ${claim}
   <footer>${esc(labels.generated)}</footer>
   ${receiptPages}
+  ${affidavits}
   </body></html>`;
 }

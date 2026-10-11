@@ -30,7 +30,8 @@ const toPolicyInput = (e: Expense): ExpenseForPolicy => ({
   merchantName: e.merchantName || null,
   merchantCountry: null,
   lineItems: [],
-  hasReceipt: e.receiptId !== null,
+  // A signed lost-receipt statement stands in for the receipt.
+  hasReceipt: e.receiptId !== null || !!e.missingReceipt,
 });
 
 const toPolicyRule = (r: CompanyRule): PolicyRule => ({

@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
 import { DateField } from '../../components/DateField';
 import { Button, Chips, TextField } from '../../components/Form';
 import { QUICK_CURRENCIES } from '../../constants';
 import { uuidv7 } from '../../domain/id';
-import type { Expense } from '../../domain/models';
+import { defaultProof, mileageAmount } from '../../domain/claim';
+import { type Expense, PROOF_TYPES, type ProofType } from '../../domain/models';
 import { convertMinor, formatMoney, fromMinor, toCurrencyCode, toMinor } from '../../domain/money';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../../domain/schemas';
 import { checkCustomValue } from '../../domain/customFields';
@@ -16,6 +17,7 @@ import { localToday } from '../../domain/trip';
 import { buildExtraExpenses } from '../../features/capture/extras';
 import { checkExpenses } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
+import { useTracker } from '../../features/mileage/useTracker';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
@@ -35,7 +37,7 @@ const RATE = /^\d+(\.\d+)?$/;
 export default function ExpenseScreen() {
   const palette = usePalette();
   const t = useT();
-  const params = useLocalSearchParams<{ id: string; receiptId?: string }>();
+  const params = useLocalSearchParams<{ id: string; receiptId?: string; merchant?: string; amount?: string; currency?: string; category?: string }>();
   const isNew = params.id === 'new';
   const existing = useAppStore((s) => s.expenses.find((e) => e.id === params.id));
   const activeTrip = useActiveTrip();
@@ -47,14 +49,37 @@ export default function ExpenseScreen() {
   const baseCurrency = existing?.baseCurrency ?? activeTrip?.baseCurrency ?? 'KRW';
   const receiptId = existing?.receiptId ?? params.receiptId ?? null;
 
-  const [merchant, setMerchant] = useState(existing?.merchantName ?? '');
-  const [amount, setAmount] = useState(existing?.total ?? '');
-  const [currency, setCurrency] = useState(existing?.currency ?? baseCurrency);
+  const [merchant, setMerchant] = useState(existing?.merchantName ?? params.merchant ?? '');
+  const [amount, setAmount] = useState(existing?.split?.fullTotal ?? existing?.total ?? params.amount ?? '');
+  const [currency, setCurrency] = useState(existing?.currency ?? params.currency ?? baseCurrency);
   const [fxRate, setFxRate] = useState(existing?.fxRate ?? '');
   const [date, setDate] = useState(existing?.localDate ?? localToday());
-  const [category, setCategory] = useState<ExpenseCategory>(existing?.category ?? 'meals');
+  const [category, setCategory] = useState<ExpenseCategory>(
+    existing?.category ?? (EXPENSE_CATEGORIES as readonly string[]).find((c) => c === params.category) as ExpenseCategory ?? 'meals',
+  );
   const [payment, setPayment] = useState<PaymentMethod>(existing?.paymentMethod ?? 'corporate_card');
   const [memo, setMemo] = useState(existing?.memo ?? '');
+  const [mode, setMode] = useState<'receipt' | 'mileage'>(existing?.mileage ? 'mileage' : 'receipt');
+  const lastMileage = useMemo(
+    () => [...allExpenses].filter((e) => e.mileage).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.mileage,
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const [people, setPeople] = useState(String(existing?.split?.people ?? 1));
+  const tracker = useTracker();
+  const [km, setKm] = useState(existing?.mileage?.km ?? '');
+  const [kmRate, setKmRate] = useState(existing?.mileage?.rate ?? lastMileage?.rate ?? '');
+  const [route, setRoute] = useState(existing?.mileage?.route ?? '');
+  const [vat, setVat] = useState(existing?.vat ?? '');
+  const [proof, setProof] = useState<ProofType | null>(existing?.proof ?? null);
+  const [missing, setMissing] = useState(existing?.missingReceipt ?? null);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const lastSigner = useMemo(
+    () => allExpenses.find((e) => e.missingReceipt)?.missingReceipt?.signer ?? '',
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const [missingReason, setMissingReason] = useState('');
+  const [missingSigner, setMissingSigner] = useState(lastSigner);
+  const [missingAgree, setMissingAgree] = useState(false);
   const customFields = useAppStore((s) => s.customFields);
   const [custom, setCustom] = useState<Record<string, string>>({ ...(existing?.custom ?? {}) });
   const [image, setImage] = useState<string | null>(null);
@@ -94,6 +119,7 @@ export default function ExpenseScreen() {
       fill('date', p.localDate, setDate);
       fill('category', p.category, setCategory);
       fill('payment', p.paymentMethod, setPayment);
+      fill('vat', p.vat, setVat);
       setExtras(outcome.extras);
     });
     return () => {
@@ -107,7 +133,33 @@ export default function ExpenseScreen() {
     if (needsRate && fxRate === '') setFxRate(lastFxRates[fxKey(currency, baseCurrency)] ?? '');
   }, [currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const amountClean = amount.replace(/,/g, '').trim();
+  const isMileage = mode === 'mileage';
+  const kmClean = km.replace(/,/g, '').trim();
+  const kmRateClean = kmRate.replace(/,/g, '').trim();
+  const mileageMinor = isMileage ? mileageAmount(kmClean, kmRateClean, baseCurrency) : null;
+  const amountClean = isMileage
+    ? (mileageMinor !== null ? fromMinor(mileageMinor, toCurrencyCode(baseCurrency)) : '')
+    : amount.replace(/,/g, '').trim();
+  const fullClean = amountClean;
+  const peopleCount = !isMileage && /^\d+$/.test(people.trim()) && Number(people) >= 1 ? Number(people) : 1;
+  // My share of a bill split between `peopleCount` people, rounded to the currency's minor unit.
+  const share = (v: string) => {
+    if (peopleCount === 1 || !AMOUNT.test(v)) return v;
+    const c = toCurrencyCode(currency);
+    const n = BigInt(peopleCount);
+    return fromMinor((toMinor(v, c) * 2n + n) / (2n * n), c);
+  };
+  const shareClean = share(fullClean);
+  const vatClean = isMileage ? '' : vat.replace(/,/g, '').trim();
+  const proofValue = proof ?? defaultProof(currency, payment);
+  const switchMode = (next: 'receipt' | 'mileage') => {
+    setMode(next);
+    if (next === 'mileage') {
+      setCurrency(baseCurrency);
+      setCategory('fuel');
+      setPayment('other');
+    }
+  };
   const rateClean = fxRate.replace(/,/g, '').trim();
   const currencyOptions = useMemo(
     () => Array.from(new Set([baseCurrency, ...QUICK_CURRENCIES, currency])),
@@ -115,7 +167,12 @@ export default function ExpenseScreen() {
   );
 
   const errors = {
-    amount: AMOUNT.test(amountClean) && Number(amountClean) > 0 ? null : t('expense.err.amount'),
+    amount: isMileage || (AMOUNT.test(amountClean) && Number(amountClean) > 0) ? null : t('expense.err.amount'),
+    km: !isMileage || (AMOUNT.test(kmClean) && Number(kmClean) > 0) ? null : t('mileage.err.km'),
+    kmRate: !isMileage || (AMOUNT.test(kmRateClean) && Number(kmRateClean) > 0) ? null : t('mileage.err.rate'),
+    vat: !vatClean || (AMOUNT.test(vatClean) && Number(vatClean) < Number(amountClean)) ? null : t('expense.err.vat'),
+    people: isMileage || (/^\d+$/.test(people.trim()) && Number(people) >= 1 && Number(people) <= 50) ? null : t('split.err'),
+    missing: !missingOpen || (missingReason.trim() && missingSigner.trim() && missingAgree) ? null : t('missing.err'),
     fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : t('expense.err.rate'),
   };
   const customErrors = Object.fromEntries(
@@ -127,11 +184,11 @@ export default function ExpenseScreen() {
   const valid = [...Object.values(errors), ...Object.values(customErrors)].every((e) => e === null);
 
   const totalBase = useMemo(() => {
-    if (errors.amount || errors.fxRate) return null;
+    if (errors.amount || errors.fxRate || errors.km || errors.kmRate || !amountClean) return null;
     const from = toCurrencyCode(currency);
     const to = toCurrencyCode(baseCurrency);
-    return convertMinor(toMinor(amountClean, from), from, to, needsRate ? rateClean : '1');
-  }, [amountClean, rateClean, currency, baseCurrency, needsRate, errors.amount, errors.fxRate]);
+    return convertMinor(toMinor(shareClean, from), from, to, needsRate ? rateClean : '1');
+  }, [shareClean, amountClean, rateClean, currency, baseCurrency, needsRate, errors.amount, errors.fxRate, errors.km, errors.kmRate]);
 
   // A new entry that matches one already recorded, e.g. a receipt for a card line entered earlier.
   const duplicate = isNew && amountClean
@@ -147,7 +204,7 @@ export default function ExpenseScreen() {
     const base = toCurrencyCode(baseCurrency);
     const draft: Expense = {
       id: draftId, tripId: draftTripId, localDate: date, merchantName: merchant, category, paymentMethod: payment,
-      currency, total: amountClean, fxRate: '1', baseCurrency, totalBase: fromMinor(totalBase, base), receiptId, memo,
+      currency, total: shareClean, fxRate: '1', baseCurrency, totalBase: fromMinor(totalBase, base), receiptId, memo,
       createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: '',
     };
     const others = allExpenses.filter((e) => e.id !== draftId && e.tripId === draftTripId);
@@ -179,16 +236,22 @@ export default function ExpenseScreen() {
       id: existing?.id ?? uuidv7(),
       tripId: existing?.tripId ?? activeTrip?.id ?? null,
       localDate: date,
-      merchantName: merchant.trim(),
+      merchantName: isMileage ? route.trim() || t('mileage.name', { km: kmClean }) : merchant.trim(),
       category,
       paymentMethod: payment,
       currency,
-      total: fromMinor(toMinor(amountClean, local), local),
+      total: fromMinor(toMinor(shareClean, local), local),
       fxRate: needsRate ? rateClean : '1',
       baseCurrency,
       totalBase: fromMinor(totalBase, base),
       receiptId,
-      memo: memo.trim(),
+      memo: memo.trim() || (isMileage ? t('mileage.memo', { km: kmClean, rate: formatMoney(toMinor(kmRateClean, base), base) }) : ''),
+      ...(vatClean ? { vat: share(vatClean) } : {}),
+      ...(peopleCount > 1 ? { split: { people: peopleCount, fullTotal: fromMinor(toMinor(fullClean, local), local) } } : {}),
+      ...(isMileage ? { mileage: { km: kmClean, rate: kmRateClean, route: route.trim() } } : { proof: proofValue }),
+      ...(missingOpen
+        ? { missingReceipt: { reason: missingReason.trim(), signer: missingSigner.trim(), signedAt: new Date().toISOString() } }
+        : missing && !receiptId && !isMileage ? { missingReceipt: missing } : {}),
       custom: Object.fromEntries(
         customFields.flatMap((f) => {
           const v = custom[f.id]?.trim() ?? '';
@@ -273,6 +336,11 @@ export default function ExpenseScreen() {
           <Text style={[type.display, type.numeric, { color: palette.text }]}>
             {totalBase === null ? '—' : formatMoney(totalBase, toCurrencyCode(baseCurrency))}
           </Text>
+          {peopleCount > 1 && totalBase !== null ? (
+            <Text style={[type.caption, { color: palette.textMuted }]}>
+              {t('split.share', { people: peopleCount, full: formatMoney(toMinor(fullClean, toCurrencyCode(currency)), toCurrencyCode(currency)) })}
+            </Text>
+          ) : null}
           {needsRate && totalBase !== null ? (
             <Text style={[type.caption, { color: palette.textMuted }]}>
               {t('expense.converted', { currency, amount: amountClean, rate: rateClean, base: baseCurrency })}
@@ -280,30 +348,87 @@ export default function ExpenseScreen() {
           ) : null}
         </Card>
 
-        <TextField label={t('expense.merchant')} value={merchant} onChangeText={edit('merchant', setMerchant)} placeholder={t('expense.merchantPlaceholder')} />
-        <TextField
-          label={t('expense.amountIn', { currency })}
-          value={amount}
-          onChangeText={edit('amount', setAmount)}
-          keyboardType="decimal-pad"
-          placeholder="0"
-          error={show(errors.amount)}
-        />
-        <Chips label={t('expense.currency')} options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
-        {needsRate ? (
-          <TextField
-            label={t('expense.rate', { currency, base: baseCurrency })}
-            value={fxRate}
-            onChangeText={edit('fxRate', setFxRate)}
-            keyboardType="decimal-pad"
-            placeholder={t('expense.ratePlaceholder')}
-            hint={t('expense.rateHint')}
-            error={show(errors.fxRate)}
+        {!receiptId ? (
+          <Chips
+            label={t('expense.mode')}
+            options={['receipt', 'mileage'] as const}
+            value={mode}
+            labelOf={(m) => t(`expense.mode.${m}`)}
+            onChange={switchMode}
           />
         ) : null}
+        {isMileage ? (
+          <>
+            {tracker.state === 'tracking' ? (
+              <Button title={t('mileage.gpsStop', { km: tracker.km })} onPress={() => setKm(tracker.stop())} />
+            ) : (
+              <Button title={t('mileage.gpsStart')} variant="secondary" onPress={tracker.start} />
+            )}
+            <Text style={[type.caption, { color: tracker.state === 'denied' || tracker.state === 'error' ? palette.block : palette.textMuted }]}>
+              {t(tracker.state === 'denied' ? 'mileage.gpsDenied' : tracker.state === 'error' ? 'mileage.gpsError' : 'mileage.gpsHint')}
+            </Text>
+            <TextField label={t('mileage.km')} value={km} onChangeText={setKm} keyboardType="decimal-pad" placeholder="0" error={show(errors.km)} />
+            <TextField
+              label={t('mileage.rate', { currency: baseCurrency })}
+              value={kmRate}
+              onChangeText={setKmRate}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              hint={t('mileage.rateHint')}
+              error={show(errors.kmRate)}
+            />
+            <TextField label={t('mileage.route')} value={route} onChangeText={setRoute} placeholder={t('mileage.routePlaceholder')} />
+          </>
+        ) : (
+          <>
+            <TextField label={t('expense.merchant')} value={merchant} onChangeText={edit('merchant', setMerchant)} placeholder={t('expense.merchantPlaceholder')} />
+            <TextField
+              label={t('expense.amountIn', { currency })}
+              value={amount}
+              onChangeText={edit('amount', setAmount)}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              error={show(errors.amount)}
+            />
+            <Chips label={t('expense.currency')} options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
+            {needsRate ? (
+              <TextField
+                label={t('expense.rate', { currency, base: baseCurrency })}
+                value={fxRate}
+                onChangeText={edit('fxRate', setFxRate)}
+                keyboardType="decimal-pad"
+                placeholder={t('expense.ratePlaceholder')}
+                hint={t('expense.rateHint')}
+                error={show(errors.fxRate)}
+              />
+            ) : null}
+          </>
+        )}
         <DateField label={t('expense.date')} value={date} onChange={edit('date', setDate)} />
-        <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
-        <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+        {!isMileage ? (
+          <>
+            <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
+            <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+            <TextField
+              label={t('split.people')}
+              value={people}
+              onChangeText={setPeople}
+              keyboardType="number-pad"
+              hint={t('split.hint')}
+              error={show(errors.people)}
+            />
+            <TextField
+              label={t('expense.vat', { currency })}
+              value={vat}
+              onChangeText={edit('vat', setVat)}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              hint={t('expense.vatHint')}
+              error={show(errors.vat)}
+            />
+            <Chips label={t('expense.proof')} options={PROOF_TYPES} value={proofValue} labelOf={(p) => t(`proof.${p}`)} onChange={setProof} />
+          </>
+        ) : null}
         {customFields.map((f) =>
           f.type === 'choice' ? (
             <View key={f.id} style={styles.customChoice}>
@@ -331,6 +456,38 @@ export default function ExpenseScreen() {
         )}
         <TextField label={t('expense.memo')} value={memo} onChangeText={setMemo} placeholder={t('expense.memoPlaceholder')} multiline />
 
+        {!receiptId && !isMileage ? (
+          missingOpen ? (
+            <View style={[styles.dup, { borderColor: palette.border }]}>
+              <Text style={[type.label, { color: palette.text, fontWeight: '700' }]}>{t('missing.title')}</Text>
+              <TextField label={t('missing.reason')} value={missingReason} onChangeText={setMissingReason} placeholder={t('missing.reasonPlaceholder')} multiline />
+              <TextField label={t('missing.signer')} value={missingSigner} onChangeText={setMissingSigner} />
+              <Pressable
+                onPress={() => setMissingAgree((v) => !v)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: missingAgree }}
+                style={styles.check}
+              >
+                <View style={[styles.box, { borderColor: palette.brand, backgroundColor: missingAgree ? palette.brand : 'transparent' }]}>
+                  {missingAgree ? <Text style={{ color: palette.onBrand, fontWeight: '700' }}>✓</Text> : null}
+                </View>
+                <Text style={[type.body, { color: palette.text, flex: 1 }]}>{t('missing.agree')}</Text>
+              </Pressable>
+              {show(errors.missing) ? <Text style={[type.caption, { color: palette.block }]}>{errors.missing}</Text> : null}
+              <Button title={t('missing.cancel')} variant="secondary" onPress={() => setMissingOpen(false)} />
+            </View>
+          ) : missing ? (
+            <View style={[styles.dup, { borderColor: palette.border }]}>
+              <Text style={[type.label, { color: palette.textMuted }]}>
+                {t('missing.done', { signer: missing.signer, date: missing.signedAt.slice(0, 10) })}
+              </Text>
+              <Button title={t('missing.remove')} variant="secondary" onPress={() => setMissing(null)} />
+            </View>
+          ) : (
+            <Button title={t('missing.open')} variant="secondary" onPress={() => setMissingOpen(true)} />
+          )
+        ) : null}
+
         <Button title={isNew ? t('expense.saveNew') : t('expense.saveEdit')} onPress={save} />
         {!isNew ? (
           <Button title={confirmDelete ? t('expense.deleteConfirm') : t('expense.delete')} variant="danger" onPress={remove} />
@@ -346,4 +503,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },
   receipt: { width: '100%', height: 280, borderRadius: 12, borderWidth: 1 },
+  check: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
