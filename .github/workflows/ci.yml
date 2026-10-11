@@ -44,3 +44,12 @@ jobs:
           for f in supabase/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$f"; done
           psql -v ON_ERROR_STOP=1 -f supabase/seed.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/smoke.sql
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
+      - run: deno check supabase/functions/*/index.ts

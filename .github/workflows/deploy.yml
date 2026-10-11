@@ -1,0 +1,51 @@
+name: Deploy server
+
+# Applies database migrations and Edge Functions to the Supabase project
+# whenever main changes. Skips quietly until the repository secrets exist.
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+jobs:
+  supabase:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: sxkembehrqovjmovagwy
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: Check credentials
+        id: creds
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::notice::SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD not set; skipping deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.creds.outputs.ready == 'true'
+      - uses: supabase/setup-cli@v1
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          version: latest
+      - name: Apply database migrations and seed
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db push --include-seed
+      - name: Deploy Edge Functions
+        if: steps.creds.outputs.ready == 'true'
+        run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
+      - name: Allow anonymous sign-in (guest use until accounts exist)
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          curl -fsS -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d '{"external_anonymous_users_enabled": true}' > /dev/null
