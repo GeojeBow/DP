@@ -187,6 +187,11 @@ export function planFill(
     const v = fieldValue[key];
     if (ref && v !== undefined && v !== '') cells[ref.toUpperCase()] = v;
   }
+  // The receipt's own amount and currency appear only when the form has room for both the
+  // paid and the converted amount. Otherwise its one money column is what gets settled, so it
+  // takes the trip-currency amount and the currency column says so: a won receipt never
+  // shows up as 14,000 in a dollar report.
+  const baseOnly = !!table && !(table.columns.amount && table.columns.amountBase);
   const rows = table
     ? own.map((e, i) => {
         const values: Record<TemplateColumn, CellValue> = {
@@ -195,8 +200,8 @@ export function planFill(
           merchant: e.merchantName,
           category: labels.category(e.category),
           payment: labels.payment(e.paymentMethod),
-          currency: e.currency,
-          amount: Number(e.total),
+          currency: baseOnly ? base : e.currency,
+          amount: Number(baseOnly ? e.totalBase : e.total),
           fxRate: Number(e.fxRate),
           amountBase: Number(e.totalBase),
           memo: e.memo,
