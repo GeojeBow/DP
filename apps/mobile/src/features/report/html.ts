@@ -152,7 +152,9 @@ export function reportToHtml(
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .hint { color: #5b6470; margin: -6px 0 10px; }
   figure { margin: 0; break-inside: avoid; border: 1px solid #c9ced6; border-radius: 6px; overflow: hidden; }
-  figure img { display: block; width: 100%; max-height: 105mm; object-fit: contain; background: #fafbfc; }
+  figure img { display: block; width: 100%; max-height: 105mm; object-fit: contain; background: #fff; }
+  /* Photos read like a scan: no colour cast, darker ink, whiter paper. */
+  figure img { filter: grayscale(1) contrast(1.4) brightness(1.1); }
   .day { margin-top: 14px; }
   .day h3 { margin: 0 0 8px; padding: 6px 10px; background: #1F3A5F; color: #fff; border-radius: 4px; font-size: 11pt; break-after: avoid; }
   .cap { display: flex; gap: 8px; align-items: center; padding: 6px 8px; background: #E8EDF4; border-bottom: 1px solid #c9ced6; }
