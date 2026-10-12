@@ -90,7 +90,9 @@ export async function shareXlsxWithPdf(bytes: Uint8Array, title: string, html: s
   }
   const xlsx = writeCache(bytes, `${safeName(title)}.xlsx`);
   const pdf = await pdfFile(html, pdfTitle);
-  await share.open({ urls: [xlsx.uri, pdf.uri], filenames: [xlsx.name, pdf.name], title, failOnCancel: false });
+  // No `filenames`: on Android it treats each local path as a folder and appends the name, so the
+  // receiving app gets a file that doesn't exist ("upload failed"). The files already carry their names.
+  await share.open({ urls: [xlsx.uri, pdf.uri], title, failOnCancel: false });
 }
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
