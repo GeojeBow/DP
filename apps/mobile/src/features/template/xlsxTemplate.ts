@@ -165,6 +165,9 @@ const valueKey = (xml: string | undefined): string | undefined => {
   return v === undefined ? undefined : `${/\bt="s"/.test(xml) ? 's' : 'n'}:${v}`;
 };
 
+const cellFormula = (ref: string, formula: string, style: string | undefined) =>
+  `<c r="${ref}"${style ? ` s="${style}"` : ''}><f>${formula}</f></c>`;
+
 function cellXml(ref: string, value: CellValue, style: string | undefined): string {
   const s = style ? ` s="${style}"` : '';
   if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${ref}"${s}><v>${value}</v></c>`;
@@ -182,6 +185,39 @@ function shiftRefs(text: string, fromRow: number, delta: number, tableEnd: numbe
   });
 }
 
+/** Moves the relative (no $) references in a formula by `dr` rows and `dc` columns, as Excel does when copying it. */
+function translate(formula: string, dr: number, dc: number): string {
+  if (!dr && !dc) return formula;
+  return formula.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)(?![\d(])/g, (_all, d1: string, col: string, d2: string, row: string) =>
+    `${d1}${d1 ? col : columnLetters(columnIndex(col) + dc)}${d2}${d2 ? row : Number(row) + dr}`);
+}
+
+/**
+ * Rewrites shared formulas (one master cell plus children that say "same as the master") as
+ * ordinary formulas, so rows can move independently without leaving a child whose master
+ * range no longer fits, which Excel reports as a broken file.
+ */
+function unshareFormulas(rows: RowXml[]) {
+  const masters = new Map<string, { row: number; col: number; text: string }>();
+  for (const r of rows) {
+    for (const [c, xml] of r.cells) {
+      const m = /<f\b[^>]*\bt="shared"[^>]*\bsi="(\d+)"[^>]*>([\s\S]*?)<\/f>/.exec(xml)
+        ?? /<f\b[^>]*\bsi="(\d+)"[^>]*\bt="shared"[^>]*>([\s\S]*?)<\/f>/.exec(xml);
+      if (m && m[2]) masters.set(m[1]!, { row: r.num, col: c, text: m[2] });
+    }
+  }
+  for (const r of rows) {
+    for (const [c, xml] of r.cells) {
+      if (!/<f\b[^>]*\bt="shared"/.test(xml)) continue;
+      const si = /\bsi="(\d+)"/.exec(xml)?.[1];
+      const master = si === undefined ? undefined : masters.get(si);
+      if (!master) continue;
+      const formula = translate(master.text, r.num - master.row, c - master.col);
+      r.cells.set(c, xml.replace(/<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/, `<f>${formula}</f>`));
+    }
+  }
+}
+
 /**
  * Writes the plan into the template and returns new .xlsx bytes. When there
  * are more items than the template's empty item rows, the rows below the
@@ -193,6 +229,7 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
   const dataMatch = /<sheetData\b[^>]*?(?:\/>|>([\s\S]*?)<\/sheetData>)/.exec(sheet);
   if (!dataMatch) throw new Error('Worksheet has no data section');
   const rows = parseRows(dataMatch[1] ?? '');
+  unshareFormulas(rows);
   const byNum = new Map(rows.map((r) => [r.num, r]));
   const getRow = (num: number, like?: RowXml): RowXml => {
     let r = byNum.get(num);
@@ -242,36 +279,47 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
     shift = Math.max(plan.table.rows.length - capacity, 0);
     if (shift > 0) {
       for (const r of rows) {
-        if (r.num > end) {
+        // Rows below the table move down; formulas anywhere (e.g. a summary at the top) follow them.
+        const moves = r.num > end;
+        if (moves) {
           byNum.delete(r.num);
           r.num += shift;
-          for (const [c, xml] of r.cells) {
-            r.cells.set(
-              c,
-              xml
-                .replace(/\br="([A-Z]+)\d+"/, `r="$1${r.num}"`)
-                .replace(/<f>([\s\S]*?)<\/f>/, (_, f: string) => `<f>${shiftRefs(f, end + 1, shift, end)}</f>`),
-            );
-          }
+        }
+        for (const [c, xml] of r.cells) {
+          if (!moves && !hasFormula(xml)) continue;
+          r.cells.set(
+            c,
+            xml
+              .replace(/\br="([A-Z]+)\d+"/, `r="$1${r.num}"`)
+              .replace(/<f\b([^>]*)>([\s\S]*?)<\/f>/, (_, attrs: string, f: string) =>
+                `<f${attrs.replace(/\bref="([^"]+)"/, (_a, ref: string) => `ref="${shiftRefs(ref, end + 1, shift, -1)}"`)}>${shiftRefs(f, end + 1, shift, end)}</f>`),
+          );
         }
       }
       for (const r of rows) byNum.set(r.num, r);
       sheet = sheet.replace(/<mergeCell ref="([^"]+)"\/>/g, (_, ref: string) => `<mergeCell ref="${shiftRefs(ref, end + 1, shift, -1)}"/>`);
     }
-    // Pre-filled text on the first item row (such as "USD") is copied into rows that had to be added.
-    const filler = [...(model?.cells.entries() ?? [])].filter(([c, xml]) => !cols.has(c) && isText(xml));
     plan.table.rows.forEach((item, i) => {
       const rowNum = firstRow + i;
       const added = rowNum > tableEnd;
       const r = getRow(rowNum, model);
-      if (added) {
-        for (const [c, xml] of filler) r.cells.set(c, xml.replace(/\br="[A-Z]+\d+"/, `r="${columnLetters(c)}${rowNum}"`));
-      }
       for (const [col, value] of Object.entries(item)) {
         const idx = columnIndex(col);
         const existing = r.cells.get(idx);
         if (hasFormula(existing)) continue;
         r.cells.set(idx, cellXml(`${col}${rowNum}`, value, styleOf(existing) ?? styleOf(model?.cells.get(idx))));
+      }
+      // A row added for overflow looks like the first item row: same borders, pre-filled text
+      // (such as "USD") and per-row formulas (such as =K15/L15, moved to this row).
+      if (added) {
+        for (const [c, xml] of model?.cells ?? []) {
+          if (r.cells.has(c)) continue;
+          const ref = `${columnLetters(c)}${rowNum}`;
+          const f = /<f>([\s\S]*?)<\/f>/.exec(xml)?.[1];
+          if (f !== undefined) r.cells.set(c, cellFormula(ref, translate(f, rowNum - firstRow, 0), styleOf(xml)));
+          else if (isText(xml)) r.cells.set(c, xml.replace(/\br="[A-Z]+\d+"/, `r="${ref}"`));
+          else r.cells.set(c, `<c r="${ref}"${styleOf(xml) ? ` s="${styleOf(xml)}"` : ''}/>`);
+        }
       }
     });
   }
