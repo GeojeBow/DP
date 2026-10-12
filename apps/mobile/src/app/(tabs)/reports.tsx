@@ -124,6 +124,60 @@ export default function ReportsScreen() {
     }
   };
 
+  const formatRow = (row: { id: string; name: string; tag: string; sub: string; edit: { pathname: string; id: string } }) => {
+    const selected = row.id === (companyTemplate?.id ?? preset.id);
+    return (
+      <Pressable
+        key={row.id}
+        onPress={() => setPresetId(row.id)}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        style={[styles.preset, { borderColor: selected ? palette.brand : palette.border, borderWidth: selected ? 2 : 1 }]}
+      >
+        <Ionicons
+          name={selected ? 'radio-button-on' : 'radio-button-off'}
+          size={20}
+          color={selected ? palette.brand : palette.textMuted}
+        />
+        <View style={styles.presetText}>
+          <Text style={[type.body, { color: palette.text, fontWeight: '600' }]}>
+            {row.name}
+            <Text style={[type.caption, { color: palette.textMuted }]}>
+              {'  '}{row.tag}{row.id === lastFormatId ? ` · ${t('template.lastUsed')}` : ''}
+            </Text>
+          </Text>
+          <Text style={[type.caption, { color: palette.textMuted }]} numberOfLines={1}>
+            {row.sub}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() =>
+            row.edit.pathname === '/template/[id]'
+              ? router.push({ pathname: '/template/[id]', params: { id: row.edit.id } })
+              : router.push({ pathname: '/report/[id]', params: { id: row.edit.id } })
+          }
+          accessibilityRole="button"
+          hitSlop={8}
+        >
+          <Text style={[type.label, { color: palette.brand }]}>{t('reports.edit')}</Text>
+        </Pressable>
+      </Pressable>
+    );
+  };
+
+  const addButton = (a: { key: string; icon: 'create-outline' | 'cloud-upload-outline' | 'download-outline'; label: string; onPress: () => void }) => (
+    <Pressable
+      key={a.key}
+      onPress={a.onPress}
+      disabled={uploading}
+      accessibilityRole="button"
+      style={[styles.addButton, { borderColor: palette.border, opacity: uploading ? 0.5 : 1 }]}
+    >
+      <Ionicons name={a.icon} size={22} color={palette.brand} />
+      <Text style={[type.caption, styles.addLabel, { color: palette.text }]}>{a.label}</Text>
+    </Pressable>
+  );
+
   return (
     <Screen title={t('tab.reports')} subtitle={t('reports.subtitle')}>
       <Card title={t('reports.trip')}>
@@ -133,82 +187,38 @@ export default function ReportsScreen() {
         </Text>
       </Card>
 
-      {/* Company Excel files and app-made formats in one list */}
+      {/* Two kinds of report format: the company's own Excel file, or one made in the app */}
       <Card title={t('reports.formats')}>
-        <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.formatsHint')}</Text>
-        {[
-          ...templates.map((x) => ({ id: x.id, name: x.name, tag: t('template.badge'), sub: x.fileName, edit: { pathname: '/template/[id]', id: x.id } })),
-          ...presets.map((p) => ({
-            id: p.id,
-            name: p.name,
-            tag: p.builtin ? t('reports.builtin') : t('reports.mine'),
-            sub: `${t('reports.columnsSummary', { n: p.columns.length, group: t(`group.${p.groupBy}`) })} · ${p.columns.map((c) => t(`column.${c}`)).join(', ')}`,
-            edit: { pathname: '/report/[id]', id: p.id },
-          })),
-        ].map((row) => {
-          const selected = row.id === (companyTemplate?.id ?? preset.id);
-          return (
-            <Pressable
-              key={row.id}
-              onPress={() => setPresetId(row.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              style={[styles.preset, { borderColor: selected ? palette.brand : palette.border, borderWidth: selected ? 2 : 1 }]}
-            >
-              <Ionicons
-                name={selected ? 'radio-button-on' : 'radio-button-off'}
-                size={20}
-                color={selected ? palette.brand : palette.textMuted}
-              />
-              <View style={styles.presetText}>
-                <Text style={[type.body, { color: palette.text, fontWeight: '600' }]}>
-                  {row.name}
-                  <Text style={[type.caption, { color: palette.textMuted }]}>
-                    {'  '}{row.tag}{row.id === lastFormatId ? ` · ${t('template.lastUsed')}` : ''}
-                  </Text>
-                </Text>
-                <Text style={[type.caption, { color: palette.textMuted }]} numberOfLines={1}>
-                  {row.sub}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() =>
-                  row.edit.pathname === '/template/[id]'
-                    ? router.push({ pathname: '/template/[id]', params: { id: row.edit.id } })
-                    : router.push({ pathname: '/report/[id]', params: { id: row.edit.id } })
-                }
-                accessibilityRole="button"
-                hitSlop={8}
-              >
-                <Text style={[type.label, { color: palette.brand }]}>{t('reports.edit')}</Text>
-              </Pressable>
-            </Pressable>
-          );
-        })}
-        <Text style={[type.label, { color: palette.textMuted, marginTop: spacing.sm }]}>{t('reports.addTitle')}</Text>
-        <View style={styles.addRow}>
-          {[
-            { key: 'new', icon: 'create-outline' as const, label: t('reports.addNew'), onPress: () => router.push({ pathname: '/report/[id]', params: { id: 'new' } }) },
-            { key: 'excel', icon: 'cloud-upload-outline' as const, label: uploading ? t('template.reading') : t('reports.addExcel'), onPress: upload },
-            { key: 'shared', icon: 'download-outline' as const, label: t('reports.addShared'), onPress: importShared },
-          ].map((a) => (
-            <Pressable
-              key={a.key}
-              onPress={a.onPress}
-              disabled={uploading}
-              accessibilityRole="button"
-              style={[styles.addButton, { borderColor: palette.border, opacity: uploading ? 0.5 : 1 }]}
-            >
-              <Ionicons name={a.icon} size={22} color={palette.brand} />
-              <Text style={[type.caption, styles.addLabel, { color: palette.text }]}>{a.label}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.group}>
+          <Text style={[type.body, { color: palette.text, fontWeight: '700' }]}>{t('reports.companyGroup')}</Text>
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.companyGroupHint')}</Text>
+          {templates.map((x) => formatRow({ id: x.id, name: x.name, tag: t('template.badge'), sub: x.fileName, edit: { pathname: '/template/[id]', id: x.id } }))}
+          <View style={styles.addRow}>
+            {addButton({ key: 'excel', icon: 'cloud-upload-outline', label: uploading ? t('template.reading') : t('reports.addExcel'), onPress: upload })}
+            {addButton({ key: 'shared', icon: 'download-outline', label: t('reports.addShared'), onPress: importShared })}
+          </View>
+        </View>
+        <View style={[styles.divider, { backgroundColor: palette.border }]} />
+        <View style={styles.group}>
+          <Text style={[type.body, { color: palette.text, fontWeight: '700' }]}>{t('reports.appGroup')}</Text>
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t('reports.appGroupHint')}</Text>
+          {presets.map((p) =>
+            formatRow({
+              id: p.id,
+              name: p.name,
+              tag: p.builtin ? t('reports.builtin') : t('reports.mine'),
+              sub: `${t('reports.columnsSummary', { n: p.columns.length, group: t(`group.${p.groupBy}`) })} · ${p.columns.map((c) => t(`column.${c}`)).join(', ')}`,
+              edit: { pathname: '/report/[id]', id: p.id },
+            }),
+          )}
+          <View style={styles.addRow}>
+            {addButton({ key: 'new', icon: 'create-outline', label: t('reports.addNew'), onPress: () => router.push({ pathname: '/report/[id]', params: { id: 'new' } }) })}
+          </View>
         </View>
       </Card>
 
       {/* What kind of file, and send it */}
       <Card title={t('reports.exportTitle')}>
-        <Text style={[type.label, { color: palette.textMuted }]}>{t('reports.fileType')}</Text>
         <View style={styles.fileTypes}>
           {REPORT_FORMATS.map((f) => {
             const selected = f === exportFormat;
@@ -258,6 +268,8 @@ const styles = StyleSheet.create({
   preset: { borderRadius: radius.card, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   presetText: { flex: 1, gap: 2 },
   addRow: { flexDirection: 'row', gap: spacing.sm },
+  group: { gap: spacing.sm },
+  divider: { height: 1, marginVertical: spacing.xs },
   addButton: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: spacing.md, paddingHorizontal: spacing.xs, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.control },
   addLabel: { textAlign: 'center', fontWeight: '600' },
 });
