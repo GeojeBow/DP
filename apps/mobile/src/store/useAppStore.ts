@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { PaymentMethod } from '../domain/schemas';
 import type { CustomField } from '../domain/customFields';
 import type { Expense, Trip } from '../domain/models';
 import type { Language } from '../i18n';
@@ -19,6 +20,12 @@ interface AppState {
   activeTripId: string | null;
   /** Last rate used per "FROM>TO" pair, offered as the default next time */
   lastFxRates: Record<string, string>;
+  /** Corporate or personal, learned per card from its last four digits */
+  cardMethods: Record<string, PaymentMethod>;
+  /** The card kind saved last, the default for the next expense */
+  lastCardMethod: PaymentMethod | null;
+  /** Remembers which kind of card was used, and for which last four digits */
+  rememberCard: (last4: string | undefined, method: PaymentMethod) => void;
   language: Language;
   theme: ThemeId;
   /** Evening and end-of-trip reminders */
@@ -79,6 +86,19 @@ interface AppState {
   deleteTrip: (id: string) => Promise<void>;
 }
 
+const isCard = (m: PaymentMethod) => m === 'corporate_card' || m === 'personal_card';
+
+/**
+ * Corporate or personal card for a receipt: what this card was saved as before, else the
+ * kind used last. A receipt alone can't tell the two apart.
+ */
+export function cardMethodFor(
+  s: Pick<AppState, 'cardMethods' | 'lastCardMethod'>, last4: string | undefined,
+): { method: PaymentMethod; known: boolean } {
+  const known = last4 ? s.cardMethods[last4] : undefined;
+  return { method: known ?? s.lastCardMethod ?? 'corporate_card', known: !!known };
+}
+
 export const fxKey = (from: string, to: string) => `${from}>${to}`;
 
 export const useAppStore = create<AppState>()(
@@ -88,6 +108,15 @@ export const useAppStore = create<AppState>()(
       expenses: [],
       activeTripId: null,
       lastFxRates: {},
+      cardMethods: {},
+      lastCardMethod: null,
+      rememberCard: (last4, method) => {
+        if (!isCard(method)) return;
+        set((s) => ({
+          lastCardMethod: method,
+          ...(last4 && s.cardMethods[last4] !== method ? { cardMethods: { ...s.cardMethods, [last4]: method } } : {}),
+        }));
+      },
       language: 'ko',
       theme: 'peach',
       reminders: true,

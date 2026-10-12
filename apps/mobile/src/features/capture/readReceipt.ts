@@ -13,6 +13,10 @@ export interface ReceiptPrefill {
   category?: ExpenseCategory;
   paymentMethod?: PaymentMethod;
   vat?: string;
+  /** Last four digits of the card, used to tell corporate from personal cards */
+  cardLast4?: string;
+  /** Paid by card, corporate or personal unknown */
+  byCard?: boolean;
 }
 
 export type ReadReceiptOutcome =
@@ -37,10 +41,13 @@ function prefillOf(tx: Transaction): ReceiptPrefill {
   if (tx.date) prefill.localDate = tx.date;
   if (tx.category) prefill.category = tx.category;
   if (tx.tax && !tx.tax.startsWith('-') && Number(tx.tax) > 0) prefill.vat = tx.tax;
-  // A receipt can't tell a corporate card from a personal one, so keep the user's default for cards.
+  // A receipt can't tell a corporate card from a personal one: the card's last digits decide
+  // (see cardMethodFor), so only non-card hints are taken as they are.
   if (tx.payment_method_hint && !CARD_HINTS.has(tx.payment_method_hint)) {
     prefill.paymentMethod = tx.payment_method_hint;
   }
+  if (tx.card_last4) prefill.cardLast4 = tx.card_last4;
+  if (tx.card_last4 || (tx.payment_method_hint && CARD_HINTS.has(tx.payment_method_hint))) prefill.byCard = true;
   return prefill;
 }
 

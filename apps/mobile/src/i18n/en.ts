@@ -689,6 +689,8 @@ export const en: Record<MessageKey, string> = {
   'category.other': 'Other',
   'payment.corporate_card': 'Corporate card',
   'payment.personal_card': 'Personal card',
+  'expense.cardKnown': 'Card ending {last4} · remembered as {kind}',
+  'expense.cardNew': 'Card ending {last4} · new card. Pick corporate or personal and it will be remembered',
   'payment.cash': 'Cash',
   'payment.bank_transfer': 'Bank transfer',
   'payment.mobile_pay': 'Mobile pay',

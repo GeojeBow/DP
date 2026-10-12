@@ -94,6 +94,7 @@ const PROMPT = `This image was taken by a business traveller. Read it and descri
 - Use null for anything not printed on it; never guess.
 - A card statement or app screenshot may list several transactions; return one entry per transaction.
 - total is the amount actually charged, including tax and tip.
+- card_last4 is the last 4 digits of the card number when printed, even if the rest is masked (e.g. "1234-****-****-5678" gives "5678").
 - receipt_box frames the receipt paper itself (not the table or background around it), so the app can crop the photo like a scan.
 - If the image is not a receipt, invoice or statement, set is_receipt to false and return no transactions.`;
 

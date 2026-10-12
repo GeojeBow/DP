@@ -47,11 +47,19 @@ describe('toPrefill', () => {
     }));
     expect(out).toEqual({
       kind: 'read',
-      prefill: { currency: 'JPY', localDate: '2026-10-03', category: 'meals', vat: '290' },
+      prefill: { currency: 'JPY', localDate: '2026-10-03', category: 'meals', vat: '290', byCard: true },
       extras: [
         { merchantName: 'Ichiran Shibuya', total: '3200', currency: 'JPY', localDate: '2026-10-03', category: 'meals', paymentMethod: 'cash', vat: '290' },
       ],
     });
+  });
+
+  it('passes the card\'s last digits on, even from a masked number', () => {
+    const out = toPrefill(parse({
+      is_receipt: true, document_kind: 'receipt', transactions: [{ ...tx, payment_method_hint: 'corporate_card', card_last4: '1234-****-****-5678' }],
+    }));
+    expect(out.kind === 'read' && out.prefill).toMatchObject({ cardLast4: '5678', byCard: true });
+    expect(out.kind === 'read' && out.prefill.paymentMethod).toBeUndefined();
   });
 
   it('reports non-receipts', () => {
