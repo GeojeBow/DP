@@ -31,7 +31,7 @@ export default function HomeScreen() {
 
   if (!trip) {
     return (
-      <Screen title={t('tab.home')} subtitle={t('home.empty.subtitle')}>
+      <Screen brand title={t('tab.home')} subtitle={t('home.empty.subtitle')}>
         <Card title={t('home.start')}>
           <Button title={t('home.createTrip')} onPress={() => router.push('/trip/new')} />
           <Button title={t('home.captureWithoutTrip')} variant="secondary" onPress={() => router.push('/capture')} />
@@ -79,6 +79,7 @@ export default function HomeScreen() {
 
   return (
     <Screen
+      brand
       eyebrow={t('home.greeting')}
       title={trip.title}
       action={

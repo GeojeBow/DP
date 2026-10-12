@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { spacing, type, usePalette } from '../theme/tokens';
 import { Backdrop } from './Backdrop';
+import { Wordmark } from './Wordmark';
 
 interface ScreenProps {
   title: string;
@@ -12,15 +13,18 @@ interface ScreenProps {
   eyebrow?: string;
   /** Control beside the title, e.g. a shortcut button. */
   action?: ReactNode;
+  /** Show the app's logo above everything, on the home screen. */
+  brand?: boolean;
   children?: ReactNode;
 }
 
-export function Screen({ title, subtitle, eyebrow, action, children }: ScreenProps) {
+export function Screen({ title, subtitle, eyebrow, action, brand, children }: ScreenProps) {
   const palette = usePalette();
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: palette.background }]} edges={['top']}>
       <Backdrop />
       <ScrollView contentContainerStyle={styles.content}>
+        {brand ? <View style={styles.brand}><Wordmark /></View> : null}
         {eyebrow ? <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>{eyebrow}</Text> : null}
         <View style={styles.titleRow}>
           <Text style={[type.display, styles.title, { color: palette.text }]} accessibilityRole="header">
@@ -37,6 +41,7 @@ export function Screen({ title, subtitle, eyebrow, action, children }: ScreenPro
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  brand: { marginBottom: spacing.sm },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl * 2, gap: spacing.xs },
   body: { marginTop: spacing.lg, gap: spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
