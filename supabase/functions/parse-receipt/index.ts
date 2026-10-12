@@ -36,9 +36,16 @@ const nullableEnum = (values: string[]) => ({ anyOf: [{ type: 'string', enum: va
 // Mirrors receiptParseResultSchema in apps/mobile/src/domain/schemas.ts, which the app validates against.
 const RECEIPT_SCHEMA = {
   type: 'object',
-  required: ['is_receipt', 'document_kind', 'transactions'],
+  required: ['is_receipt', 'document_kind', 'receipt_box', 'transactions'],
   properties: {
     is_receipt: { type: 'boolean' },
+    receipt_box: nullable({
+      type: 'array',
+      items: { type: 'integer' },
+      minItems: 4,
+      maxItems: 4,
+      description: 'Where the receipt paper is in the image: [ymin, xmin, ymax, xmax], each 0-1000',
+    }),
     document_kind: { type: 'string', enum: ['receipt', 'invoice', 'card_statement', 'other'] },
     transactions: {
       type: 'array',
@@ -87,6 +94,7 @@ const PROMPT = `This image was taken by a business traveller. Read it and descri
 - Use null for anything not printed on it; never guess.
 - A card statement or app screenshot may list several transactions; return one entry per transaction.
 - total is the amount actually charged, including tax and tip.
+- receipt_box frames the receipt paper itself (not the table or background around it), so the app can crop the photo like a scan.
 - If the image is not a receipt, invoice or statement, set is_receipt to false and return no transactions.`;
 
 const cors = {

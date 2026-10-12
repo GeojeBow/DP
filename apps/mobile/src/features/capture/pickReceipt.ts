@@ -1,9 +1,12 @@
+import { File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform, TurboModuleRegistry } from 'react-native';
 
 import { uuidv7 } from '../../domain/id';
-import { saveReceiptImage } from '../../store/receiptImages';
+import { loadReceiptImage, saveReceiptImage } from '../../store/receiptImages';
+import { cropArea } from './cropArea';
+import type { ReceiptBox } from './readReceipt';
 
 export type PickSource = 'camera' | 'gallery';
 
@@ -91,4 +94,42 @@ async function store(uri: string, width?: number, height?: number): Promise<stri
   const receiptId = uuidv7();
   await saveReceiptImage(receiptId, `data:image/jpeg;base64,${saved.base64}`);
   return receiptId;
+}
+
+/**
+ * Crops a stored receipt photo to the receipt paper the AI found, so photos picked from the
+ * gallery look like scans in reports too. Returns the new image, or null when nothing changed.
+ */
+export async function cropToReceipt(receiptId: string, box: ReceiptBox): Promise<string | null> {
+  const area = cropArea(box);
+  if (!area) return null;
+  const dataUri = await loadReceiptImage(receiptId);
+  const base64 = dataUri && /^data:image\/[a-z]+;base64,(.+)$/.exec(dataUri)?.[1];
+  if (!dataUri || !base64) return null;
+  let source = dataUri;
+  let temp: File | undefined;
+  if (Platform.OS !== 'web') {
+    temp = new File(Paths.cache, `crop-${receiptId}.jpg`);
+    if (temp.exists) temp.delete();
+    temp.create();
+    temp.write(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)));
+    source = temp.uri;
+  }
+  try {
+    const { width, height } = await ImageManipulator.manipulate(source).renderAsync();
+    const crop = {
+      originX: Math.round(area.left * width),
+      originY: Math.round(area.top * height),
+      width: Math.round((area.right - area.left) * width),
+      height: Math.round((area.bottom - area.top) * height),
+    };
+    const rendered = await ImageManipulator.manipulate(source).crop(crop).renderAsync();
+    const saved = await rendered.saveAsync({ compress: 0.7, format: SaveFormat.JPEG, base64: true });
+    if (!saved.base64) return null;
+    const cropped = `data:image/jpeg;base64,${saved.base64}`;
+    await saveReceiptImage(receiptId, cropped);
+    return cropped;
+  } finally {
+    if (temp?.exists) temp.delete();
+  }
 }

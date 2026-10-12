@@ -17,10 +17,13 @@ export interface ReceiptPrefill {
 
 export type ReadReceiptOutcome =
   /** `extras`: the other payments on the same image, e.g. a card statement's other lines */
-  | { kind: 'read'; prefill: ReceiptPrefill; extras: ReceiptPrefill[] }
+  | { kind: 'read'; prefill: ReceiptPrefill; extras: ReceiptPrefill[]; box?: ReceiptBox }
   | { kind: 'not_receipt' }
   | { kind: 'quota_exceeded' }
   | { kind: 'failed'; reason?: string };
+
+/** Where the receipt paper is in the photo: [ymin, xmin, ymax, xmax] on a 0-1000 scale. */
+export type ReceiptBox = [number, number, number, number];
 
 const CARD_HINTS = new Set<PaymentMethod>(['corporate_card', 'personal_card']);
 
@@ -44,7 +47,8 @@ function prefillOf(tx: Transaction): ReceiptPrefill {
 export function toPrefill(result: ReceiptParseResult): ReadReceiptOutcome {
   const [first, ...rest] = result.transactions;
   if (!result.is_receipt || !first) return { kind: 'not_receipt' };
-  return { kind: 'read', prefill: prefillOf(first), extras: rest.map(prefillOf) };
+  const box = result.receipt_box?.length === 4 ? (result.receipt_box as ReceiptBox) : undefined;
+  return { kind: 'read', prefill: prefillOf(first), extras: rest.map(prefillOf), ...(box ? { box } : {}) };
 }
 
 /** Sends a receipt image (data URI) to the parse-receipt Edge Function. */

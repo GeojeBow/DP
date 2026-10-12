@@ -61,6 +61,8 @@ export type ParsedTransaction = z.infer<typeof parsedTransactionSchema>;
 export const receiptParseResultSchema = z.object({
   is_receipt: z.boolean(),
   document_kind: z.enum(['receipt', 'invoice', 'card_statement', 'other']),
+  /** Where the receipt paper is in the photo: [ymin, xmin, ymax, xmax] on a 0-1000 scale. */
+  receipt_box: z.array(z.number()).length(4).nullable().optional(),
   transactions: z.array(parsedTransactionSchema),
 });
 export type ReceiptParseResult = z.infer<typeof receiptParseResultSchema>;

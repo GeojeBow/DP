@@ -21,7 +21,7 @@ import { checkExpenses, rulesForTrip } from '../../features/policy/rules';
 import { useFlagMessages } from '../../features/policy/usePolicy';
 import { worstAction } from '../../domain/policy';
 import { useTracker } from '../../features/mileage/useTracker';
-import { pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
+import { cropToReceipt, pickReceipt, type PickSource } from '../../features/capture/pickReceipt';
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
@@ -141,6 +141,11 @@ export default function ExpenseScreen() {
       fill('payment', p.paymentMethod, setPayment);
       fill('vat', p.vat, setVat);
       setExtras(outcome.extras);
+      // A photo from the gallery still shows the table around the receipt: keep just the paper.
+      if (outcome.box) {
+        const cropped = await cropToReceipt(receiptId, outcome.box).catch(() => null);
+        if (cropped && alive) setImage(cropped);
+      }
     });
     return () => {
       alive = false;
