@@ -39,6 +39,8 @@ export const ja: Record<MessageKey, string> = {
   'home.captureWithoutTrip': '出張なしでレシートを撮る',
   'home.dayOfTrip': '{day}/{total}日目',
   'home.spentOfBudget': '使用額 / 予算',
+  'home.spentTotal': 'これまでの支出',
+  'home.spentSub': '{n}件 · 1日平均 {avg}',
   'home.spent': '使用額',
   'home.available.total': '残りの予算',
   'home.available.daily': '今日使えるお金',
