@@ -165,6 +165,13 @@ const valueKey = (xml: string | undefined): string | undefined => {
   return v === undefined ? undefined : `${/\bt="s"/.test(xml) ? 's' : 'n'}:${v}`;
 };
 
+/** A plain number typed into a cell (not a formula, string or date flagged otherwise). */
+const numberOf = (xml: string | undefined): number | undefined => {
+  if (!xml || /<f[\s>]/.test(xml) || /\bt="(?!n")[^"]*"/.test(xml)) return undefined;
+  const v = /<v>([^<]+)<\/v>/.exec(xml)?.[1];
+  return v !== undefined && Number.isFinite(Number(v)) ? Number(v) : undefined;
+};
+
 const cellFormula = (ref: string, formula: string, style: string | undefined) =>
   `<c r="${ref}"${style ? ` s="${style}"` : ''}><f>${formula}</f></c>`;
 
@@ -313,23 +320,35 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
     plan.table.rows.forEach((item, i) => {
       const rowNum = firstRow + i;
       const added = rowNum > tableEnd;
-      const r = getRow(rowNum, model);
+      // Rows added for overflow continue the last template item row, as Excel's fill-down does.
+      const last = added ? byNum.get(tableEnd) : undefined;
+      const prev = tableEnd > firstRow ? byNum.get(tableEnd - 1) : undefined;
+      const r = getRow(rowNum, last ?? model);
       for (const [col, value] of Object.entries(item)) {
         const idx = columnIndex(col);
         const existing = r.cells.get(idx);
         if (hasFormula(existing)) continue;
-        r.cells.set(idx, cellXml(`${col}${rowNum}`, value, styleOf(existing) ?? styleOf(model?.cells.get(idx))));
+        const like = existing ?? (last ?? model)?.cells.get(idx);
+        r.cells.set(idx, cellXml(`${col}${rowNum}`, value, styleOf(like)));
       }
-      // A row added for overflow looks like the first item row: same borders, pre-filled text
-      // (such as "USD") and per-row formulas (such as =K15/L15, moved to this row).
-      if (added) {
-        for (const [c, xml] of model?.cells ?? []) {
+      // Everything else in an added row: same borders, per-row formulas moved to this row
+      // (=K28/L28 becomes =K29/L29), pre-filled values such as "USD" or a rate of 1, and
+      // line numbers carried on (8, 9 then 10).
+      if (last) {
+        const steps = rowNum - tableEnd;
+        for (const [c, xml] of last.cells) {
           if (r.cells.has(c)) continue;
           const ref = `${columnLetters(c)}${rowNum}`;
+          const style = styleOf(xml) ? ` s="${styleOf(xml)}"` : '';
           const f = /<f>([\s\S]*?)<\/f>/.exec(xml)?.[1];
-          if (f !== undefined) r.cells.set(c, cellFormula(ref, translate(f, rowNum - firstRow, 0), styleOf(xml)));
-          else if (isText(xml)) r.cells.set(c, xml.replace(/\br="[A-Z]+\d+"/, `r="${ref}"`));
-          else r.cells.set(c, `<c r="${ref}"${styleOf(xml) ? ` s="${styleOf(xml)}"` : ''}/>`);
+          const n = numberOf(xml);
+          if (f !== undefined) r.cells.set(c, cellFormula(ref, translate(f, steps, 0), styleOf(xml)));
+          else if (n !== undefined) {
+            const before = numberOf(prev?.cells.get(c));
+            const step = before === undefined ? 0 : n - before;
+            r.cells.set(c, `<c r="${ref}"${style}><v>${Number((n + step * steps).toPrecision(12))}</v></c>`);
+          } else if (isText(xml)) r.cells.set(c, xml.replace(/\br="[A-Z]+\d+"/, `r="${ref}"`));
+          else r.cells.set(c, `<c r="${ref}"${style}/>`);
         }
       }
     });
@@ -339,6 +358,15 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
   for (const [ref, value] of Object.entries(plan.cells)) {
     const { col, row } = splitRef(ref);
     put(`${col}${row > tableEnd ? row + shift : row}`, value);
+  }
+
+  // Cached results of the form's formulas are stale now (a total that still says 0). Drop them so
+  // every viewer works the formulas out again, including previews that don't recalculate on open.
+  for (const r of rows) {
+    for (const [c, xml] of r.cells) {
+      if (!hasFormula(xml)) continue;
+      r.cells.set(c, xml.replace(/<v>[^<]*<\/v>|<v\/>/, '').replace(/^(<c\b[^>]*?)\s+t="[^"]*"/, '$1'));
+    }
   }
 
   rows.sort((a, b) => a.num - b.num);

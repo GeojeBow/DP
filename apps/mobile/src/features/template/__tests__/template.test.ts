@@ -142,6 +142,25 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="D5"><f>SUM(D2:D4)</f></c>');
   });
 
+  it('fills added rows like the last item row: line numbers, pre-filled rate and formulas', () => {
+    const files = unzipSync(fixture());
+    const item = (r: number) =>
+      `<row r="${r}"><c r="A${r}" s="1"><v>${r - 1}</v></c><c r="B${r}" s="2"/><c r="C${r}" s="3"><v>1</v></c>`
+      + `<c r="D${r}" s="4"><f>$B${r}/$C${r}</f><v>0</v></c></row>`;
+    files['xl/worksheets/sheet1.xml'] = strToU8(
+      '<worksheet><dimension ref="A1:D4"/><sheetData>'
+      + '<row r="1"><c r="B1" t="inlineStr"><is><t>Amount</t></is></c></row>'
+      + item(2) + item(3)
+      + '<row r="4"><c r="D4"><f>SUM(D2:D3)</f></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const t = readTemplate(zipSync(files));
+    const xml = sheetXml(fillTemplate(t, { cells: {}, table: { firstRow: 2, rows: [{ B: 10 }, { B: 20 }, { B: 30 }, { B: 40 }] } }));
+    expect(xml).toContain('<row r="4"><c r="A4" s="1"><v>3</v></c><c r="B4" s="2"><v>30</v></c><c r="C4" s="3"><v>1</v></c><c r="D4" s="4"><f>$B4/$C4</f></c></row>');
+    expect(xml).toContain('<c r="A5" s="1"><v>4</v></c>');
+    expect(xml).toContain('<c r="D6"><f>SUM(D2:D5)</f></c>');
+  });
+
   it('keeps shared formulas valid and carries per-row formulas into added rows', () => {
     const files = unzipSync(fixture());
     files['xl/worksheets/sheet1.xml'] = strToU8(
@@ -161,7 +180,7 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="C4" s="4"><f>$A4*2</f></c>');
     expect(xml).toContain('<f>SUM(C2:C4)</f>');
     // The section below moved two rows; its formulas, and the summary at the top, follow it.
-    expect(xml).toContain('<c r="C7"><f>$A7*3</f><v>0</v></c>');
+    expect(xml).toContain('<c r="C7"><f>$A7*3</f></c>');
     expect(xml).toContain('<f>SUM(C6:C7)</f>');
     expect(xml).toContain('<c r="B1"><f>C8</f></c>');
   });
