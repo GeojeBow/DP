@@ -125,6 +125,23 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="A6" t="inlineStr"><is><t>숙박비</t></is></c>');
   });
 
+  it('stops at a total row that only has a SUM formula', () => {
+    const files = unzipSync(fixture());
+    files['xl/worksheets/sheet1.xml'] = strToU8(
+      '<worksheet><dimension ref="A1:D5"/><sheetData>'
+      + '<row r="1"><c r="B1" t="inlineStr"><is><t>Amount</t></is></c></row>'
+      + '<row r="2"><c r="D2"><f t="shared" ref="D2:D3" si="0">B2*2</f></c></row>'
+      + '<row r="3"><c r="D3"><f t="shared" si="0"/></c></row>'
+      + '<row r="4"><c r="D4"><f>SUM(D2:D3)</f></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const t = readTemplate(zipSync(files));
+    const xml = sheetXml(fillTemplate(t, { cells: {}, table: { firstRow: 2, rows: [{ B: 1 }, { B: 2 }, { B: 3 }] } }));
+    // The per-row =B2*2 rows hold receipts; the total row moves down instead of taking the third one.
+    expect(xml).toContain('<c r="B4"><v>3</v></c><c r="D4"><f>B4*2</f></c>');
+    expect(xml).toContain('<c r="D5"><f>SUM(D2:D4)</f></c>');
+  });
+
   it('keeps shared formulas valid and carries per-row formulas into added rows', () => {
     const files = unzipSync(fixture());
     files['xl/worksheets/sheet1.xml'] = strToU8(
