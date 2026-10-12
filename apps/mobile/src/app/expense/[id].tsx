@@ -237,8 +237,8 @@ export default function ExpenseScreen() {
       createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: '',
     };
     const others = allExpenses.filter((e) => e.id !== draftId && e.tripId === draftTripId);
-    return checkExpenses([...others, draft], companyRules).get(draftId);
-  }, [totalBase, companyRules, allExpenses, date, category, receiptId, baseCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+    return checkExpenses([...others, draft], companyRules, trip?.startDate).get(draftId);
+  }, [totalBase, companyRules, allExpenses, date, category, receiptId, baseCurrency, payment, merchant]); // eslint-disable-line react-hooks/exhaustive-deps
   const ruleMessages = useFlagMessages(draftFlags);
   const blocked = worstAction(draftFlags) === 'block';
 
