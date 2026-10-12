@@ -64,6 +64,18 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="F8" s="5"><v>9101</v></c>');
     expect(xml).toContain('<c r="C9" s="4" t="inlineStr"><is><t xml:space="preserve">Shop 2</t></is></c>');
     expect(xml).toContain('<f>SUM(F8:F12)</f>');
+    // Only the converted amount has a column, so the currency beside it is the trip's.
+    expect(xml).toMatch(/<c r="E8"[^>]*><is><t xml:space="preserve">KRW<\/t>/);
+  });
+
+  it('puts the trip-currency amount in a lone amount column', () => {
+    const t = readTemplate(fixture());
+    const m = guessMapping(t);
+    const mapping = { ...m, table: { ...m.table!, columns: { date: 'B', amount: 'F' } } };
+    const plan = planFill(trip, [expense(1)], { mapping, values: {} }, labels);
+    expect(plan.table?.rows[0]).toMatchObject({ F: 9101 });
+    const both = { ...m, table: { ...m.table!, columns: { currency: 'D', amount: 'E', amountBase: 'F' } } };
+    expect(planFill(trip, [expense(1)], { mapping: both, values: {} }, labels).table?.rows[0]).toMatchObject({ D: 'JPY', E: 1000, F: 9101 });
   });
 
   it('pushes the totals row down and stretches its formula when items overflow', () => {
