@@ -256,9 +256,10 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
     const cols = new Set(plan.table.rows.flatMap((r) => Object.keys(r)).map(columnIndex));
     // Template item rows: from firstRow down to the first row that already holds something new:
     // anything in the table's own columns, or text anywhere in the row (a next-section heading
-    // like "숙박비" in A31 while receipts go in B). Numbers and formulas in other columns, such as
-    // pre-printed line numbers or a per-row =D8*E8, are part of the empty item rows, and so is a
-    // value repeated from the first item row or the row above (a pre-filled "USD" on every line).
+    // like "숙박비" in A31 while receipts go in B), or a formula that isn't the row above's formula
+    // moved down one row (a section total such as =SUM(M20:M28)). Pre-printed line numbers and a
+    // per-row =D8*E8 are part of the empty item rows, and so is a value repeated from the first
+    // item row or the row above (a pre-filled "USD" on every line).
     const model = byNum.get(firstRow);
     let end = firstRow;
     while (true) {
@@ -268,8 +269,18 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
         const key = valueKey(xml);
         return key !== undefined && (key === valueKey(model?.cells.get(c)) || key === valueKey(above?.cells.get(c)));
       };
+      const formulaOf = (xml: string | undefined) => (xml ? /<f>([\s\S]*?)<\/f>/.exec(xml)?.[1] : undefined);
+      const perRowFormula = (c: number, xml: string) => {
+        const f = formulaOf(xml);
+        if (f === undefined) return false;
+        const fromAbove = formulaOf(above?.cells.get(c));
+        const fromModel = formulaOf(model?.cells.get(c));
+        return (fromAbove !== undefined && translate(fromAbove, 1, 0) === f)
+          || (fromModel !== undefined && translate(fromModel, end + 1 - firstRow, 0) === f);
+      };
       const occupied = r && [...r.cells.entries()].some(([c, xml]) =>
-        !repeated(c, xml) && (cols.has(c) ? /<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml) : isText(xml)));
+        !repeated(c, xml) && !perRowFormula(c, xml)
+        && (cols.has(c) ? /<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml) : isText(xml) || hasFormula(xml)));
       const blankBeyond = !r && ![...byNum.keys()].some((n) => n > end + 1);
       if (occupied || blankBeyond || end - firstRow > 500) break;
       end += 1;
