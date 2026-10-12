@@ -124,7 +124,7 @@ export default function HomeScreen() {
             style={[styles.tripChip, styles.tripAdd, { borderColor: palette.border }]}
           >
             <Ionicons name="add" size={20} color={palette.brand} />
-            <Text style={[type.caption, { color: palette.brand, fontWeight: '700' }]}>{t('home.newTripChip')}</Text>
+            <Text style={[type.caption, { color: palette.brand, fontWeight: '700' }]} numberOfLines={1}>{t('home.newTripChip')}</Text>
           </Pressable>
         </ScrollView>
       ) : null}
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   tripSettings: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
   tripRow: { gap: spacing.sm, paddingVertical: 2 },
   tripChip: { borderWidth: 1, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxWidth: 180 },
-  tripAdd: { justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
+  tripAdd: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, borderStyle: 'dashed', maxWidth: undefined },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   ccy: { width: 44, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' },
