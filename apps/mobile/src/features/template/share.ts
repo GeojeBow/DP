@@ -28,6 +28,7 @@ const sharedSchema = z.object({
       columns: z.partialRecord(z.enum(TEMPLATE_COLUMNS), colRef),
       custom: z.record(z.string(), colRef).optional(),
     }).nullable(),
+    skip: z.array(z.string().max(100)).max(200).optional(),
   }),
   customFields: z.array(z.object({
     id: z.string().min(1),
@@ -94,9 +95,13 @@ export function unpackTemplate(text: string, mine: readonly CustomField[], newId
   const custom = Object.fromEntries(
     Object.entries(table?.custom ?? {}).flatMap(([id, col]) => (idMap.has(id) ? [[idMap.get(id)!, col]] : [])),
   );
+  const skip = (shared.mapping.skip ?? []).flatMap((key) =>
+    key.startsWith('x:') ? (idMap.has(key.slice(2)) ? [`x:${idMap.get(key.slice(2))!}`] : []) : [key],
+  );
   const mapping: TemplateMapping = {
     fields: shared.mapping.fields,
     table: table ? { firstRow: table.firstRow, columns: table.columns, custom } : null,
+    ...(skip.length ? { skip } : {}),
   };
   return {
     template: { id: newId(), name: shared.name, fileName: shared.fileName, mapping, values: {} },
