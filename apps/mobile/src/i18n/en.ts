@@ -11,6 +11,7 @@ export const en: Record<MessageKey, string> = {
   'screen.newTrip': 'New trip',
   'screen.tripSettings': 'Trip settings',
   'home.tripSettings': 'Trip settings',
+  'home.newTripChip': 'New trip',
   'tripSettings.scope': 'These settings apply only to "{trip}". App-wide settings like theme, language and reminders are separate.',
   'tripSettings.basics': 'Basics',
   'tripSettings.dates': 'Dates',

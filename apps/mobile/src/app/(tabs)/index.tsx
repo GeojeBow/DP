@@ -94,7 +94,8 @@ export default function HomeScreen() {
       }
       subtitle={`${trip.startDate} ~ ${trip.endDate} · ${t('home.dayOfTrip', { day: summary.dayOfTrip, total: summary.totalDays })}`}
     >
-      {trips.length > 1 ? (
+      {/* Always shown, even with one trip: the + chip is how a new trip is added from home. */}
+      {trips.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tripRow}>
           {[...trips].sort((a, b) => b.startDate.localeCompare(a.startDate)).map((x) => {
             const selected = x.id === trip.id;
@@ -122,7 +123,8 @@ export default function HomeScreen() {
             accessibilityLabel={t('home.createTrip')}
             style={[styles.tripChip, styles.tripAdd, { borderColor: palette.border }]}
           >
-            <Ionicons name="add" size={22} color={palette.brand} />
+            <Ionicons name="add" size={20} color={palette.brand} />
+            <Text style={[type.caption, { color: palette.brand, fontWeight: '700' }]}>{t('home.newTripChip')}</Text>
           </Pressable>
         </ScrollView>
       ) : null}

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../components/Card';
+import { Button } from '../components/Form';
 import { summarizeClaim } from '../domain/claim';
 import type { Trip } from '../domain/models';
 import { formatMoney, toCurrencyCode } from '../domain/money';
@@ -25,6 +26,7 @@ export default function TripHistoryScreen() {
     <ScrollView style={{ backgroundColor: palette.background }} contentContainerStyle={styles.content}>
       <Text style={[type.caption, { color: palette.textMuted }]}>{t('history.hint')}</Text>
       {trips.length === 0 ? <Text style={[type.body, { color: palette.textMuted }]}>{t('history.empty')}</Text> : null}
+      <Button title={t('settings.newTrip')} variant="secondary" onPress={() => router.push('/trip/new')} />
       {current.length ? (
         <Card title={t('history.current')}>
           {current.map((x) => <TripLine key={x.id} trip={x} />)}

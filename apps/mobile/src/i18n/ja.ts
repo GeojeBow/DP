@@ -11,6 +11,7 @@ export const ja: Record<MessageKey, string> = {
   'screen.newTrip': '新しい出張',
   'screen.tripSettings': '出張の設定',
   'home.tripSettings': '出張の設定',
+  'home.newTripChip': '新しい出張',
   'tripSettings.scope': '「{trip}」だけに適用される設定です。テーマ・言語・通知などのアプリ全体の設定とは別です。',
   'tripSettings.basics': '基本情報',
   'tripSettings.dates': '期間',
