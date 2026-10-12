@@ -9,6 +9,7 @@ export const ko = {
   'screen.newTrip': '새 출장',
   'screen.tripSettings': '출장 설정',
   'home.tripSettings': '출장 설정',
+  'home.newTripChip': '새 출장',
   'tripSettings.scope': '"{trip}" 출장에만 적용되는 설정이에요. 테마·언어·알림 같은 앱 전체 설정과는 따로예요.',
   'tripSettings.basics': '기본 정보',
   'tripSettings.dates': '기간',
