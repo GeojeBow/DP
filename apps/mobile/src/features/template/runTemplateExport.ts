@@ -2,8 +2,8 @@ import type { CustomField } from '../../domain/customFields';
 import type { Expense, Trip } from '../../domain/models';
 import { localToday } from '../../domain/trip';
 import type { Translate } from '../../i18n';
-import { shareXlsx } from '../report/exportReport';
-import { shareTripReceipts } from '../report/runExport';
+import { shareXlsxWithPdf } from '../report/exportReport';
+import { tripReceiptsHtml } from '../report/runExport';
 import { type CompanyTemplate, planFill } from './mapping';
 import { loadTemplateFile } from './storage';
 import { fillTemplate, readTemplate } from './xlsxTemplate';
@@ -23,7 +23,7 @@ export async function runTemplateExport(
     payment: (p) => t(`payment.${p}`),
     today: localToday(),
   }, customFields);
-  await shareXlsx(fillTemplate(readTemplate(bytes), plan), `${trip.title} ${trip.startDate}`);
-  // The company's sheet has no room for photos; the receipts follow as a PDF.
-  await shareTripReceipts(trip, expenses, t, customFields);
+  const title = `${trip.title} ${trip.startDate}`;
+  // The company's sheet has no room for photos; the receipts go along as a PDF in the same share.
+  await shareXlsxWithPdf(fillTemplate(readTemplate(bytes), plan), title, await tripReceiptsHtml(trip, expenses, t, customFields), `${title} ${t('report.receipts')}`);
 }
