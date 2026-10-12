@@ -90,6 +90,23 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<dimension ref="A1:F18"/>');
   });
 
+  it('treats a heading in any column as the end of the item rows', () => {
+    const files = unzipSync(fixture());
+    files['xl/worksheets/sheet1.xml'] = strToU8(
+      '<worksheet><dimension ref="A1:C4"/><sheetData>'
+      + '<row r="1"><c r="B1" t="inlineStr"><is><t>내역</t></is></c></row>'
+      + '<row r="2"><c r="A2"><v>1</v></c><c r="C2"><f>B2*2</f></c></row>'
+      + '<row r="3"><c r="A3"><v>2</v></c><c r="C3"><f>B3*2</f></c></row>'
+      + '<row r="4"><c r="A4" t="inlineStr"><is><t>숙박비</t></is></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const t = readTemplate(zipSync(files));
+    const xml = sheetXml(fillTemplate(t, { cells: {}, table: { firstRow: 2, rows: [{ B: 'a' }, { B: 'b' }, { B: 'c' }] } }));
+    // Pre-printed numbers and per-row formulas don't stop the table; the heading moves down instead of being overwritten.
+    expect(xml).toContain('<c r="B4" t="inlineStr"><is><t xml:space="preserve">c</t></is></c>');
+    expect(xml).toContain('<c r="A5" t="inlineStr"><is><t>숙박비</t></is></c>');
+  });
+
   it('reads shared strings', () => {
     const files = unzipSync(fixture());
     files['xl/sharedStrings.xml'] = strToU8('<sst><si><t>Name</t></si><si><r><t>Tot</t></r><r><t>al</t></r></si></sst>');

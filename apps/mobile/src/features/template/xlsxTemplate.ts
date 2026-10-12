@@ -150,6 +150,9 @@ const rowXml = (r: RowXml) => {
 
 const styleOf = (cellXml: string | undefined) => (cellXml ? /\bs="(\d+)"/.exec(cellXml)?.[1] : undefined);
 const hasFormula = (cellXml: string | undefined) => !!cellXml && /<f[\s>]/.test(cellXml);
+/** A typed-in text cell (shared or inline string with something in it), not a number or formula. */
+const isText = (xml: string) =>
+  !/<f[\s>]/.test(xml) && ((/\bt="s"/.test(xml) && /<v>[^<]+<\/v>/.test(xml)) || (/\bt="inlineStr"/.test(xml) && /<t[^>]*>[^<]*\S/.test(xml)));
 
 function cellXml(ref: string, value: CellValue, style: string | undefined): string {
   const s = style ? ` s="${style}"` : '';
@@ -203,11 +206,15 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
   if (plan.table && plan.table.rows.length > 0) {
     const { firstRow } = plan.table;
     const cols = new Set(plan.table.rows.flatMap((r) => Object.keys(r)).map(columnIndex));
-    // Template item rows: from firstRow down to the first row with content in the table's columns.
+    // Template item rows: from firstRow down to the first row that already holds something:
+    // anything in the table's own columns, or text anywhere in the row (a next-section heading
+    // like "숙박비" in A31 while receipts go in B). Numbers and formulas in other columns, such as
+    // pre-printed line numbers or a per-row =D8*E8, are part of the empty item rows.
     let end = firstRow;
     while (true) {
       const r = byNum.get(end + 1);
-      const occupied = r && [...r.cells.entries()].some(([c, xml]) => cols.has(c) && (/<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml)));
+      const occupied = r && [...r.cells.entries()].some(([c, xml]) =>
+        cols.has(c) ? /<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml) : isText(xml));
       const blankBeyond = !r && ![...byNum.keys()].some((n) => n > end + 1);
       if (occupied || blankBeyond || end - firstRow > 500) break;
       end += 1;
