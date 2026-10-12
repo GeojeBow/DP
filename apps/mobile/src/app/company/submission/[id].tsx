@@ -17,6 +17,7 @@ import {
   submissionFiles,
   toCompanyError,
 } from '../../../features/company/api';
+import { formatQuote } from '../../../domain/fx';
 import { money } from '../../../features/company/format';
 import { useT } from '../../../i18n';
 import { radius, spacing, type, usePalette } from '../../../theme/tokens';
@@ -152,7 +153,7 @@ export default function SubmissionScreen() {
                   <Text style={[type.body, type.numeric, { color: palette.text, fontWeight: '600' }]}>{money(e.totalBase, e.baseCurrency)}</Text>
                   {e.currency !== e.baseCurrency ? (
                     <Text style={[type.caption, type.numeric, { color: palette.textMuted }]}>
-                      {money(e.total, e.currency)} × {e.fxRate}
+                      {money(e.total, e.currency)} · {formatQuote(e.fxRate, e.currency, e.baseCurrency)}
                     </Text>
                   ) : null}
                 </View>

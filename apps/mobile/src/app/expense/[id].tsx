@@ -9,7 +9,9 @@ import { QUICK_CURRENCIES } from '../../constants';
 import { uuidv7 } from '../../domain/id';
 import { defaultProof, mileageAmount } from '../../domain/claim';
 import { type Expense, PROOF_TYPES, type ProofType } from '../../domain/models';
+import { divide, formatQuote, quoteFor, quoteValue, rateFromQuote } from '../../domain/fx';
 import { convertMinor, formatMoney, fromMinor, toCurrencyCode, toMinor } from '../../domain/money';
+import { fetchRate } from '../../features/fx/liveRate';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../../domain/schemas';
 import { checkCustomValue } from '../../domain/customFields';
 import { findDuplicate } from '../../domain/duplicates';
@@ -146,19 +148,49 @@ export default function ExpenseScreen() {
   }, [receiptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const needsRate = currency !== baseCurrency;
-  // A rate filled from memory shows as one line instead of a question; "change" opens the field.
-  const [rateFromMemory, setRateFromMemory] = useState(false);
+  // Where the rate came from. Anything but "manual" shows as one line with a "change" link;
+  // nobody has to type a rate unless they want the card's own figure.
+  const [rateSource, setRateSource] = useState<'saved' | 'memory' | 'auto' | 'loading' | 'manual'>(
+    existing && existing.currency !== existing.baseCurrency ? 'saved' : 'manual',
+  );
+  // Manual entry: the amount the card actually charged (rate worked out), or the rate itself.
+  const [manualMode, setManualMode] = useState<'charged' | 'rate'>('charged');
+  const [charged, setCharged] = useState('');
+  const [quoteText, setQuoteText] = useState('');
+  const [flipped, setFlipped] = useState(false);
   const firstCurrency = useRef(true);
-  // Fill in the rate remembered for this currency whenever the currency changes (not when an
-  // existing expense first opens with its own saved rate).
+  // Fill in the rate for this currency whenever the currency changes (not when an existing
+  // expense first opens with its own saved rate): the one used before on this trip, else today's.
   useEffect(() => {
     if (firstCurrency.current) {
       firstCurrency.current = false;
       if (existing) return;
     }
-    const remembered = needsRate ? rateFor(currency) : undefined;
-    setFxRate(remembered ?? '');
-    setRateFromMemory(!!remembered);
+    setCharged('');
+    setQuoteText('');
+    setFlipped(false);
+    if (!needsRate) {
+      setFxRate('');
+      setRateSource('manual');
+      return;
+    }
+    const remembered = rateFor(currency);
+    if (remembered) {
+      setFxRate(remembered);
+      setRateSource('memory');
+      return;
+    }
+    let alive = true;
+    setFxRate('');
+    setRateSource('loading');
+    fetchRate(currency, baseCurrency).then((live) => {
+      if (!alive) return;
+      setFxRate(live ?? '');
+      setRateSource(live ? 'auto' : 'manual');
+    });
+    return () => {
+      alive = false;
+    };
   }, [currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isMileage = mode === 'mileage';
@@ -188,7 +220,26 @@ export default function ExpenseScreen() {
       setPayment('other');
     }
   };
-  const rateClean = fxRate.replace(/,/g, '').trim();
+  const boardQuote = useMemo(() => {
+    const q = quoteFor(currency, baseCurrency, fxRate || undefined);
+    return flipped ? { from: q.to, to: q.from, unit: q.to === 'JPY' ? 100 : 1 } : q;
+  }, [currency, baseCurrency, fxRate, flipped]);
+  const rateClean = !needsRate
+    ? ''
+    : rateSource !== 'manual'
+      ? fxRate.replace(/,/g, '').trim()
+      : manualMode === 'charged'
+        ? (amountClean ? divide(charged, amountClean) ?? '' : '')
+        : rateFromQuote(quoteText, boardQuote, currency) ?? '';
+  const changeRate = () => {
+    // Start the manual fields from the rate on screen, so a small tweak stays small.
+    if (rateClean) {
+      setQuoteText(quoteValue(rateClean, boardQuote, currency) ?? '');
+      const base = toCurrencyCode(baseCurrency);
+      if (amountClean) setCharged(fromMinor(convertMinor(toMinor(amountClean, toCurrencyCode(currency)), toCurrencyCode(currency), base, rateClean), base));
+    }
+    setRateSource('manual');
+  };
   const currencyOptions = useMemo(
     () => Array.from(new Set([baseCurrency, ...QUICK_CURRENCIES, currency])),
     [baseCurrency, currency],
@@ -201,7 +252,9 @@ export default function ExpenseScreen() {
     vat: !vatClean || (AMOUNT.test(vatClean) && Number(vatClean) < Number(amountClean)) ? null : t('expense.err.vat'),
     people: isMileage || (/^\d+$/.test(people.trim()) && Number(people) >= 1 && Number(people) <= 50) ? null : t('split.err'),
     missing: !missingOpen || (missingReason.trim() && missingSigner.trim() && missingAgree) ? null : t('missing.err'),
-    fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0) ? null : t('expense.err.rate'),
+    fxRate: !needsRate || (RATE.test(rateClean) && Number(rateClean) > 0)
+      ? null
+      : rateSource === 'manual' && manualMode === 'charged' ? t('expense.err.charged', { base: baseCurrency }) : t('expense.err.rate'),
   };
   const customErrors = Object.fromEntries(
     customFields.map((f) => {
@@ -385,7 +438,7 @@ export default function ExpenseScreen() {
           ) : null}
           {needsRate && totalBase !== null ? (
             <Text style={[type.caption, { color: palette.textMuted }]}>
-              {t('expense.converted', { currency, amount: amountClean, rate: rateClean, base: baseCurrency })}
+              {t('expense.convertedQuote', { amount: formatMoney(toMinor(shareClean, toCurrencyCode(currency)), toCurrencyCode(currency)), quote: formatQuote(rateClean, currency, baseCurrency) })}
             </Text>
           ) : null}
         </Card>
@@ -433,28 +486,68 @@ export default function ExpenseScreen() {
               error={show(errors.amount)}
             />
             <Chips label={t('expense.currency')} options={currencyOptions} value={currency} labelOf={(c) => c} onChange={edit('currency', setCurrency)} />
-            {needsRate && rateFromMemory && !errors.fxRate ? (
+            {needsRate && rateSource === 'loading' ? (
+              <Text style={[type.caption, { color: palette.textMuted }]}>{t('expense.rateLoading')}</Text>
+            ) : needsRate && rateSource !== 'manual' && !errors.fxRate ? (
               <View style={styles.rememberedRate}>
                 <View style={styles.flex}>
                   <Text style={[type.label, { color: palette.text }]}>
-                    {t('expense.rateRemembered', { currency, rate: rateClean, base: baseCurrency })}
+                    {t('expense.rateLine', { quote: formatQuote(rateClean, currency, baseCurrency) })}
                   </Text>
-                  <Text style={[type.caption, { color: palette.textMuted }]}>{t('expense.rateRememberedHint')}</Text>
+                  <Text style={[type.caption, { color: palette.textMuted }]}>
+                    {t(rateSource === 'auto' ? 'expense.rateAutoHint' : rateSource === 'memory' ? 'expense.rateRememberedHint' : 'expense.rateSavedHint')}
+                  </Text>
                 </View>
-                <Pressable onPress={() => setRateFromMemory(false)} accessibilityRole="button" hitSlop={8}>
+                <Pressable onPress={changeRate} accessibilityRole="button" hitSlop={8}>
                   <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>{t('expense.rateChange')}</Text>
                 </Pressable>
               </View>
             ) : needsRate ? (
-              <TextField
-                label={t('expense.rate', { currency, base: baseCurrency })}
-                value={fxRate}
-                onChangeText={edit('fxRate', setFxRate)}
-                keyboardType="decimal-pad"
-                placeholder={t('expense.ratePlaceholder')}
-                hint={t('expense.rateHint')}
-                error={show(errors.fxRate)}
-              />
+              <>
+                <Chips
+                  label={t('expense.rateHow')}
+                  options={['charged', 'rate'] as const}
+                  value={manualMode}
+                  labelOf={(m) => t(m === 'charged' ? 'expense.rateHow.charged' : 'expense.rateHow.rate')}
+                  onChange={setManualMode}
+                />
+                {manualMode === 'charged' ? (
+                  <TextField
+                    label={t('expense.charged', { base: baseCurrency })}
+                    value={charged}
+                    onChangeText={setCharged}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    hint={t('expense.chargedHint', { base: baseCurrency })}
+                    error={show(errors.fxRate)}
+                  />
+                ) : (
+                  <View style={styles.quoteRow}>
+                    <View style={styles.flex}>
+                      <TextField
+                        label={t('expense.rateBoard', { unit: boardQuote.unit, from: boardQuote.from, to: boardQuote.to })}
+                        value={quoteText}
+                        onChangeText={setQuoteText}
+                        keyboardType="decimal-pad"
+                        placeholder={t('expense.ratePlaceholder')}
+                        error={show(errors.fxRate)}
+                      />
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setFlipped((f) => !f);
+                        setQuoteText('');
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('expense.rateFlip')}
+                      hitSlop={8}
+                      style={styles.flip}
+                    >
+                      <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>⇄</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
             ) : null}
           </>
         )}
@@ -556,6 +649,8 @@ const styles = StyleSheet.create({
   dup: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.sm },
   flex: { flex: 1 },
   rememberedRate: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  quoteRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  flip: { paddingHorizontal: spacing.sm, paddingTop: spacing.md },
   content: { padding: spacing.lg, gap: spacing.lg },
   receipt: { width: '100%', height: 280, borderRadius: 12, borderWidth: 1 },
   check: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
