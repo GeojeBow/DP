@@ -125,6 +125,30 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="A6" t="inlineStr"><is><t>숙박비</t></is></c>');
   });
 
+  it('keeps shared formulas valid and carries per-row formulas into added rows', () => {
+    const files = unzipSync(fixture());
+    files['xl/worksheets/sheet1.xml'] = strToU8(
+      '<worksheet><dimension ref="A1:C6"/><sheetData>'
+      + '<row r="1"><c r="A1" t="inlineStr"><is><t>Amount</t></is></c><c r="B1"><f>C6</f></c></row>'
+      + '<row r="2"><c r="A2" s="3"/><c r="C2" s="4"><f t="shared" ref="C2" si="0">$A2*2</f><v>0</v></c></row>'
+      + '<row r="3"><c r="A3" t="inlineStr"><is><t>TOTAL</t></is></c><c r="C3"><f>SUM(C2:C2)</f></c></row>'
+      + '<row r="4"><c r="A4"/><c r="C4"><f t="shared" ref="C4:C5" si="1">$A4*3</f><v>0</v></c></row>'
+      + '<row r="5"><c r="A5"/><c r="C5"><f t="shared" si="1"/><v>0</v></c></row>'
+      + '<row r="6"><c r="C6"><f>SUM(C4:C5)</f></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const t = readTemplate(zipSync(files));
+    const xml = sheetXml(fillTemplate(t, { cells: {}, table: { firstRow: 2, rows: [{ A: 1 }, { A: 2 }, { A: 3 }] } }));
+    expect(xml).not.toContain('t="shared"');
+    // The added rows get the first item row's style and formula, moved to their own row.
+    expect(xml).toContain('<c r="C4" s="4"><f>$A4*2</f></c>');
+    expect(xml).toContain('<f>SUM(C2:C4)</f>');
+    // The section below moved two rows; its formulas, and the summary at the top, follow it.
+    expect(xml).toContain('<c r="C7"><f>$A7*3</f><v>0</v></c>');
+    expect(xml).toContain('<f>SUM(C6:C7)</f>');
+    expect(xml).toContain('<c r="B1"><f>C8</f></c>');
+  });
+
   it('reads shared strings', () => {
     const files = unzipSync(fixture());
     files['xl/sharedStrings.xml'] = strToU8('<sst><si><t>Name</t></si><si><r><t>Tot</t></r><r><t>al</t></r></si></sst>');
