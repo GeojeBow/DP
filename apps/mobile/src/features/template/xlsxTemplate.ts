@@ -154,6 +154,17 @@ const hasFormula = (cellXml: string | undefined) => !!cellXml && /<f[\s>]/.test(
 const isText = (xml: string) =>
   !/<f[\s>]/.test(xml) && ((/\bt="s"/.test(xml) && /<v>[^<]+<\/v>/.test(xml)) || (/\bt="inlineStr"/.test(xml) && /<t[^>]*>[^<]*\S/.test(xml)));
 
+/** What a plain cell holds (shared-string index, inline text or number); undefined for empty cells and formulas. */
+const valueKey = (xml: string | undefined): string | undefined => {
+  if (!xml || /<f[\s>]/.test(xml)) return undefined;
+  if (/\bt="inlineStr"/.test(xml)) {
+    const text = [...xml.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((m) => m[1]).join('').trim();
+    return text ? `i:${text}` : undefined;
+  }
+  const v = /<v>([^<]+)<\/v>/.exec(xml)?.[1];
+  return v === undefined ? undefined : `${/\bt="s"/.test(xml) ? 's' : 'n'}:${v}`;
+};
+
 function cellXml(ref: string, value: CellValue, style: string | undefined): string {
   const s = style ? ` s="${style}"` : '';
   if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${ref}"${s}><v>${value}</v></c>`;
@@ -206,15 +217,22 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
   if (plan.table && plan.table.rows.length > 0) {
     const { firstRow } = plan.table;
     const cols = new Set(plan.table.rows.flatMap((r) => Object.keys(r)).map(columnIndex));
-    // Template item rows: from firstRow down to the first row that already holds something:
+    // Template item rows: from firstRow down to the first row that already holds something new:
     // anything in the table's own columns, or text anywhere in the row (a next-section heading
     // like "숙박비" in A31 while receipts go in B). Numbers and formulas in other columns, such as
-    // pre-printed line numbers or a per-row =D8*E8, are part of the empty item rows.
+    // pre-printed line numbers or a per-row =D8*E8, are part of the empty item rows, and so is a
+    // value repeated from the first item row or the row above (a pre-filled "USD" on every line).
+    const model = byNum.get(firstRow);
     let end = firstRow;
     while (true) {
       const r = byNum.get(end + 1);
+      const above = byNum.get(end);
+      const repeated = (c: number, xml: string) => {
+        const key = valueKey(xml);
+        return key !== undefined && (key === valueKey(model?.cells.get(c)) || key === valueKey(above?.cells.get(c)));
+      };
       const occupied = r && [...r.cells.entries()].some(([c, xml]) =>
-        cols.has(c) ? /<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml) : isText(xml));
+        !repeated(c, xml) && (cols.has(c) ? /<v>[^<]+<\/v>|<t[\s>]|<f[\s>]/.test(xml) : isText(xml)));
       const blankBeyond = !r && ![...byNum.keys()].some((n) => n > end + 1);
       if (occupied || blankBeyond || end - firstRow > 500) break;
       end += 1;
@@ -240,10 +258,15 @@ export function fillTemplate(t: ParsedTemplate, plan: FillPlan): Uint8Array {
       for (const r of rows) byNum.set(r.num, r);
       sheet = sheet.replace(/<mergeCell ref="([^"]+)"\/>/g, (_, ref: string) => `<mergeCell ref="${shiftRefs(ref, end + 1, shift, -1)}"/>`);
     }
-    const model = byNum.get(firstRow);
+    // Pre-filled text on the first item row (such as "USD") is copied into rows that had to be added.
+    const filler = [...(model?.cells.entries() ?? [])].filter(([c, xml]) => !cols.has(c) && isText(xml));
     plan.table.rows.forEach((item, i) => {
       const rowNum = firstRow + i;
+      const added = rowNum > tableEnd;
       const r = getRow(rowNum, model);
+      if (added) {
+        for (const [c, xml] of filler) r.cells.set(c, xml.replace(/\br="[A-Z]+\d+"/, `r="${columnLetters(c)}${rowNum}"`));
+      }
       for (const [col, value] of Object.entries(item)) {
         const idx = columnIndex(col);
         const existing = r.cells.get(idx);

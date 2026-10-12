@@ -107,6 +107,24 @@ describe('company Excel templates', () => {
     expect(xml).toContain('<c r="A5" t="inlineStr"><is><t>숙박비</t></is></c>');
   });
 
+  it('keeps going past a pre-filled currency on every item row', () => {
+    const files = unzipSync(fixture());
+    const usd = (r: number) => `<c r="C${r}" t="inlineStr"><is><t>USD</t></is></c>`;
+    files['xl/worksheets/sheet1.xml'] = strToU8(
+      '<worksheet><dimension ref="A1:C5"/><sheetData>'
+      + '<row r="1"><c r="B1" t="inlineStr"><is><t>내역</t></is></c></row>'
+      + `<row r="2">${usd(2)}</row><row r="3">${usd(3)}</row><row r="4">${usd(4)}</row>`
+      + '<row r="5"><c r="A5" t="inlineStr"><is><t>숙박비</t></is></c><c r="C5" t="inlineStr"><is><t>USD</t></is></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const t = readTemplate(zipSync(files));
+    const xml = sheetXml(fillTemplate(t, { cells: {}, table: { firstRow: 2, rows: [{ B: 'a' }, { B: 'b' }, { B: 'c' }, { B: 'd' }] } }));
+    // The three USD rows are item rows; only the fourth receipt needs a new row, which gets USD too.
+    expect(xml).toContain('<c r="B4" t="inlineStr"><is><t xml:space="preserve">c</t></is></c>');
+    expect(xml).toContain('<row r="5"><c r="B5" t="inlineStr"><is><t xml:space="preserve">d</t></is></c><c r="C5" t="inlineStr"><is><t>USD</t></is></c></row>');
+    expect(xml).toContain('<c r="A6" t="inlineStr"><is><t>숙박비</t></is></c>');
+  });
+
   it('reads shared strings', () => {
     const files = unzipSync(fixture());
     files['xl/sharedStrings.xml'] = strToU8('<sst><si><t>Name</t></si><si><r><t>Tot</t></r><r><t>al</t></r></si></sst>');
