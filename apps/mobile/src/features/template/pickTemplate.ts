@@ -18,3 +18,15 @@ export async function pickTemplate(): Promise<{ name: string; bytes: Uint8Array 
   }
   return { name: asset.name, bytes };
 }
+
+/** Lets the user choose a template file a friend shared; its text, or null when they cancel. */
+export async function pickSharedTemplate(): Promise<string | null> {
+  const result = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', 'application/octet-stream', '*/*'], copyToCacheDirectory: true });
+  const asset = result.canceled ? undefined : result.assets[0];
+  if (!asset) return null;
+  if (Platform.OS === 'web') {
+    const blob: Blob = asset.file ?? (await (await fetch(asset.uri)).blob());
+    return blob.text();
+  }
+  return new File(asset.uri).text();
+}

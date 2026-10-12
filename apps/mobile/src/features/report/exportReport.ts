@@ -75,3 +75,18 @@ export async function sharePdf(html: string, title: string): Promise<void> {
   new File(uri).move(file);
   await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: file.name });
 }
+
+/** Opens the share sheet (phone, phone browsers) or downloads (desktop) a shared template file. */
+export async function shareTemplateFile(text: string, filename: string): Promise<void> {
+  const bytes = new TextEncoder().encode(text);
+  const name = safeName(filename);
+  if (Platform.OS === 'web') {
+    await shareOnWeb(bytes, name, 'application/json');
+    return;
+  }
+  const file = new File(Paths.cache, name);
+  if (file.exists) file.delete();
+  file.create();
+  file.write(bytes);
+  await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: name });
+}
