@@ -39,6 +39,8 @@ export const en: Record<MessageKey, string> = {
   'home.captureWithoutTrip': 'Capture a receipt without a trip',
   'home.dayOfTrip': 'Day {day} of {total}',
   'home.spentOfBudget': 'Spent / budget',
+  'home.spentTotal': 'Spent so far',
+  'home.spentSub': '{n} expenses · {avg} a day',
   'home.spent': 'Spent',
   'home.available.total': 'Budget left',
   'home.available.daily': 'Left for today',

@@ -56,11 +56,8 @@ export default function HomeScreen() {
   const maxDay = series.reduce((m, d) => (d.amount > m ? d.amount : m), 0n);
   const ratio = summary.burnRatio;
   const barColor = ratio === null ? palette.onBrand : ratio > 1 ? palette.block : ratio > 0.85 ? palette.warn : palette.onBrand;
-  const heroLabel =
-    status.available === null
-      ? t('home.spent')
-      : t(`home.available.${status.kind === 'daily_pooled' ? 'pooled' : status.kind === 'daily' ? 'daily' : 'total'}`);
-  const heroAmount = status.available ?? summary.spent;
+  const heroLabel = t(`home.available.${status.kind === 'daily_pooled' ? 'pooled' : 'daily'}`);
+  const remaining = summary.budget !== null ? summary.budget - summary.spent : null;
 
   const checks = submissionChecks(own, flags);
   const checkRows: Array<{ icon: IconName; key: keyof typeof checks; color: string }> = [
@@ -72,15 +69,12 @@ export default function HomeScreen() {
 
   const stats: Array<{ icon: IconName; label: string; value: string }> = [
     { icon: 'today-outline', label: t('home.stat.today'), value: money(spentToday) },
-    { icon: 'trending-up-outline', label: t('home.stat.avg'), value: money(avgPerDay) },
     { icon: 'hourglass-outline', label: t('home.daysLeft'), value: t('home.days', { n: summary.daysRemaining }) },
-    { icon: 'receipt-outline', label: t('home.stat.count'), value: t('home.count', { n: own.length }) },
   ];
 
   return (
     <Screen
       brand
-      eyebrow={t('home.greeting')}
       title={trip.title}
       action={
         <Pressable
@@ -129,19 +123,46 @@ export default function HomeScreen() {
           </Pressable>
         </ScrollView>
       ) : null}
+      {/* What matters most first: how much has gone out, then how much is left. */}
       <View style={[styles.hero, { backgroundColor: palette.brand }]}>
-        {/* Brand-to-accent glow without a gradient module: two soft circles clipped by the card. */}
         <View style={[styles.glow, { backgroundColor: palette.accent, top: -60, right: -70 }]} />
-        <View style={[styles.glow, styles.glowSmall, { backgroundColor: palette.accent, bottom: -70, left: -40 }]} />
-        <Ionicons name="airplane" size={64} color={palette.onBrand} style={styles.heroPlane} />
-        <Text style={[type.label, styles.heroMuted, { color: palette.onBrand }]}>{heroLabel}</Text>
-        <Text
-          style={[type.hero, type.numeric, { color: status.available !== null && status.available < 0n ? '#FFB4B4' : palette.onBrand }]}
-          adjustsFontSizeToFit
-          numberOfLines={1}
-        >
-          {money(heroAmount)}
+        <Text style={[type.label, styles.heroMuted, { color: palette.onBrand }]}>{t('home.spentTotal')}</Text>
+        <Text style={[styles.heroAmount, type.numeric, { color: palette.onBrand }]} adjustsFontSizeToFit numberOfLines={1}>
+          {money(summary.spent)}
         </Text>
+        <Text style={[type.caption, type.numeric, styles.heroMuted, { color: palette.onBrand }]}>
+          {t('home.spentSub', { n: own.length, avg: money(avgPerDay) })}
+        </Text>
+        {summary.budget !== null && ratio !== null ? (
+          <View style={styles.heroBudget}>
+            <View style={[styles.track, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+              <View style={[styles.fill, { width: `${Math.min(ratio, 1) * 100}%`, backgroundColor: barColor }]} />
+            </View>
+            <View style={styles.between}>
+              <View>
+                <Text style={[type.caption, styles.heroMuted, { color: palette.onBrand }]}>{t('home.available.total')}</Text>
+                <Text
+                  style={[type.display, type.numeric, { color: remaining !== null && remaining < 0n ? '#FFB4B4' : palette.onBrand }]}
+                  adjustsFontSizeToFit
+                  numberOfLines={1}
+                >
+                  {money(remaining ?? 0n)}
+                </Text>
+              </View>
+              <Text style={[type.caption, type.numeric, styles.heroMuted, styles.budgetNote, { color: palette.onBrand }]}>
+                {t('home.budgetLine', { budget: money(summary.budget), pct: Math.round(ratio * 100) })}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {status.kind === 'daily' || status.kind === 'daily_pooled' ? (
+          <View style={[styles.heroNow, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+            <Text style={[type.label, styles.heroMuted, { color: palette.onBrand, flex: 1 }]}>{heroLabel}</Text>
+            <Text style={[type.title, type.numeric, { color: status.available !== null && status.available < 0n ? '#FFB4B4' : palette.onBrand }]}>
+              {money(status.available ?? 0n)}
+            </Text>
+          </View>
+        ) : null}
         {status.kind === 'daily_pooled' ? (
           <Text style={[type.caption, styles.heroMuted, { color: palette.onBrand }]}>
             {t(status.resetsInDays === 0 ? 'home.pooled.lastDay' : 'home.pooled.period', {
@@ -150,21 +171,6 @@ export default function HomeScreen() {
               days: status.resetsInDays ?? 0,
             })}
           </Text>
-        ) : null}
-        {summary.budget !== null && ratio !== null ? (
-          <View style={styles.heroBudget}>
-            <View style={[styles.track, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-              <View style={[styles.fill, { width: `${Math.min(ratio, 1) * 100}%`, backgroundColor: barColor }]} />
-            </View>
-            <View style={styles.between}>
-              <Text style={[type.caption, type.numeric, styles.heroMuted, { color: palette.onBrand }]}>
-                {t('home.spentLine', { spent: money(summary.spent) })}
-              </Text>
-              <Text style={[type.caption, type.numeric, styles.heroMuted, { color: palette.onBrand }]}>
-                {t('home.budgetLine', { budget: money(summary.budget), pct: Math.round(ratio * 100) })}
-              </Text>
-            </View>
-          </View>
         ) : null}
       </View>
 
@@ -209,6 +215,23 @@ export default function HomeScreen() {
       ) : null}
 
       <ClaimCard trip={trip} />
+
+      <Card
+        title={t('home.recent')}
+        action={
+          own.length > recent.length ? (
+            <Pressable onPress={() => router.push('/expenses')} accessibilityRole="link" hitSlop={8}>
+              <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>{t('home.seeAll')}</Text>
+            </Pressable>
+          ) : null
+        }
+      >
+        {recent.length === 0 ? (
+          <Text style={[type.body, { color: palette.textMuted }]}>{t('home.noExpenses')}</Text>
+        ) : (
+          recent.map((e) => <ExpenseRow key={e.id} expense={e} />)
+        )}
+      </Card>
 
       <Card title={t('home.dailyChart')}>
         <View style={styles.chart}>
@@ -284,22 +307,6 @@ export default function HomeScreen() {
         </Card>
       ) : null}
 
-      <Card
-        title={t('home.recent')}
-        action={
-          own.length > recent.length ? (
-            <Pressable onPress={() => router.push('/expenses')} accessibilityRole="link" hitSlop={8}>
-              <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>{t('home.seeAll')}</Text>
-            </Pressable>
-          ) : null
-        }
-      >
-        {recent.length === 0 ? (
-          <Text style={[type.body, { color: palette.textMuted }]}>{t('home.noExpenses')}</Text>
-        ) : (
-          recent.map((e) => <ExpenseRow key={e.id} expense={e} />)
-        )}
-      </Card>
     </Screen>
   );
 }
@@ -335,12 +342,14 @@ const styles = StyleSheet.create({
   hero: { borderRadius: radius.card + 4, padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' },
   glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.75 },
   glowSmall: { width: 160, height: 160, borderRadius: 80, opacity: 0.45 },
-  heroPlane: { position: 'absolute', top: 14, right: 16, opacity: 0.25, transform: [{ rotate: '-15deg' }] },
+  heroAmount: { fontSize: 44, fontWeight: '800', lineHeight: 52, letterSpacing: -1 },
+  heroNow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm, marginTop: spacing.xs },
+  budgetNote: { alignSelf: 'flex-end', textAlign: 'right', flexShrink: 1 },
   heroMuted: { opacity: 0.85 },
   heroBudget: { gap: spacing.sm, marginTop: spacing.sm },
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
-  between: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: spacing.sm },
   actions: { flexDirection: 'row', gap: spacing.sm },
   action: {
     flex: 1,

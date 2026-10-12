@@ -37,6 +37,8 @@ export const ko = {
   'home.captureWithoutTrip': '여행 없이 영수증 찍기',
   'home.dayOfTrip': '{day}/{total}일차',
   'home.spentOfBudget': '사용액 / 예산',
+  'home.spentTotal': '지금까지 쓴 돈',
+  'home.spentSub': '{n}건 · 하루 평균 {avg}',
   'home.spent': '사용액',
   'home.available.total': '남은 예산',
   'home.available.daily': '오늘 쓸 수 있는 돈',
