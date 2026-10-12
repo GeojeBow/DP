@@ -49,8 +49,8 @@ export async function runExport(
  * The numbered receipt photos (and no-receipt statements) as one PDF, sent after
  * an Excel file so the numbers in the sheet can be matched to the photos.
  */
-export async function shareReceipts(table: ReportTable, t: Translate, fileTitle: string): Promise<void> {
-  const html = reportToHtml(table, await receiptImages(table), docLabels(t), { receiptsOnly: true });
+export async function shareReceipts(table: ReportTable, t: Translate, fileTitle: string, tags = true): Promise<void> {
+  const html = reportToHtml(table, await receiptImages(table), docLabels(t), { receiptsOnly: true, tags });
   await sharePdf(html, `${fileTitle} ${t('report.receipts')}`);
 }
 
@@ -66,6 +66,12 @@ function docLabels(t: Translate): HtmlLabels {
     total: t('report.total'),
     receipts: t('report.receipts'),
     receiptsHint: (photos, missing) => t('report.receiptsHint', { photos, missing }),
+    receiptsHintByDay: (photos, missing) => t('report.receiptsHintByDay', { photos, missing }),
+    day: (date, count, total) => {
+      const [, m, d] = date.split('-').map(Number);
+      const w = t('date.weekdays').split(',')[new Date(`${date}T00:00:00`).getDay()] ?? '';
+      return t('report.dayHeading', { m: m ?? '', d: d ?? '', w, count, total });
+    },
     noPhoto: {
       none: t('report.noPhoto.none'),
       affidavit: t('report.noPhoto.affidavit'),
@@ -119,5 +125,6 @@ export async function shareTripReceipts(
   trip: Trip, expenses: readonly Expense[], t: Translate, customFields: readonly CustomField[] = [],
 ): Promise<void> {
   const table = buildReport(trip, expenses, { ...BUILTIN_PRESETS[0]!, receiptAppendix: true }, tableLabels(t), customFields);
-  if (table.attachments.length) await shareReceipts(table, t, `${trip.title} ${trip.startDate}`);
+  // A company form has no column for our line numbers, so the pages go by day instead.
+  if (table.attachments.length) await shareReceipts(table, t, `${trip.title} ${trip.startDate}`, false);
 }

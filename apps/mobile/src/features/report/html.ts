@@ -1,4 +1,5 @@
-import type { ReportTable } from '../../domain/report';
+import { formatMoney, toCurrencyCode } from '../../domain/money';
+import type { ReportAttachment, ReportTable } from '../../domain/report';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -17,6 +18,10 @@ export interface HtmlLabels {
   /** Summary chart titles; the summary is left out when absent */
   byCategory?: string;
   byDay?: string;
+  /** Heading over each day's receipts, e.g. "10월 12일 (월) · 3장 · KRW 120,000" */
+  day?: (date: string, count: number, total: string) => string;
+  /** Hint under the receipts heading when the line numbers are left off */
+  receiptsHintByDay?: (photos: number, missing: number) => string;
 }
 
 // Chart colours that read well in print, one per category in order.
@@ -27,8 +32,11 @@ export function reportToHtml(
   table: ReportTable,
   images: Record<string, string | null>,
   labels: HtmlLabels,
-  /** receiptsOnly: just the numbered receipt pages and statements, to go with a spreadsheet */
-  options: { receiptsOnly?: boolean } = {},
+  /**
+   * receiptsOnly: just the receipt pages and statements, to go with a spreadsheet.
+   * tags: false leaves off the #01 line numbers, for a company form that has no column for them.
+   */
+  options: { receiptsOnly?: boolean; tags?: boolean } = {},
 ): string {
   const numeric = (i: number) => table.sections.some((s) => s.rows.some((r) => r[i]?.number !== undefined));
   const align = table.headers.map((_, i) => (numeric(i) ? ' class="num"' : ''));
@@ -61,23 +69,38 @@ export function reportToHtml(
   </section>`
     : '';
 
-  // Lines with no photo keep their place in the sequence, so the numbers at the back never skip.
-  const pages = table.attachments.map((a) => {
+  // Receipts are grouped under one heading per day, so they line up with a form's daily rows.
+  // Lines with no photo keep their place, so the numbers never skip.
+  const showTags = options.tags !== false;
+  const base = toCurrencyCode(table.baseCurrency);
+  const figure = (a: ReportAttachment) => {
     const src = a.receiptId ? images[a.receiptId] : null;
     const why = a.missing ? labels.noPhoto[a.missing] : labels.noPhoto.failed;
     return `<figure class="${src ? '' : 'empty'}">
-      <div class="cap"><span class="tag big">${a.tags.map(esc).join(' ')}</span>
-        <div><strong>${esc(a.date)} · ${esc(a.merchant)}</strong><small>${esc(a.category)} · ${esc(a.amount)}</small></div></div>
+      <div class="cap">${showTags ? `<span class="tag">${a.tags.map(esc).join(' ')}</span>` : ''}
+        <div class="what"><strong>${esc(a.merchant)}</strong><small>${esc(a.category)} · ${esc(a.payment)}</small></div>
+        <div class="paid"><strong>${esc(a.amountBase)}</strong>${a.amountLocal ? `<small>${esc(a.amountLocal)}</small>` : ''}</div></div>
       ${src ? `<img src="${src}"/>` : `<div class="noimg"><strong>${esc(why)}</strong>${a.details.length
         ? `<table class="details">${a.details.map((d) => `<tr><th>${esc(d.label)}</th><td>${esc(d.value)}</td></tr>`).join('')}</table>`
         : a.note ? `<small>${esc(a.note)}</small>` : ''}</div>`}
     </figure>`;
+  };
+  const byDay = new Map<string, ReportAttachment[]>();
+  for (const a of [...table.attachments].sort((x, y) => x.date.localeCompare(y.date))) {
+    byDay.set(a.date, [...(byDay.get(a.date) ?? []), a]);
+  }
+  const dayBlocks = [...byDay].map(([date, list]) => {
+    const total = formatMoney(list.reduce((sum, a) => sum + a.baseMinor, 0n), base);
+    const title = labels.day ? labels.day(date, list.length, total) : `${date} · ${total}`;
+    return `<div class="day"><h3>${esc(title)}</h3><div class="grid">${list.map(figure).join('')}</div></div>`;
   });
   const photos = table.attachments.filter((a) => a.receiptId).length;
-  const receiptPages = pages.length
+  const missing = table.attachments.length - photos;
+  const hint = !showTags && labels.receiptsHintByDay ? labels.receiptsHintByDay(photos, missing) : labels.receiptsHint(photos, missing);
+  const receiptPages = dayBlocks.length
     ? `<section class="receipts"><h2>${esc(labels.receipts)}</h2>
-      <p class="hint">${esc(labels.receiptsHint(photos, table.attachments.length - photos))}</p>
-      <div class="grid">${pages.join('')}</div></section>`
+      <p class="hint">${esc(hint)}</p>
+      ${dayBlocks.join('')}</section>`
     : '';
 
   // Shown only when it says more than the grand total already does.
@@ -89,7 +112,7 @@ export function reportToHtml(
 
   const a = labels.affidavit;
   const affidavits = table.affidavits
-    .map((x) => `<section class="affidavit"><h2><span class="tag big">${esc(x.tag)}</span> ${esc(a.title)}</h2><table>
+    .map((x) => `<section class="affidavit"><h2>${showTags ? `<span class="tag big">${esc(x.tag)}</span> ` : ''}${esc(a.title)}</h2><table>
       <tr><th>${esc(a.date)}</th><td>${esc(x.date)}</td></tr>
       <tr><th>${esc(a.merchant)}</th><td>${esc(x.merchant)}</td></tr>
       <tr><th>${esc(a.amount)}</th><td>${esc(x.amount)}</td></tr>
@@ -130,9 +153,14 @@ export function reportToHtml(
   .hint { color: #5b6470; margin: -6px 0 10px; }
   figure { margin: 0; break-inside: avoid; border: 1px solid #c9ced6; border-radius: 6px; overflow: hidden; }
   figure img { display: block; width: 100%; max-height: 105mm; object-fit: contain; background: #fafbfc; }
+  .day { margin-top: 14px; }
+  .day h3 { margin: 0 0 8px; padding: 6px 10px; background: #1F3A5F; color: #fff; border-radius: 4px; font-size: 11pt; break-after: avoid; }
   .cap { display: flex; gap: 8px; align-items: center; padding: 6px 8px; background: #E8EDF4; border-bottom: 1px solid #c9ced6; }
+  .cap .what { flex: 1; min-width: 0; }
+  .cap .paid { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .cap strong { display: block; font-size: 9.5pt; }
-  .cap small { color: #5b6470; font-size: 8.5pt; }
+  .cap .paid strong { font-size: 11pt; color: #1F3A5F; }
+  .cap small { display: block; color: #5b6470; font-size: 8.5pt; }
   .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; background: #1F3A5F; color: #fff; font-weight: 700; font-size: 9pt; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tag.big { font-size: 12pt; padding: 2px 8px; }
   .tag.off { background: #fff; color: #B42318; border: 1px solid #B42318; }

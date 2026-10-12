@@ -13,8 +13,8 @@ const table: ReportTable = {
   }],
   total: 'KRW 50,960', totalNumber: 50960,
   attachments: [
-    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', category: 'Meals', receiptId: 'r1', missing: null, note: '', details: [] },
-    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', category: 'Transport', receiptId: null, missing: 'none', note: 'no slip', details: [{ label: 'Memo', value: 'airport taxi' }] },
+    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', amountBase: 'KRW 29,120', amountLocal: 'JPY 3,200', baseMinor: 29120n, payment: 'Card', category: 'Meals', receiptId: 'r1', missing: null, note: '', details: [] },
+    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', amountBase: 'KRW 21,840', amountLocal: 'JPY 2,400', baseMinor: 21840n, payment: 'Cash', category: 'Transport', receiptId: null, missing: 'none', note: 'no slip', details: [{ label: 'Memo', value: 'airport taxi' }] },
   ],
   claim: [], affidavits: [],
 };
@@ -30,7 +30,9 @@ describe('reportToHtml receipt pages', () => {
     const html = reportToHtml(table, { r1: 'data:image/png;base64,AA' }, labels);
     expect(html).toContain('1 photos, 1 missing');
     expect(html).toContain('<span class="tag off">#02</span>');
-    expect(html.indexOf('<span class="tag big">#01</span>')).toBeLessThan(html.indexOf('<span class="tag big">#02</span>'));
+    expect(html.indexOf('<span class="tag">#01</span>')).toBeLessThan(html.indexOf('<span class="tag">#02</span>'));
+    expect(html).toContain('2026-10-01 · KRW 50,960');
+    expect(html).toContain('<strong>KRW 29,120</strong><small>JPY 3,200</small>');
     expect(html).toContain('NO RECEIPT');
     expect(html).toContain('<th>Memo</th><td>airport taxi</td>');
   });
@@ -39,6 +41,11 @@ describe('reportToHtml receipt pages', () => {
     const html = reportToHtml(table, { r1: 'data:image/png;base64,AA' }, labels, { receiptsOnly: true });
     expect(html).toContain('<img src="data:image/png;base64,AA"/>');
     expect(html).not.toContain('<thead>');
+  });
+
+  it('leaves the line numbers off for a company form', () => {
+    const html = reportToHtml(table, { r1: 'data:image/png;base64,AA' }, labels, { receiptsOnly: true, tags: false });
+    expect(html).not.toContain('#01');
   });
 
   it('keeps the page when the photo cannot be loaded', () => {
