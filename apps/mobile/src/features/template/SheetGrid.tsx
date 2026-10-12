@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing, type, usePalette } from '../../theme/tokens';
@@ -6,8 +6,8 @@ import { columnIndex, columnLetters, type ParsedTemplate, splitRef } from './xls
 
 export interface CellMark {
   label: string;
-  /** false for the faint cells below a table column's first row */
-  strong: boolean;
+  /** focus: the item being placed now; set: another item's place; faint: rows below a table column's first row */
+  tone: 'focus' | 'set' | 'faint';
 }
 
 const MAX_ROWS = 60;
@@ -33,13 +33,24 @@ export const SheetGrid = memo(function SheetGrid({
   sheet,
   marks,
   extraRefs,
+  focus,
   onTap,
 }: {
   sheet: ParsedTemplate;
   marks: Record<string, CellMark>;
   extraRefs: readonly string[];
+  /** Cell to scroll into view */
+  focus?: string;
   onTap: (ref: string) => void;
 }) {
+  const down = useRef<ScrollView>(null);
+  const across = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (!focus) return;
+    const { col, row } = splitRef(focus);
+    across.current?.scrollTo({ x: Math.max(0, (columnIndex(col) - 2) * CELL_W), animated: true });
+    down.current?.scrollTo({ y: Math.max(0, (row - 3) * CELL_H), animated: true });
+  }, [focus]);
   const palette = usePalette();
   const text = new Map(sheet.cells.map((c) => [c.ref, c.text]));
   const { rows, cols } = sheetSize(sheet, extraRefs);
@@ -47,8 +58,8 @@ export const SheetGrid = memo(function SheetGrid({
   const line = { borderColor: palette.border };
 
   return (
-    <ScrollView style={[styles.frame, line]} nestedScrollEnabled>
-      <ScrollView horizontal nestedScrollEnabled>
+    <ScrollView ref={down} style={[styles.frame, line]} nestedScrollEnabled>
+      <ScrollView ref={across} horizontal nestedScrollEnabled>
         <View>
           <View style={styles.row}>
             <View style={[styles.corner, line, { backgroundColor: palette.surface }]} />
@@ -76,11 +87,17 @@ export const SheetGrid = memo(function SheetGrid({
                     style={[
                       styles.cell,
                       line,
-                      mark && { backgroundColor: mark.strong ? palette.brand : palette.brandSoft },
+                      mark && { backgroundColor: mark.tone === 'focus' ? palette.brand : palette.brandSoft },
+                      mark?.tone === 'focus' && { borderColor: palette.text, borderWidth: 2 },
                     ]}
                   >
-                    {mark?.strong ? (
-                      <Text numberOfLines={2} style={[styles.cellText, { color: palette.onBrand, fontWeight: '700' }]}>{mark.label}</Text>
+                    {mark && mark.tone !== 'faint' ? (
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.cellText, { color: mark.tone === 'focus' ? palette.onBrand : palette.brand, fontWeight: '700' }]}
+                      >
+                        {mark.label}
+                      </Text>
                     ) : (
                       <Text numberOfLines={2} style={[styles.cellText, { color: value?.startsWith('=') ? palette.textMuted : palette.text }]}>
                         {value?.startsWith('=') ? 'ƒx' : value ?? ''}
