@@ -11,8 +11,9 @@ import { BUILTIN_PRESETS, REPORT_FORMATS, type ReportFormat } from '../../domain
 import { uuidv7 } from '../../domain/id';
 import { SubmitCard } from '../../features/company/SubmitCard';
 import { runExport } from '../../features/report/runExport';
-import { pickTemplate } from '../../features/template/pickTemplate';
+import { pickSharedTemplate, pickTemplate } from '../../features/template/pickTemplate';
 import { runTemplateExport } from '../../features/template/runTemplateExport';
+import { unpackTemplate } from '../../features/template/share';
 import { saveTemplateFile } from '../../features/template/storage';
 import { suggestMapping } from '../../features/template/suggestMapping';
 import { readTemplate } from '../../features/template/xlsxTemplate';
@@ -30,6 +31,7 @@ export default function ReportsScreen() {
   const custom = useAppStore((s) => s.reportPresets);
   const templates = useAppStore((s) => s.companyTemplates);
   const saveTemplate = useAppStore((s) => s.saveTemplate);
+  const saveField = useAppStore((s) => s.saveField);
   const presets = [...BUILTIN_PRESETS, ...custom];
 
   const [tripId, setTripId] = useState(activeTripId ?? trips[0]?.id ?? '');
@@ -69,6 +71,26 @@ export default function ReportsScreen() {
       router.push({ pathname: '/template/[id]', params: { id, by } });
     } catch (e) {
       setError(t('template.uploadFailed', { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // A template a friend set up and shared: same file, same places, nothing to redo.
+  const importShared = async () => {
+    setError(null);
+    setUploading(true);
+    try {
+      const text = await pickSharedTemplate();
+      if (!text) return;
+      const { template, bytes, newFields } = unpackTemplate(text, customFields, uuidv7);
+      for (const f of newFields) saveField(f);
+      await saveTemplateFile(template.id, bytes);
+      saveTemplate(template);
+      setPresetId(template.id);
+      router.push({ pathname: '/template/[id]', params: { id: template.id, by: 'shared' } });
+    } catch {
+      setError(t('template.importFailed'));
     } finally {
       setUploading(false);
     }
@@ -141,6 +163,7 @@ export default function ReportsScreen() {
           );
         })}
         <Button title={uploading ? t('template.reading') : t('template.upload')} variant="secondary" onPress={upload} disabled={uploading} />
+        <Button title={t('template.import')} variant="secondary" onPress={importShared} disabled={uploading} />
       </Card>
 
       <Card title={t('reports.formats')}>
