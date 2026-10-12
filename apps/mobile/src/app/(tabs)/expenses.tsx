@@ -27,7 +27,7 @@ export default function ExpensesScreen() {
 
   return (
     <Screen title={t('tab.expenses')} subtitle={trip ? trip.title : t('expenses.unassigned')}>
-      <TextField label={t('search.label')} value={query} onChangeText={setQuery} placeholder={t('search.placeholder')} />
+      <TextField label={t('search.label')} value={query} onChangeText={setQuery} placeholder={t('search.placeholder')} hint={t('search.hint')} />
       {found ? (
         <Card title={t('search.results', { n: found.length })}>
           {found.length === 0 ? <Text style={[type.body, { color: palette.textMuted }]}>{t('search.none')}</Text> : null}

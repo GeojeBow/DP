@@ -26,7 +26,11 @@ export function usePolicyFlags(): Map<string, PolicyFlag[]> {
 export function useDescribeRule(): (rule: CompanyRule) => string {
   const t = useT();
   return (rule) =>
-    t(`policy.desc.${rule.type}`, {
+    t(rule.type === 'daily_cap' && rule.poolDays !== undefined
+      ? rule.poolDays > 0 ? 'policy.desc.daily_cap_block' : 'policy.desc.daily_cap_trip'
+      : `policy.desc.${rule.type}`, {
+      days: rule.poolDays ?? 0,
+      pay: rule.payment ? t(`payment.${rule.payment}`) : '',
       cat: rule.category ? t(`category.${rule.category}`) : t('policy.allCats'),
       amount: ruleNeedsAmount(rule.type) ? formatMoney(toMinor(rule.amount, toCurrencyCode(rule.currency)), toCurrencyCode(rule.currency)) : '',
       words: (rule.keywords ?? []).join(', '),

@@ -10,10 +10,10 @@ import { BUDGET_KINDS, type BudgetKind, type BudgetRule } from '../domain/budget
 import { tripDays } from '../domain/claim';
 import { uuidv7 } from '../domain/id';
 import type { PerDiem, Trip } from '../domain/models';
-import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../domain/schemas';
+import { EXPENSE_CATEGORIES, type ExpenseCategory, PAYMENT_METHODS, type PaymentMethod } from '../domain/schemas';
 import {
   COMPANY_RULE_TYPES, type CompanyRule, type CompanyRuleType, companyPolicyOf, policyFits, policyMode,
-  RULE_ACTIONS, type RuleAction, ruleNeedsAmount,
+  RULE_ACTIONS, RULE_EXAMPLES, type RuleAction, ruleNeedsAmount,
 } from '../features/policy/rules';
 import { useDescribeRule } from '../features/policy/usePolicy';
 import { useT } from '../i18n';
@@ -23,6 +23,7 @@ import { spacing, type, usePalette } from '../theme/tokens';
 const ALL = 'all' as const;
 const AMOUNT = /^\d+(\.\d{1,2})?$/;
 const TRAVEL_PERCENTS = ['100', '50', '0'] as const;
+const POOL_MODES = ['none', 'trip', 'block'] as const;
 const clean = (v: string) => v.replace(/,/g, '').trim();
 const positive = (v: string) => AMOUNT.test(v) && Number(v) > 0;
 
@@ -92,6 +93,8 @@ export default function PolicyScreen() {
         {rules.length === 0 ? <Text style={[type.body, { color: palette.textMuted }]}>{t('policy.empty')}</Text> : null}
         {rules.map((rule) => <RuleRow key={rule.id} rule={rule} onDelete={() => deleteRule(rule.id)} />)}
       </Card>
+
+      {currency === 'KRW' ? <ExamplesCard rules={rules} onAdd={addRule} /> : null}
 
       <AddRuleCard currency={currency} onAdd={addRule} />
     </ScrollView>
@@ -244,6 +247,38 @@ function RuleRow({ rule, onDelete }: { rule: CompanyRule; onDelete: () => void }
   );
 }
 
+/** Common rules, added with one tap. */
+function ExamplesCard({ rules, onAdd }: { rules: readonly CompanyRule[]; onAdd: (rule: CompanyRule) => void }) {
+  const palette = usePalette();
+  const t = useT();
+  const describe = useDescribeRule();
+  const same = (a: Omit<CompanyRule, 'id' | 'currency'>, b: CompanyRule) =>
+    a.type === b.type && a.category === b.category && a.amount === b.amount && a.payment === b.payment && a.poolDays === b.poolDays;
+  const left = RULE_EXAMPLES.filter((x) => !rules.some((r) => same(x, r)));
+  if (left.length === 0) return null;
+  return (
+    <Card title={t('policy.examples')}>
+      <Text style={[type.caption, { color: palette.textMuted }]}>{t('policy.examplesHint')}</Text>
+      <View style={styles.examples}>
+        {left.map((x) => {
+          const rule: CompanyRule = { ...x, id: '', currency: 'KRW' };
+          return (
+            <Pressable
+              key={`${x.type}-${x.category}`}
+              onPress={() => onAdd({ ...rule, id: uuidv7() })}
+              accessibilityRole="button"
+              style={[styles.example, { borderColor: palette.brand, backgroundColor: palette.brandSoft }]}
+            >
+              <Ionicons name="add-circle" size={16} color={palette.brand} />
+              <Text style={[type.caption, { color: palette.text, fontWeight: '600', flexShrink: 1 }]}>{describe(rule)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Card>
+  );
+}
+
 function AddRuleCard({ currency, onAdd }: { currency: string; onAdd: (rule: CompanyRule) => void }) {
   const palette = usePalette();
   const t = useT();
@@ -252,6 +287,9 @@ function AddRuleCard({ currency, onAdd }: { currency: string; onAdd: (rule: Comp
   const [amount, setAmount] = useState('');
   const [words, setWords] = useState('');
   const [action, setAction] = useState<RuleAction>('warn');
+  const [pool, setPool] = useState<(typeof POOL_MODES)[number]>('none');
+  const [poolDays, setPoolDays] = useState('7');
+  const [pay, setPay] = useState<PaymentMethod>('corporate_card');
   const [submitted, setSubmitted] = useState(false);
   const setKind = (k: CompanyRuleType) => {
     setKindState(k);
@@ -264,10 +302,11 @@ function AddRuleCard({ currency, onAdd }: { currency: string; onAdd: (rule: Comp
   const error = needsAmount && !positive(amountClean)
     ? t('policy.err.amount')
     : kind === 'prohibited_keyword' && keywords.length === 0 ? t('policy.err.keywords') : null;
+  const poolError = kind === 'daily_cap' && pool === 'block' && !(/^\d+$/.test(poolDays) && Number(poolDays) >= 2) ? t('trip.err.poolDays') : null;
 
   const add = () => {
     setSubmitted(true);
-    if (error) return;
+    if (error || poolError) return;
     onAdd({
       id: uuidv7(),
       type: kind,
@@ -276,6 +315,8 @@ function AddRuleCard({ currency, onAdd }: { currency: string; onAdd: (rule: Comp
       currency,
       ...(kind === 'prohibited_keyword' ? { keywords } : {}),
       ...(action !== 'warn' ? { action } : {}),
+      ...(kind === 'daily_cap' && pool !== 'none' ? { poolDays: pool === 'trip' ? 0 : Number(poolDays) } : {}),
+      ...(kind === 'payment_required' ? { payment: pay } : {}),
     });
     setAmount('');
     setWords('');
@@ -314,6 +355,24 @@ function AddRuleCard({ currency, onAdd }: { currency: string; onAdd: (rule: Comp
           hint={t('policy.keywordsHint')}
         />
       ) : null}
+      {kind === 'daily_cap' ? (
+        <>
+          <Chips label={t('policy.pool')} options={POOL_MODES} value={pool} labelOf={(m) => t(`policy.pool.${m}`)} onChange={setPool} />
+          <Text style={[type.caption, { color: palette.textMuted }]}>{t(`policy.poolHint.${pool}`)}</Text>
+          {pool === 'block' ? (
+            <TextField
+              label={t('trip.poolDays')}
+              value={poolDays}
+              onChangeText={setPoolDays}
+              keyboardType="number-pad"
+              error={submitted ? poolError : null}
+            />
+          ) : null}
+        </>
+      ) : null}
+      {kind === 'payment_required' ? (
+        <Chips label={t('policy.payment')} options={PAYMENT_METHODS} value={pay} labelOf={(p) => t(`payment.${p}`)} onChange={setPay} />
+      ) : null}
       <Chips label={t('policy.actionLabel')} options={RULE_ACTIONS} value={action} labelOf={(a) => t(`policy.actionChoice.${a}`)} onChange={setAction} />
       <Button title={t('policy.save')} onPress={add} />
     </Card>
@@ -324,5 +383,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl * 2 },
   rule: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   flex: { flex: 1, gap: 2 },
+  examples: { gap: spacing.sm },
+  example: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
 });
