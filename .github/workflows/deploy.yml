@@ -42,7 +42,10 @@ jobs:
           supabase db push --include-seed
       - name: Deploy Edge Functions
         if: steps.creds.outputs.ready == 'true'
-        run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
+        # Supabase's server-side bundler sometimes answers 500; bundle on the runner with Docker instead.
+        run: |
+          supabase functions deploy --project-ref "$PROJECT_REF" --use-api \
+            || supabase functions deploy --project-ref "$PROJECT_REF" --use-docker
       # Guests use the app anonymously; accounts sign up with email and password.
       # Email confirmation stays off until a custom SMTP sender is set up before launch.
       - name: Configure sign-in
