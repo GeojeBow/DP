@@ -52,3 +52,13 @@ describe('sharing a template', () => {
     expect(() => unpackTemplate(JSON.stringify({ ...broken, file: 'AAAA' }), [], newId)).toThrow();
   });
 });
+
+describe('sharing "not needed" choices', () => {
+  it('keeps them, with company-only boxes renamed to the receiver ids', () => {
+    const withSkip: CompanyTemplate = { ...template, mapping: { ...template.mapping, skip: ['f:department', 'x:o1'] } };
+    const mine: CustomField = { ...other, id: 'mine-o' };
+    const got = unpackTemplate(packTemplate(withSkip, bytes, [project, other]), [mine], () => 'new');
+    // o1 is skipped, not placed, so it is not packed; its skip entry is dropped rather than left dangling.
+    expect(got.template.mapping.skip).toEqual(['f:department']);
+  });
+});

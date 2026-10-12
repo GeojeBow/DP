@@ -23,6 +23,8 @@ export interface TemplateMapping {
     /** Custom field id → column letter */
     custom?: Record<string, string>;
   } | null;
+  /** Items the user marked as not needed in this form: f:<field>, c:<column> or x:<custom field id> */
+  skip?: string[];
 }
 
 /** A saved company template: the original file plus where things go. */

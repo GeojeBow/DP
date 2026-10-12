@@ -50,6 +50,8 @@ export default function TemplateScreen() {
   /** What the next tap on the sheet places: f:<field>, c:<column> or x:<custom field id> */
   const [picking, setPicking] = useState<string>(`f:${TEMPLATE_FIELDS[0]}`);
   const [manual, setManual] = useState(false);
+  /** Items marked "not needed" for this form */
+  const [skip, setSkip] = useState<Set<string>>(() => new Set(source?.mapping.skip ?? []));
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
@@ -114,13 +116,36 @@ export default function TemplateScreen() {
         if (placed) setFirstRow(String(dataRow));
       }
       if (placed) {
-        const at = items.indexOf(picking);
-        const next = [...items.slice(at + 1), ...items.slice(0, at)].find((x) => x !== picking && !placeOf(x));
-        if (next) setPicking(next);
+        setSkip((s) => (s.has(picking) ? new Set([...s].filter((x) => x !== picking)) : s));
+        moveOn();
       }
     },
-    [picking, fields, columns, custom, firstRow, parsed, items], // eslint-disable-line react-hooks/exhaustive-deps
+    [picking, fields, columns, custom, firstRow, parsed, items, skip], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  /** Next item still waiting for a place or a "not needed" */
+  const moveOn = () => {
+    const at = items.indexOf(picking);
+    const next = [...items.slice(at + 1), ...items.slice(0, at)].find((x) => x !== picking && !placeOf(x) && !skip.has(x));
+    if (next) setPicking(next);
+  };
+
+  const clearPlace = (key: string) => {
+    const [kind, k] = [key.slice(0, 1), key.slice(2)];
+    const set = kind === 'f' ? setFields : kind === 'c' ? setColumns : setCustom;
+    set((s) => ({ ...s, [k]: '' }));
+  };
+
+  // "Not needed": this form has no place for the item, so it is left out and skipped next time.
+  const toggleSkip = () => {
+    if (skip.has(picking)) {
+      setSkip((s) => new Set([...s].filter((x) => x !== picking)));
+      return;
+    }
+    clearPlace(picking);
+    setSkip((s) => new Set([...s, picking]));
+    moveOn();
+  };
 
   const marks = useMemo(() => {
     const out: Record<string, CellMark> = {};
@@ -163,6 +188,7 @@ export default function TemplateScreen() {
         firstRow && Object.keys(cleanColumns).length + Object.keys(cleanCustom).length
           ? { firstRow: rowNum, columns: cleanColumns, custom: cleanCustom }
           : null,
+      skip: [...skip].filter((key) => items.includes(key) && !placeOf(key)),
     };
   };
 
@@ -231,6 +257,7 @@ export default function TemplateScreen() {
                   .map((key) => {
                     const selected = key === picking;
                     const place = placeOf(key);
+                    const skipped = !place && skip.has(key);
                     return (
                       <Pressable
                         key={key}
@@ -245,8 +272,13 @@ export default function TemplateScreen() {
                           },
                         ]}
                       >
-                        <Text style={[type.label, { color: selected ? palette.onBrand : palette.text, fontWeight: selected ? '700' : '500' }]}>
-                          {place ? '✓ ' : ''}{itemLabel(key)}{place ? ` · ${place}` : ''}
+                        <Text
+                          style={[
+                            type.label,
+                            { color: selected ? palette.onBrand : skipped ? palette.textMuted : palette.text, fontWeight: selected ? '700' : '500' },
+                          ]}
+                        >
+                          {place ? '✓ ' : skipped ? '– ' : ''}{itemLabel(key)}{place ? ` · ${place}` : skipped ? ` · ${t('template.skipped')}` : ''}
                         </Text>
                       </Pressable>
                     );
@@ -256,24 +288,29 @@ export default function TemplateScreen() {
           ))}
           <View style={[styles.banner, { backgroundColor: palette.brandSoft }]}>
             <Text style={[type.label, { color: palette.brand, fontWeight: '700' }]}>
-              {t(picking.startsWith('f:') ? 'template.tapCell' : 'template.tapColumn', { item: itemLabel(picking) })}
+              {skip.has(picking) && !placeOf(picking)
+                ? t('template.skippedBanner', { item: itemLabel(picking) })
+                : t(picking.startsWith('f:') ? 'template.tapCell' : 'template.tapColumn', { item: itemLabel(picking) })}
             </Text>
           </View>
           <SheetGrid sheet={parsed} marks={marks} extraRefs={markedRefs} onTap={tap} />
           {Number(firstRow) > 0 ? (
             <Text style={[type.caption, { color: palette.textMuted }]}>{t('template.firstRowIs', { row: firstRow })}</Text>
           ) : null}
-          {placeOf(picking) ? (
-            <Button
-              title={t('template.clearItem', { item: itemLabel(picking) })}
-              variant="secondary"
-              onPress={() => {
-                const [kind, k] = [picking.slice(0, 1), picking.slice(2)];
-                const set = kind === 'f' ? setFields : kind === 'c' ? setColumns : setCustom;
-                set((s) => ({ ...s, [k]: '' }));
-              }}
-            />
-          ) : null}
+          <View style={styles.pickActions}>
+            {placeOf(picking) ? (
+              <View style={styles.pickAction}>
+                <Button title={t('template.clearItem', { item: itemLabel(picking) })} variant="secondary" onPress={() => clearPlace(picking)} />
+              </View>
+            ) : null}
+            <View style={styles.pickAction}>
+              <Button
+                title={skip.has(picking) && !placeOf(picking) ? t('template.unskip') : t('template.skipItem', { item: itemLabel(picking) })}
+                variant="secondary"
+                onPress={toggleSkip}
+              />
+            </View>
+          </View>
         </Card>
       ) : null}
 
@@ -374,6 +411,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   gridItem: { flexBasis: '47%', flexGrow: 1 },
   pickGroup: { gap: spacing.xs },
+  pickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  pickAction: { flexGrow: 1, flexBasis: '45%' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { borderWidth: 1, borderRadius: radius.chip, paddingHorizontal: spacing.md, paddingVertical: 6 },
 });
