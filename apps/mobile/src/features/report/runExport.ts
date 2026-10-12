@@ -5,7 +5,7 @@ import { localToday } from '../../domain/trip';
 import type { Translate } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
 import { reportToDocx } from './docx';
-import { shareDocx, sharePdf, shareXlsx } from './exportReport';
+import { shareDocx, sharePdf, shareXlsxWithPdf } from './exportReport';
 import { type HtmlLabels, reportToHtml } from './html';
 import { reportToXlsx } from './xlsx';
 
@@ -32,8 +32,7 @@ export async function runExport(
       share: t('report.share'),
       amount: t('report.amount'),
     };
-    await shareXlsx(reportToXlsx(table, xlsxLabels), fileTitle);
-    if (table.attachments.length) await shareReceipts(table, t, fileTitle);
+    await shareXlsxWithPdf(reportToXlsx(table, xlsxLabels), fileTitle, await receiptsHtml(table, t), `${fileTitle} ${t('report.receipts')}`);
     return;
   }
   const images = await receiptImages(table);
@@ -46,12 +45,12 @@ export async function runExport(
 }
 
 /**
- * The numbered receipt photos (and no-receipt statements) as one PDF, sent after
- * an Excel file so the numbers in the sheet can be matched to the photos.
+ * The receipt photos (and no-receipt statements) as the HTML of one PDF that goes along
+ * with an Excel file; null when there are none. `tags` false leaves off the line numbers.
  */
-export async function shareReceipts(table: ReportTable, t: Translate, fileTitle: string, tags = true): Promise<void> {
-  const html = reportToHtml(table, await receiptImages(table), docLabels(t), { receiptsOnly: true, tags });
-  await sharePdf(html, `${fileTitle} ${t('report.receipts')}`);
+export async function receiptsHtml(table: ReportTable, t: Translate, tags = true): Promise<string | null> {
+  if (!table.attachments.length) return null;
+  return reportToHtml(table, await receiptImages(table), docLabels(t), { receiptsOnly: true, tags });
 }
 
 async function receiptImages(table: ReportTable): Promise<Record<string, string | null>> {
@@ -120,11 +119,10 @@ function tableLabels(t: Translate): ReportLabels {
   };
 }
 
-/** The trip's receipts as a numbered PDF, for exports (a company's own Excel file) that cannot hold photos. */
-export async function shareTripReceipts(
+/** The trip's receipts PDF for a company's own Excel file, which cannot hold photos; grouped by day, no line numbers. */
+export async function tripReceiptsHtml(
   trip: Trip, expenses: readonly Expense[], t: Translate, customFields: readonly CustomField[] = [],
-): Promise<void> {
+): Promise<string | null> {
   const table = buildReport(trip, expenses, { ...BUILTIN_PRESETS[0]!, receiptAppendix: true }, tableLabels(t), customFields);
-  // A company form has no column for our line numbers, so the pages go by day instead.
-  if (table.attachments.length) await shareReceipts(table, t, `${trip.title} ${trip.startDate}`, false);
+  return receiptsHtml(table, t, false);
 }
