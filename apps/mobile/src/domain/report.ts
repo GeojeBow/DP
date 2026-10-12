@@ -88,7 +88,15 @@ export interface ReportAttachment {
   tags: string[];
   date: string;
   merchant: string;
+  /** What was paid, in the currency on the receipt */
   amount: string;
+  /** The same in the trip's currency, which leads on the page */
+  amountBase: string;
+  /** Receipt-currency amount when it differs from the trip's, shown under the main one */
+  amountLocal: string | null;
+  /** amountBase in minor units, for day totals */
+  baseMinor: bigint;
+  payment: string;
   category: string;
   receiptId: string | null;
   /** Why there is no photo: added without one, a signed lost-receipt statement, or a car trip */
@@ -163,10 +171,27 @@ export function buildReport(
   };
   const attachments: ReportAttachment[] = [];
   const byReceipt = new Map<string, ReportAttachment>();
+  // Running totals for a receipt split into several lines, so its page shows the whole receipt.
+  const sums = new Map<ReportAttachment, { local: bigint; base: bigint; currency: string | null }>();
+  const addTo = (page: ReportAttachment, e: Expense) => {
+    const prev = sums.get(page) ?? { local: 0n, base: 0n, currency: e.currency };
+    const same = prev.currency === e.currency;
+    const next = {
+      local: same ? prev.local + toMinor(e.total, toCurrencyCode(e.currency)) : 0n,
+      base: prev.base + toMinor(e.totalBase, base),
+      currency: same ? e.currency : null,
+    };
+    sums.set(page, next);
+    page.baseMinor = next.base;
+    page.amountBase = formatMoney(next.base, base);
+    page.amount = next.currency ? formatMoney(next.local, toCurrencyCode(next.currency)) : page.amountBase;
+    page.amountLocal = next.currency && next.currency !== base ? page.amount : null;
+  };
   for (const e of ordered) {
     const shared = e.receiptId ? byReceipt.get(e.receiptId) : undefined;
     if (shared) {
       shared.tags.push(tagOf(e));
+      addTo(shared, e);
       continue;
     }
     const page: ReportAttachment = {
@@ -174,12 +199,17 @@ export function buildReport(
       date: e.localDate,
       merchant: e.merchantName || labels.none,
       amount: money(e),
+      amountBase: '',
+      amountLocal: null,
+      baseMinor: 0n,
+      payment: labels.payment(e.paymentMethod),
       category: labels.category(e.category),
       receiptId: e.receiptId,
       missing: e.receiptId ? null : e.mileage ? 'mileage' : e.missingReceipt ? 'affidavit' : 'none',
       note: e.receiptId ? '' : e.mileage ? [e.mileage.route, `${e.mileage.km} km`].filter(Boolean).join(' · ') : e.missingReceipt?.reason ?? e.memo,
       details: e.receiptId ? [] : noPhotoDetails(e),
     };
+    addTo(page, e);
     if (e.receiptId) byReceipt.set(e.receiptId, page);
     attachments.push(page);
   }

@@ -9,7 +9,8 @@ import { ExpenseRow } from '../../components/ExpenseRow';
 import { Button } from '../../components/Form';
 import { Screen } from '../../components/Screen';
 import { currencyBreakdown, submissionChecks } from '../../domain/insights';
-import { formatMoney, toCurrencyCode } from '../../domain/money';
+import { divide, formatQuote } from '../../domain/fx';
+import { formatMoney, fromMinor, toCurrencyCode } from '../../domain/money';
 import { ClaimCard } from '../../features/claim/ClaimCard';
 import { dailySpend, localToday, summarizeTrip } from '../../domain/trip';
 import { usePolicyFlags } from '../../features/policy/usePolicy';
@@ -68,7 +69,6 @@ export default function HomeScreen() {
     { icon: 'help-circle-outline', key: 'noMerchant', color: palette.textMuted },
   ];
   const currencies = currencyBreakdown(own, trip.baseCurrency);
-  const rate = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   const stats: Array<{ icon: IconName; label: string; value: string }> = [
     { icon: 'today-outline', label: t('home.stat.today'), value: money(spentToday) },
@@ -274,9 +274,7 @@ export default function HomeScreen() {
                     {t('home.currencyLine', { amount: formatMoney(c.local, code), n: c.count })}
                   </Text>
                   <Text style={[type.caption, type.numeric, { color: palette.textMuted }]}>
-                    {c.minRate === c.maxRate
-                      ? t('home.rateLine', { avg: rate(c.avgRate) })
-                      : t('home.rateRange', { avg: rate(c.avgRate), min: rate(c.minRate), max: rate(c.maxRate) })}
+                    {t('home.rateLine', { avg: formatQuote(divide(fromMinor(c.base, base), fromMinor(c.local, code)) ?? '1', c.currency, base) })}
                   </Text>
                 </View>
                 <Text style={[type.body, type.numeric, styles.catAmount, { color: palette.text }]}>{money(c.base)}</Text>

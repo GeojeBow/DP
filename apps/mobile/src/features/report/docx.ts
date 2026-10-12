@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
 
+import { formatMoney, toCurrencyCode } from '../../domain/money';
 import type { ReportTable } from '../../domain/report';
 import type { HtmlLabels } from './html';
 
@@ -144,14 +145,22 @@ export function reportToDocx(table: ReportTable, images: Record<string, string |
     const photos = table.attachments.filter((a) => a.receiptId).length;
     body.push(para([{ text: labels.receipts, bold: true, size: 14, color: NAVY }], { pageBreak: true }));
     body.push(para([{ text: labels.receiptsHint(photos, table.attachments.length - photos), color: '5B6470' }], { after: 160 }));
-    table.attachments.forEach((a, n) => {
+    let day = '';
+    [...table.attachments].sort((x, y) => x.date.localeCompare(y.date)).forEach((a, n) => {
+      if (a.date !== day) {
+        day = a.date;
+        const list = table.attachments.filter((x) => x.date === day);
+        const total = formatMoney(list.reduce((sum, x) => sum + x.baseMinor, 0n), toCurrencyCode(table.baseCurrency));
+        body.push(para([{ text: labels.day ? labels.day(day, list.length, total) : `${day} · ${total}`, bold: true, size: 12, color: NAVY }], { before: n ? 360 : 0, after: 120 }));
+      }
       const image = decodeImage(a.receiptId ? images[a.receiptId] : null);
       const color = image ? NAVY : RED;
       body.push(para([
-        { text: `${a.tags.join(' ')}  `, bold: true, size: 13, color },
-        { text: `${a.date} · ${a.merchant}`, bold: true },
-        { text: `   ${a.category} · ${a.amount}`, color: '5B6470' },
-      ], { before: n ? 240 : 0, after: 60 }));
+        { text: `${a.tags.join(' ')}  `, bold: true, size: 11, color },
+        { text: a.merchant, bold: true },
+        { text: `   ${a.amountBase}`, bold: true, color: NAVY },
+        { text: `${a.amountLocal ? ` (${a.amountLocal})` : ''}   ${a.category} · ${a.payment}`, color: '5B6470' },
+      ], { before: 200, after: 60 }));
       if (image) {
         const rid = `rIdImg${n + 1}`;
         const name = `receipt${n + 1}.${image.ext}`;

@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Form';
 import { perDiemDays, travelDayPercent } from '../../domain/claim';
+import { formatQuote } from '../../domain/fx';
 import { formatMoney, toCurrencyCode, toMinor } from '../../domain/money';
 import { companyPolicyOf, policyFits, rulesForTrip } from '../../features/policy/rules';
 import { useT } from '../../i18n';
@@ -99,7 +100,7 @@ export default function TripSettingsScreen() {
             key={currency}
             icon="swap-horizontal-outline"
             label={currency}
-            value={`1 ${currency} = ${rate} ${trip.baseCurrency}`}
+            value={formatQuote(rate, currency, trip.baseCurrency)}
             action={
               <Pressable onPress={() => forgetRate(currency)} accessibilityRole="button" accessibilityLabel={t('tripSettings.fxForget')} hitSlop={8}>
                 <Text style={[type.label, { color: palette.textMuted }]}>{t('tripSettings.fxForget')}</Text>

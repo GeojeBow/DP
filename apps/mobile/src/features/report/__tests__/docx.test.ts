@@ -14,8 +14,8 @@ const table: ReportTable = {
     [{ text: '#02' }, { text: 'Taxi' }, { text: 'KRW 21,840', number: 21840 }, { text: 'No receipt' }]], subtotal: '' }],
   total: 'KRW 50,960', totalNumber: 50960,
   attachments: [
-    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', category: 'Meals', receiptId: 'r1', missing: null, note: '', details: [] },
-    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', category: 'Transport', receiptId: null, missing: 'none', note: '', details: [{ label: 'Memo', value: 'airport' }] },
+    { tags: ['#01'], date: '2026-10-01', merchant: 'Ichiran', amount: 'JPY 3,200', amountBase: 'KRW 29,120', amountLocal: 'JPY 3,200', baseMinor: 29120n, payment: 'Card', category: 'Meals', receiptId: 'r1', missing: null, note: '', details: [] },
+    { tags: ['#02'], date: '2026-10-01', merchant: 'Taxi', amount: 'JPY 2,400', amountBase: 'KRW 21,840', amountLocal: 'JPY 2,400', baseMinor: 21840n, payment: 'Cash', category: 'Transport', receiptId: null, missing: 'none', note: '', details: [{ label: 'Memo', value: 'airport' }] },
   ],
   claim: [], affidavits: [],
 };
