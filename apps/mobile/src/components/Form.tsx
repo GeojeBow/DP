@@ -35,9 +35,10 @@ interface ChipsProps<T extends string> {
   value: T;
   labelOf: (value: T) => string;
   onChange: (value: T) => void;
+  hint?: string;
 }
 
-export function Chips<T extends string>({ label, options, value, labelOf, onChange }: ChipsProps<T>) {
+export function Chips<T extends string>({ label, options, value, labelOf, onChange, hint }: ChipsProps<T>) {
   const palette = usePalette();
   return (
     <View style={styles.field}>
@@ -64,6 +65,7 @@ export function Chips<T extends string>({ label, options, value, labelOf, onChan
           );
         })}
       </View>
+      {hint ? <Text style={[type.caption, { color: palette.textMuted }]}>{hint}</Text> : null}
     </View>
   );
 }

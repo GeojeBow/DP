@@ -25,7 +25,7 @@ import { cropToReceipt, pickReceipt, type PickSource } from '../../features/capt
 import { readReceipt, type ReadReceiptOutcome, type ReceiptPrefill } from '../../features/capture/readReceipt';
 import { type MessageKey, useT } from '../../i18n';
 import { loadReceiptImage } from '../../store/receiptImages';
-import { rememberedRate, useActiveTrip, useAppStore } from '../../store/useAppStore';
+import { cardMethodFor, rememberedRate, useActiveTrip, useAppStore } from '../../store/useAppStore';
 import { spacing, type, usePalette } from '../../theme/tokens';
 
 const AMOUNT = /^\d+(\.\d+)?$/;
@@ -77,7 +77,12 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState<ExpenseCategory>(
     existing?.category ?? (EXPENSE_CATEGORIES as readonly string[]).find((c) => c === params.category) as ExpenseCategory ?? 'meals',
   );
-  const [payment, setPayment] = useState<PaymentMethod>(existing?.paymentMethod ?? 'corporate_card');
+  const [payment, setPayment] = useState<PaymentMethod>(
+    () => existing?.paymentMethod ?? cardMethodFor(useAppStore.getState(), undefined).method,
+  );
+  /** The card's last four digits read from the receipt, and whether this card was seen before */
+  const [card, setCard] = useState<{ last4: string; known: boolean } | null>(null);
+  const rememberCard = useAppStore((s) => s.rememberCard);
   const [memo, setMemo] = useState(existing?.memo ?? '');
   const [mode, setMode] = useState<'receipt' | 'mileage'>(existing?.mileage ? 'mileage' : 'receipt');
   const lastMileage = useMemo(
@@ -139,6 +144,11 @@ export default function ExpenseScreen() {
       fill('date', p.localDate, setDate);
       fill('category', p.category, setCategory);
       fill('payment', p.paymentMethod, setPayment);
+      if (p.byCard) {
+        const learned = cardMethodFor(useAppStore.getState(), p.cardLast4);
+        fill('payment', learned.method, setPayment);
+        if (p.cardLast4) setCard({ last4: p.cardLast4, known: learned.known });
+      }
       fill('vat', p.vat, setVat);
       setExtras(outcome.extras);
       // A photo from the gallery still shows the table around the receipt: keep just the paper.
@@ -350,6 +360,7 @@ export default function ExpenseScreen() {
       updatedAt: now,
     };
     upsertExpense(expense);
+    if (!isMileage) rememberCard(card?.last4, payment);
     if (isNew && addExtras && extras.length) {
       const rest = buildExtraExpenses(extras, {
         tripId: expense.tripId,
@@ -560,7 +571,11 @@ export default function ExpenseScreen() {
         {!isMileage ? (
           <>
             <Chips label={t('expense.category')} options={EXPENSE_CATEGORIES} value={category} labelOf={(c) => t(`category.${c}`)} onChange={edit('category', setCategory)} />
-            <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)} />
+            <Chips label={t('expense.payment')} options={PAYMENT_METHODS} value={payment} labelOf={(p) => t(`payment.${p}`)} onChange={edit('payment', setPayment)}
+              hint={card && (payment === 'corporate_card' || payment === 'personal_card')
+                ? t(card.known ? 'expense.cardKnown' : 'expense.cardNew', { last4: card.last4, kind: t(`payment.${payment}`) })
+                : undefined}
+            />
             <TextField
               label={t('split.people')}
               value={people}

@@ -688,6 +688,8 @@ export const ja: Record<MessageKey, string> = {
   'category.other': 'その他',
   'payment.corporate_card': '法人カード',
   'payment.personal_card': '個人カード',
+  'expense.cardKnown': '末尾{last4}のカード · {kind}として記憶しています',
+  'expense.cardNew': '末尾{last4}のカード · 初めてのカードです。法人/個人を選ぶと次回から記憶します',
   'payment.cash': '現金',
   'payment.bank_transfer': '振込',
   'payment.mobile_pay': 'モバイル決済',

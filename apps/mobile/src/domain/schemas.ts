@@ -51,7 +51,11 @@ export const parsedTransactionSchema = z.object({
   total: decimalStringSchema.nullable(),
   category: expenseCategorySchema.nullable(),
   payment_method_hint: paymentMethodSchema.nullable(),
-  card_last4: z.string().regex(/^\d{4}$/).nullable(),
+  // Models sometimes return the masked number ("****5678"); keep only its last four digits.
+  card_last4: z.preprocess(
+    (v) => (typeof v === 'string' ? /(\d{4})\D*$/.exec(v)?.[1] ?? null : v),
+    z.string().regex(/^\d{4}$/).nullable(),
+  ),
   line_items: z.array(z.object({ description: z.string(), amount: decimalStringSchema.nullable() })),
   confidence: z.record(z.string(), confidenceSchema),
 });

@@ -687,6 +687,8 @@ export const ko = {
   'category.other': '기타',
   'payment.corporate_card': '법인카드',
   'payment.personal_card': '개인카드',
+  'expense.cardKnown': '끝자리 {last4} 카드 · {kind}로 기억해 둔 카드예요',
+  'expense.cardNew': '끝자리 {last4} 카드 · 처음 보는 카드예요. 법인/개인 맞게 골라 주시면 다음부터 기억해요',
   'payment.cash': '현금',
   'payment.bank_transfer': '계좌이체',
   'payment.mobile_pay': '간편결제',
