@@ -1,0 +1,50 @@
+name: NeoDir (Windows exe)
+
+# Builds the portable single-file NeoDir.exe on every change to apps/neodir.
+# Download it from the run's "Artifacts" section. A tag like neodir-v0.1.0
+# also publishes it as a GitHub Release.
+on:
+  push:
+    branches: [main]
+    tags: ['neodir-v*']
+    paths: ['apps/neodir/**', '.github/workflows/neodir.yml']
+  pull_request:
+    paths: ['apps/neodir/**', '.github/workflows/neodir.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/neodir
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test core logic
+        run: dotnet test tests/NeoDir.Core.Tests -c Release
+      - name: Publish single-file exe
+        run: dotnet publish src/NeoDir/NeoDir.csproj -c Release -o publish
+      - name: Smoke test (starts and stays up)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath publish/NeoDir.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "NeoDir.exe exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+          Get-Item publish/NeoDir.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeoDir-win-x64
+          path: apps/neodir/publish/NeoDir.exe
+          if-no-files-found: error
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/neodir-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/neodir/publish/NeoDir.exe
