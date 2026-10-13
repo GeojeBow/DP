@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ['apps/rea-search/**', '.github/workflows/rea-search.yml']
   push:
-    branches: [main]
+    branches: [main, rea-search]
     paths: ['apps/rea-search/**', '.github/workflows/rea-search.yml']
   workflow_dispatch:
 
@@ -63,3 +63,35 @@ jobs:
         with:
           name: REASearch
           path: apps/rea-search/go/release/REASearch.exe
+
+  # A fixed download link for phones and other PCs:
+  # https://github.com/GeojeBow/DP/releases/download/rea-search-latest/REASearch.zip
+  # replaced on every push to the rea-search branch, after the checks pass.
+  publish:
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/rea-search'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: apps/rea-search/README.md
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: REASearch
+          path: dl
+      - name: Make the zip
+        run: |
+          mkdir REASearch
+          cp dl/REASearch.exe apps/rea-search/README.md REASearch/
+          zip -r REASearch.zip REASearch
+      - name: Replace the rea-search-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete rea-search-latest --cleanup-tag --yes || true
+          gh release create rea-search-latest REASearch.zip --prerelease --target "$GITHUB_SHA" \
+            --title "REA Search 최신 빌드" \
+            --notes "rea-search 브랜치 ${GITHUB_SHA::7} 빌드. REASearch.zip을 받아 압축을 풀고 REASearch.exe를 실행하세요. 사용법은 프로그램의 ? 버튼(F1)에 있습니다."
