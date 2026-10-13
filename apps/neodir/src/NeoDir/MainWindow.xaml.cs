@@ -63,7 +63,7 @@ public partial class MainWindow : Window, IPaneHost
         _active = _panes[Math.Clamp(_settings.ActivePane, 0, 3)];
 
         ApplySavedBounds();
-        SetSidebar(_settings.SidebarVisible, _settings.SidebarWidth);
+        SetSidebar(_settings.SidebarVisible);
         ApplyLayout(_settings.Layout);
 
         _toastTimer.Tick += (_, _) => HideToast();
@@ -72,7 +72,7 @@ public partial class MainWindow : Window, IPaneHost
             _previewTimer.Stop();
             Preview.Show(_active.SelectedEntries);
         };
-        SetPreview(_settings.PreviewVisible, _settings.PreviewWidth);
+        SetPreview(_settings.PreviewVisible);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -221,13 +221,12 @@ public partial class MainWindow : Window, IPaneHost
         _previewTimer.Start();
     }
 
-    private void SetPreview(bool visible, double width)
+    private void SetPreview(bool visible)
     {
+        CaptureDockSizes();
         PreviewToggle.IsChecked = visible;
         Preview.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        PreviewSplitter.Visibility = Preview.Visibility;
-        PreviewColumn.Width = visible ? new GridLength(Math.Clamp(width, 200, 900)) : new GridLength(0);
-        PreviewSplitterColumn.Width = visible ? new GridLength(4) : new GridLength(0);
+        ArrangeDocks();
         if (visible) SchedulePreview();
     }
 
@@ -235,9 +234,144 @@ public partial class MainWindow : Window, IPaneHost
 
     private void TogglePreview()
     {
-        var visible = Preview.Visibility != Visibility.Visible;
-        if (!visible) _settings.PreviewWidth = PreviewColumn.ActualWidth;
-        SetPreview(visible, _settings.PreviewWidth);
+        SetPreview(Preview.Visibility != Visibility.Visible);
+    }
+
+    // ───────────── Docking: where the sidebar and preview sit ─────────────
+
+    private DefinitionBase? _sidebarDef;
+    private DefinitionBase? _previewDef;
+
+    private static bool IsVertical(DockSide side) => side is DockSide.Top or DockSide.Bottom;
+
+    private static string SideName(DockSide side) => side switch
+    {
+        DockSide.Left => "왼쪽",
+        DockSide.Top => "위",
+        DockSide.Right => "오른쪽",
+        _ => "아래",
+    };
+
+    /// <summary>Rebuilds the body: preview docked around the panes, then the sidebar around both.</summary>
+    private void ArrangeDocks()
+    {
+        foreach (var element in new FrameworkElement[] { Sidebar, Preview, PaneHost })
+            if (element.Parent is Panel parent) parent.Children.Remove(element);
+        for (var i = Body.Children.Count - 1; i >= 0; i--)
+            if (Body.Children[i] != Toast) Body.Children.RemoveAt(i);
+
+        var previewSize = IsVertical(_settings.PreviewDock)
+            ? Math.Clamp(_settings.PreviewHeight, 120, 800)
+            : Math.Clamp(_settings.PreviewWidth, 200, 900);
+        var sidebarSize = IsVertical(_settings.SidebarDock)
+            ? Math.Clamp(_settings.SidebarHeight, 100, 600)
+            : Math.Clamp(_settings.SidebarWidth, 150, 500);
+
+        var inner = Dock(PaneHost, Preview, _settings.PreviewDock, previewSize, out _previewDef);
+        var outer = Dock(inner, Sidebar, _settings.SidebarDock, sidebarSize, out _sidebarDef);
+        Body.Children.Insert(0, outer);
+
+        // Docked on top or bottom, the sidebar is wide and short: lay its sections side by side.
+        var wide = IsVertical(_settings.SidebarDock);
+        UIElement[] sections = [FavoritesSection, QuickSection, DrivesSection];
+        SidebarSections.RowDefinitions.Clear();
+        SidebarSections.ColumnDefinitions.Clear();
+        for (var i = 0; i < sections.Length; i++)
+        {
+            if (wide) SidebarSections.ColumnDefinitions.Add(new ColumnDefinition());
+            else SidebarSections.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(sections[i], wide ? i : 0);
+            Grid.SetRow(sections[i], wide ? 0 : i);
+        }
+    }
+
+    private Grid Dock(UIElement center, FrameworkElement side, DockSide dock, double size, out DefinitionBase? sideDef)
+    {
+        sideDef = null;
+        var grid = new Grid();
+        if (side.Visibility != Visibility.Visible)
+        {
+            grid.Children.Add(center);
+            Grid.SetRow(center, 0);
+            Grid.SetColumn(center, 0);
+            return grid;
+        }
+
+        var sideBySide = !IsVertical(dock);
+        var splitter = new GridSplitter { Style = (Style)FindResource("PaneSplitter") };
+        UIElement[] cells = (dock is DockSide.Left or DockSide.Top) ? [side, splitter, center] : [center, splitter, side];
+        foreach (var cell in cells)
+        {
+            var length = cell == side ? new GridLength(size)
+                : cell == splitter ? new GridLength(4)
+                : new GridLength(1, GridUnitType.Star);
+            AddCell(grid, cell, length, sideBySide, cell == side ? 100 : cell == center ? 200 : 0);
+        }
+        var index = Array.IndexOf(cells, side);
+        sideDef = sideBySide ? grid.ColumnDefinitions[index] : grid.RowDefinitions[index];
+        return grid;
+    }
+
+    /// <summary>Remembers the sizes the user dragged the sidebar and preview to.</summary>
+    private void CaptureDockSizes()
+    {
+        switch (_sidebarDef)
+        {
+            case ColumnDefinition { ActualWidth: > 0 } c: _settings.SidebarWidth = c.ActualWidth; break;
+            case RowDefinition { ActualHeight: > 0 } r: _settings.SidebarHeight = r.ActualHeight; break;
+        }
+        switch (_previewDef)
+        {
+            case ColumnDefinition { ActualWidth: > 0 } c: _settings.PreviewWidth = c.ActualWidth; break;
+            case RowDefinition { ActualHeight: > 0 } r: _settings.PreviewHeight = r.ActualHeight; break;
+        }
+    }
+
+    private void MoveSidebar(DockSide side)
+    {
+        CaptureDockSizes();
+        _settings.SidebarDock = side;
+        if (Sidebar.Visibility != Visibility.Visible) SetSidebar(true);
+        else ArrangeDocks();
+        ShowToast($"사이드바를 {SideName(side)}으로 옮겼어요");
+        _active.FocusList();
+    }
+
+    private void MovePreview(DockSide side)
+    {
+        CaptureDockSizes();
+        _settings.PreviewDock = side;
+        if (Preview.Visibility != Visibility.Visible) SetPreview(true);
+        else ArrangeDocks();
+        ShowToast($"미리보기를 {SideName(side)}으로 옮겼어요");
+        _active.FocusList();
+    }
+
+    private static DockSide NextSide(DockSide side) => (DockSide)(((int)side + 1) % 4);
+
+    private void OnSidebarDockMenu(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        ShowDockMenu(SidebarToggle, "사이드바 위치", _settings.SidebarDock, MoveSidebar);
+    }
+
+    private void OnPreviewDockMenu(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        ShowDockMenu(PreviewToggle, "미리보기 위치", _settings.PreviewDock, MovePreview);
+    }
+
+    private static void ShowDockMenu(UIElement anchor, string title, DockSide current, Action<DockSide> move)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = title, IsEnabled = false });
+        foreach (var side in Enum.GetValues<DockSide>())
+        {
+            var item = new MenuItem { Header = SideName(side), Tag = side == current ? "\uE73E" : "" };
+            item.Click += (_, _) => move(side);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
     }
 
     // ───────────── Workspaces ─────────────
@@ -517,22 +651,19 @@ public partial class MainWindow : Window, IPaneHost
         e.Handled = true;
     }
 
-    private void SetSidebar(bool visible, double width)
+    private void SetSidebar(bool visible)
     {
+        CaptureDockSizes();
         SidebarToggle.IsChecked = visible;
         Sidebar.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        SidebarSplitter.Visibility = Sidebar.Visibility;
-        SidebarColumn.Width = visible ? new GridLength(Math.Clamp(width, 150, 500)) : new GridLength(0);
-        SidebarSplitterColumn.Width = visible ? new GridLength(4) : new GridLength(0);
+        ArrangeDocks();
     }
 
     private void OnSidebarToggle(object sender, RoutedEventArgs e) => ToggleSidebar();
 
     private void ToggleSidebar()
     {
-        var visible = Sidebar.Visibility != Visibility.Visible;
-        if (!visible) _settings.SidebarWidth = SidebarColumn.ActualWidth;
-        SetSidebar(visible, _settings.SidebarWidth);
+        SetSidebar(Sidebar.Visibility != Visibility.Visible);
     }
 
     private void OnHiddenToggle(object sender, RoutedEventArgs e) => ToggleHidden();
@@ -564,6 +695,7 @@ public partial class MainWindow : Window, IPaneHost
             "Ctrl+Shift+N  새 폴더 · Ctrl+Shift+C  경로 복사\n" +
             "Ctrl+D  즐겨찾기 · Ctrl+B  사이드바 · Ctrl+H  숨김 파일\n" +
             "Ctrl+P  미리보기 · Ctrl+Alt+1~9  작업공간 열기\n" +
+            "Ctrl+Shift+B / Ctrl+Shift+P  사이드바·미리보기 위치 바꾸기 (버튼 오른쪽 클릭도 가능)\n" +
             "필터에서 Enter  하위 폴더까지 검색\n" +
             "Shift+우클릭  Windows 기본 메뉴 (압축, 보내기, 새로 만들기 등)\n" +
             "끌어서 놓기: 같은 드라이브는 이동, 다른 드라이브는 복사 (Ctrl=복사, Shift=이동)";
@@ -588,6 +720,7 @@ public partial class MainWindow : Window, IPaneHost
                 var slot = key - Key.D1;
                 if (slot < _settings.Workspaces.Count) LoadWorkspace(_settings.Workspaces[slot]);
                 break;
+            case Key.P when ctrl && shift: MovePreview(NextSide(_settings.PreviewDock)); break;
             case Key.P when ctrl: TogglePreview(); break;
             case Key.D1 or Key.NumPad1 when ctrl: ApplyLayout(LayoutKind.Single); break;
             case Key.D2 or Key.NumPad2 when ctrl: ApplyLayout(LayoutKind.TwoColumns); break;
@@ -605,6 +738,7 @@ public partial class MainWindow : Window, IPaneHost
             case Key.Tab when ctrl: _active.NextTab(shift ? -1 : 1); break;
             case Key.L when ctrl: _active.EditAddress(); break;
             case Key.F when ctrl: _active.FocusFilter(); break;
+            case Key.B when ctrl && shift: MoveSidebar(NextSide(_settings.SidebarDock)); break;
             case Key.B when ctrl: ToggleSidebar(); break;
             case Key.H when ctrl: ToggleHidden(); break;
             case Key.D when ctrl:
@@ -692,8 +826,7 @@ public partial class MainWindow : Window, IPaneHost
         _settings.ShowHidden = ShowHidden;
         _settings.SidebarVisible = Sidebar.Visibility == Visibility.Visible;
         _settings.PreviewVisible = Preview.Visibility == Visibility.Visible;
-        if (_settings.PreviewVisible && PreviewColumn.ActualWidth > 0) _settings.PreviewWidth = PreviewColumn.ActualWidth;
-        if (_settings.SidebarVisible && SidebarColumn.ActualWidth > 0) _settings.SidebarWidth = SidebarColumn.ActualWidth;
+        CaptureDockSizes();
         try
         {
             _store.Save(_settings);

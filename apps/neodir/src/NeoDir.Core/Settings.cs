@@ -15,6 +15,15 @@ public enum LayoutKind
     OneOverTwo,
 }
 
+/// <summary>Which edge of the window a side panel (sidebar, preview) sits on.</summary>
+public enum DockSide
+{
+    Left,
+    Top,
+    Right,
+    Bottom,
+}
+
 public sealed class Favorite
 {
     public string Name { get; set; } = "";
@@ -48,6 +57,10 @@ public sealed class AppSettings
     public double SidebarWidth { get; set; } = 230;
     public bool PreviewVisible { get; set; }
     public double PreviewWidth { get; set; } = 320;
+    public DockSide SidebarDock { get; set; } = DockSide.Left;
+    public DockSide PreviewDock { get; set; } = DockSide.Right;
+    public double SidebarHeight { get; set; } = 190;
+    public double PreviewHeight { get; set; } = 280;
     public List<Workspace> Workspaces { get; set; } = [];
     public double WindowLeft { get; set; } = double.NaN;
     public double WindowTop { get; set; } = double.NaN;
