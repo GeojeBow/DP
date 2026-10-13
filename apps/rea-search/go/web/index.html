@@ -945,6 +945,7 @@ function renderContentFold(running) {
   if (list.length > 60) items.push(el("div", "empty-note", `외 ${(list.length - 60).toLocaleString()}곳`));
   if (!list.length) items.push(el("div", "empty-note", running ? "내용을 찾는 중…" : "결과 없음"));
   $("fold").classList.remove("stale"); $("fold").replaceChildren(...items); $("crumbs").hidden = true;
+  renderSummary(running);
 }
 function refineNote(text) { $("fold").replaceChildren(el("div", "empty-note", text)); $("crumbs").hidden = true; }
 async function loadFacets(my) {
@@ -997,14 +998,24 @@ function renderFold() {
 }
 // summary line: how many, how big, what kinds (click a colour to keep only
 // that kind) and a few one-click suggestions for narrowing a long list
-function renderSummary() {
+// The summary line always counts the results on screen: name results come
+// from the server's counts, content results are counted from the list.
+function renderSummary(running) {
   const sb = $("sumbar"); sb.classList.remove("stale");
-  if (!fac || S.view === "recent") { sb.hidden = true; return; }
+  if (idle() || S.view === "recent") { sb.hidden = true; return; }
+  let T, bytes = 0, catN;
+  if (contentShown()) {
+    T = rows.length; catN = {};
+    for (const r of rows) { catN[r.cat || "other"] = (catN[r.cat || "other"] || 0) + 1; if (!r.dir && r.size > 0) bytes += r.size; }
+  } else {
+    if (!fac) { sb.hidden = true; return; }
+    T = fac.total; catN = fac.cats || {}; bytes = fac.metaKnown ? fac.bytes : 0;
+  }
   sb.hidden = false;
-  const T = fac.total, t = [contentShown() ? `찾는 범위 ${T.toLocaleString()}개` : `결과 ${T.toLocaleString()}개`];
-  if (fac.metaKnown && fac.bytes) t.push(`합계 ${fmtSize(fac.bytes)}`);
+  const t = [`결과 ${T.toLocaleString()}개${running ? " (찾는 중…)" : ""}`];
+  if (bytes) t.push(`합계 ${fmtSize(bytes)}`);
   $("sum-text").textContent = t.join(" · ");
-  const cats = CATS.filter(c => c[0] && (fac.cats || {})[c[0]]).map(c => [...c, fac.cats[c[0]]]).sort((a, b) => b[3] - a[3]);
+  const cats = CATS.filter(c => c[0] && catN[c[0]]).map(c => [...c, catN[c[0]]]).sort((a, b) => b[3] - a[3]);
   const sum = cats.reduce((a, c) => a + c[3], 0) || 1;
   const pick = k => setF({ cats: S.cats.length === 1 && S.cats[0] === k ? [] : [k] });
   $("sum-bar").hidden = !cats.length;
@@ -1020,10 +1031,10 @@ function renderSummary() {
   }));
   const sg = [], add = (label, fn, tip) => { const b = el("button", "sg", label); b.onclick = fn; if (tip) b.title = tip; sg.push(b); };
   if (T >= 20 && S.view !== "dups" && !contentShown()) {
-    const ff = fac.folder || {}, fl = ff.folders || [], crumbs = ff.crumbs || [];
+    const fl = fac.parents || [];
     if (fl.length >= 2 && fl[0].count / T >= 0.2 && fl[0].count < T) {
-      const base = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") : "", f = fl[0];
-      add(`'${f.name}' 폴더만 ${f.count.toLocaleString()}개`, () => setUnder(f.key, base ? base + "\\" + f.name : f.name), "결과가 가장 많은 폴더");
+      const f = fl[0], nm = f.name.split(/[\\/]/).filter(Boolean).pop() || f.name;
+      add(`'${nm}' 폴더만 ${f.count.toLocaleString()}개`, () => setUnder(f.key, f.name), f.name + " (결과가 가장 많은 폴더)");
     }
     const ex = (fac.exts || []).filter(x => x.ext !== "/");
     if (!S.exts.length && ex.length >= 2 && ex[0].count / T >= 0.2 && ex[0].count < T) add(`${extLabel(ex[0].ext)}만 ${ex[0].count.toLocaleString()}개`, () => setF({ exts: [ex[0].ext] }), "가장 많은 확장자");
