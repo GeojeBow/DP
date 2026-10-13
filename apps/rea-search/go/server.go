@@ -83,9 +83,16 @@ func (s *server) reindex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	if !s.reindexing.CompareAndSwap(false, true) {
+	if !s.startReindex() {
 		bad(w, "이미 다시 색인하는 중입니다")
 		return
+	}
+	writeJSON(w, "ok")
+}
+
+func (s *server) startReindex() bool {
+	if !s.reindexing.CompareAndSwap(false, true) {
+		return false
 	}
 	logf("사용자 요청으로 이름 색인을 다시 만듭니다")
 	go func() {
@@ -94,7 +101,7 @@ func (s *server) reindex(w http.ResponseWriter, r *http.Request) {
 		s.eng.Build()
 		s.eng.Save()
 	}()
-	writeJSON(w, "ok")
+	return true
 }
 
 // summon brings up the search window (the global shortcut).
@@ -268,6 +275,7 @@ func (s *server) routes() *http.ServeMux {
 		"/api/status":         s.status,
 		"/api/search":         s.search,
 		"/api/facets":         s.facets,
+		"/api/schedule":       s.schedule,
 		"/api/manual":         s.manual,
 		"/api/open":           s.open,
 		"/api/preview":        s.preview,
@@ -292,6 +300,92 @@ func (s *server) routes() *http.ServeMux {
 		m.HandleFunc(path, s.guard(h))
 	}
 	return m
+}
+
+type schedInfo struct {
+	Target string   `json:"target"` // main, content, folder
+	ID     int      `json:"id,omitempty"`
+	Name   string   `json:"name"`
+	Hours  float64  `json:"hours"`
+	At     []string `json:"at"`
+	Last   int64    `json:"last"` // unix, 0 never
+	Next   int64    `json:"next"` // unix, 0 only when asked
+	Busy   bool     `json:"busy"`
+	Note   string   `json:"note,omitempty"`
+}
+
+// schedule lists and changes when each index is refreshed, and runs one now.
+func (s *server) schedule(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var req struct {
+			Target string   `json:"target"`
+			ID     int      `json:"id"`
+			Hours  float64  `json:"hours"`
+			At     []string `json:"at"`
+			Now    bool     `json:"now"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			bad(w, "잘못된 요청")
+			return
+		}
+		if req.Now {
+			switch req.Target {
+			case "main":
+				s.startReindex()
+			case "content":
+				s.eng.Content.walkSoon()
+			case "folder":
+				s.eng.RescanFolder(req.ID)
+			}
+		} else if err := s.eng.SetSchedule(req.Target, req.ID, Schedule{Hours: req.Hours, At: req.At}); err != nil {
+			bad(w, err.Error())
+			return
+		}
+		time.Sleep(100 * time.Millisecond) // let a started run show as busy
+	}
+	now := time.Now()
+	unix := func(t time.Time) int64 {
+		if t.IsZero() {
+			return 0
+		}
+		return t.Unix()
+	}
+	var out []schedInfo
+	mode, _, _, _ := s.eng.Info()
+	ms := s.eng.MainSchedule()
+	s.eng.mu.RLock()
+	mainLast := s.eng.mainLast
+	s.eng.mu.RUnlock()
+	mi := schedInfo{Target: "main", Name: "이름 색인 (드라이브)", Hours: ms.Hours, At: ms.At, Last: unix(mainLast), Busy: s.reindexing.Load() || mode == "loading"}
+	eff := ms
+	if mode == "ntfs" {
+		eff.Hours = 0
+		mi.Note = "NTFS 실시간 감시로 바뀐 파일이 바로 반영되므로 주기는 쓰지 않습니다. 정한 시각에는 처음부터 다시 색인합니다."
+	}
+	mi.Next = unix(eff.Next(mainLast, now))
+	out = append(out, mi)
+	for _, f := range s.eng.Folders() {
+		fs := f.FolderSource.schedule()
+		last := time.Unix(f.Last, 0)
+		if f.Last <= 0 {
+			last = time.Time{}
+		}
+		out = append(out, schedInfo{Target: "folder", ID: f.ID, Name: f.Path, Hours: fs.Hours, At: fs.At,
+			Last: unix(last), Next: unix(fs.Next(last, now)), Busy: f.Scanning})
+	}
+	cs := s.eng.ContentSchedule()
+	cl := s.eng.Content.LastWalk()
+	ci := schedInfo{Target: "content", Name: "내용 색인", Hours: cs.Hours, At: cs.At, Last: unix(cl), Next: unix(cs.Next(cl, now)), Busy: s.eng.Content.Status().Busy}
+	if len(s.eng.Content.Status().Folders) == 0 {
+		ci.Note = "내용 색인한 폴더가 아직 없습니다."
+	}
+	out = append(out, ci)
+	for i := range out {
+		if out[i].At == nil {
+			out[i].At = []string{}
+		}
+	}
+	writeJSON(w, out)
 }
 
 // manual is the user guide (a copy of README.md) for the in-app help.

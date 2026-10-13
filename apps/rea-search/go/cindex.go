@@ -203,6 +203,7 @@ type CIndex struct {
 	status string
 	busy   bool
 	walked time.Time
+	sched  Schedule
 	report CIndexReport
 	fails  map[string]CFail // lower-cased path -> why it could not be read
 }
@@ -425,10 +426,24 @@ func (c *CIndex) walkSoon() {
 	go c.Refresh(true)
 }
 
-func (c *CIndex) walkDue(every time.Duration) bool {
+func (c *CIndex) walkDue() bool {
 	c.smu.Lock()
 	defer c.smu.Unlock()
-	return time.Since(c.walked) > every
+	return c.sched.Due(c.walked, time.Now())
+}
+
+// SetSchedule sets when the folders are re-read for changed files.
+func (c *CIndex) SetSchedule(s Schedule) {
+	c.smu.Lock()
+	c.sched = s
+	c.smu.Unlock()
+}
+
+// LastWalk is when the folders were last read in full.
+func (c *CIndex) LastWalk() time.Time {
+	c.smu.Lock()
+	defer c.smu.Unlock()
+	return c.walked
 }
 
 func underAny(p string, folders []string) bool {
@@ -902,11 +917,11 @@ func intersect(a, b []uint32) []uint32 {
 
 // Run keeps the index current: changed paths every 20 seconds, and a full
 // folder check at start and every walkEvery.
-func (c *CIndex) Run(walkEvery time.Duration) {
+func (c *CIndex) Run() {
 	defer recoverLog("content index")
 	c.Refresh(true)
 	for range time.Tick(20 * time.Second) {
-		full := c.walkDue(walkEvery)
+		full := c.walkDue()
 		c.dirtyMu.Lock()
 		hasDirty := len(c.dirty) > 0
 		c.dirtyMu.Unlock()
@@ -916,9 +931,6 @@ func (c *CIndex) Run(walkEvery time.Duration) {
 	}
 }
 
-// Close writes pending documents so nothing indexed is lost on exit.
-// Close saves pending work and closes the segment files (Windows cannot
-// delete or replace files that are still open).
 // Flush writes pending changes to disk and keeps the index open.
 func (c *CIndex) Flush() {
 	c.mu.Lock()
@@ -927,6 +939,8 @@ func (c *CIndex) Flush() {
 	c.saveLocked()
 }
 
+// Close saves pending work and closes the segment files (Windows cannot
+// delete or replace files that are still open).
 func (c *CIndex) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

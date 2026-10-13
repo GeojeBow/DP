@@ -59,10 +59,13 @@ type VolumeInfo struct {
 
 // FolderSource is an extra folder (often a network share) indexed by walking.
 type FolderSource struct {
-	ID    int     `json:"id"`
-	Path  string  `json:"path"`
-	Hours float64 `json:"hours"` // rescan interval
+	ID    int      `json:"id"`
+	Path  string   `json:"path"`
+	Hours float64  `json:"hours"`        // rescan interval, 0 = none
+	At    []string `json:"at,omitempty"` // and/or every day at these times
 }
+
+func (f FolderSource) schedule() Schedule { return Schedule{Hours: f.Hours, At: f.At} }
 
 type source struct {
 	FolderSource
@@ -81,6 +84,80 @@ type Settings struct {
 	// Admin asks for administrator rights at start for the fast NTFS index.
 	// Off by default: on company PCs the request is a security prompt.
 	Admin bool `json:"admin"`
+	// When to re-index: the drives (when walked, or at set times) and the
+	// content index. nil = default.
+	Main    *Schedule `json:"main,omitempty"`
+	Content *Schedule `json:"content,omitempty"`
+}
+
+func (e *Engine) MainSchedule() Schedule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.settings.Main == nil {
+		return defaultMainSchedule
+	}
+	return *e.settings.Main
+}
+
+func (e *Engine) ContentSchedule() Schedule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.settings.Content == nil {
+		return defaultContentSchedule
+	}
+	return *e.settings.Content
+}
+
+// SetSchedule changes when "main", "content" or extra folder id re-indexes.
+func (e *Engine) SetSchedule(target string, id int, s Schedule) error {
+	s, err := s.Normalize()
+	if err != nil {
+		return err
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	switch target {
+	case "main":
+		e.settings.Main = &s
+	case "content":
+		e.settings.Content = &s
+		e.Content.SetSchedule(s)
+	case "folder":
+		found := false
+		for _, f := range e.folders {
+			if f.ID == id {
+				f.Hours, f.At, found = s.Hours, s.At, true
+			}
+		}
+		if !found {
+			return fmt.Errorf("폴더를 찾을 수 없습니다")
+		}
+	default:
+		return fmt.Errorf("알 수 없는 대상")
+	}
+	e.saveSettingsLocked()
+	name := map[string]string{"main": "이름 색인", "content": "내용 색인"}[target]
+	for _, f := range e.folders {
+		if target == "folder" && f.ID == id {
+			name = f.Path
+		}
+	}
+	logf("색인 일정 변경 (%s): %s", name, describeSchedule(s))
+	return nil
+}
+
+func describeSchedule(s Schedule) string {
+	var parts []string
+	if s.Hours > 0 {
+		parts = append(parts, fmt.Sprintf("%g시간마다", s.Hours))
+	}
+	if len(s.At) > 0 {
+		parts = append(parts, "매일 "+strings.Join(s.At, ", "))
+	}
+	if len(parts) == 0 {
+		return "직접 할 때만"
+	}
+	return strings.Join(parts, " + ")
 }
 
 // wantAdmin reads the Admin setting before the engine exists (at start,
@@ -290,18 +367,26 @@ func (e *Engine) Start() {
 	go e.folderLoop()
 	go e.metaFill()
 	go e.saveLoop()
-	go e.Content.Run(30 * time.Minute)
+	e.Content.SetSchedule(e.ContentSchedule())
+	go e.Content.Run()
 }
 
 func (e *Engine) watchLoop() {
 	defer recoverLog("watch")
 	for range time.Tick(time.Second) {
 		e.pollOnce()
+		s := e.MainSchedule()
 		e.mu.RLock()
-		walkDue := e.Mode == "walk" && len(e.roots) == 0 && time.Since(e.mainLast) > time.Hour
+		if e.Mode != "walk" || len(e.roots) > 0 {
+			s.Hours = 0 // the change journal keeps NTFS drives current; set times still apply
+		}
+		due := e.Mode != "loading" && !e.mainLast.IsZero() && s.Due(e.mainLast, time.Now()) ||
+			e.Mode == "walk" && len(e.roots) == 0 && e.mainLast.IsZero()
 		e.mu.RUnlock()
-		if walkDue { // no change journal without admin rights: re-walk hourly
+		if due { // no change journal without admin rights: re-walk on schedule
+			logf("이름 색인 일정에 따라 다시 색인합니다")
 			e.Build()
+			e.Save()
 		}
 	}
 }
@@ -495,7 +580,7 @@ func (e *Engine) folderLoop() {
 	for {
 		for _, f := range e.snapshotFolders() {
 			e.mu.RLock()
-			due := !f.scanning && time.Since(f.last) > time.Duration(f.Hours*float64(time.Hour))
+			due := !f.scanning && f.schedule().Due(f.last, time.Now())
 			e.mu.RUnlock()
 			if due {
 				e.scanFolder(f)

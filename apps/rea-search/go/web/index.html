@@ -188,6 +188,9 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
 .kv > div { word-break:break-all; }
 .pill { font-size:11px; border-radius:10px; padding:1px 8px; background:var(--chip); color:var(--muted); font-weight:500; }
 .pill.ok { color:var(--ok); } .pill.warn { color:var(--warn); } .pill.bad { color:var(--bad); }
+.sched-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0; font-size:12px; }
+.sched-row > span:first-child { width:92px; color:var(--muted); flex:none; }
+.sched-row input[type=time] { border:1px solid var(--line); background:var(--input); border-radius:6px; padding:3px 6px; }
 .loglist { font:12px/1.5 "Cascadia Mono","D2Coding",Consolas,monospace; max-height:52vh; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:6px 0; }
 .logline { display:flex; gap:10px; padding:1px 10px; white-space:pre-wrap; word-break:break-all; }
 .logline b { color:var(--faint); font-weight:400; flex:none; }
@@ -289,7 +292,7 @@ body.noside aside#side { display:none; }
 <div class="menu" id="menu"></div>
 <div id="dlg"><div class="dlg">
   <div class="dlg-head"><h3>설정</h3><div class="spacer"></div><button class="btn icon" id="dlg-close" title="닫기">✕</button></div>
-  <div class="tabs"><button class="tab" data-p="p-status">색인 현황</button><button class="tab" data-p="p-log">로그</button><button class="tab on" data-p="p-folders">검색할 폴더</button><button class="tab" data-p="p-content">내용 색인</button><button class="tab" data-p="p-keys">단축키·시작·권한</button><button class="tab" data-p="p-help">검색 문법</button><button class="tab" data-p="p-about">정보</button></div>
+  <div class="tabs"><button class="tab" data-p="p-status">색인 현황</button><button class="tab" data-p="p-log">로그</button><button class="tab on" data-p="p-folders">검색할 폴더</button><button class="tab" data-p="p-content">내용 색인</button><button class="tab" data-p="p-sched">색인 일정</button><button class="tab" data-p="p-keys">단축키·시작·권한</button><button class="tab" data-p="p-help">검색 문법</button><button class="tab" data-p="p-about">정보</button></div>
   <div class="pane" id="p-status"><div class="cards" id="st-cards"></div><div class="rowbtns"><button class="btn" id="st-reindex">이름 색인 처음부터 다시 만들기</button><button class="btn" id="st-ci">내용 색인 지금 갱신</button><span class="hint" id="st-time"></span></div></div>
   <div class="pane" id="p-log">
     <div class="rowbtns" style="margin:0 0 10px"><span class="seg" id="log-filter"><button data-f="" class="on">전체</button><button data-f="warn">경고·오류만</button></span><div class="spacer"></div><button class="btn" id="log-copy">복사</button><button class="btn" id="log-file">로그 파일 위치 열기</button><button class="btn" id="log-data">데이터 폴더 열기</button></div>
@@ -306,9 +309,13 @@ body.noside aside#side { display:none; }
     <p>내용을 자주 검색하는 폴더를 추가하면 문서의 글자를 미리 색인해 둡니다. 수십만 개 파일도 몇 초 안에 찾고, 바뀐 파일만 다시 읽습니다. 색인하지 않은 폴더도 내용 검색은 되지만 검색할 때마다 파일을 직접 읽어 느립니다.</p>
     <div id="ci-status" class="hint"></div>
     <div id="ci-list"></div>
-    <div class="addrow"><input type="text" id="ci-path" placeholder="예: C:\Users\이름\Documents  또는  \\fileserver\문서"><button class="btn primary" id="ci-add">추가</button><button class="btn" id="ci-refresh">지금 갱신</button></div>
+    <div class="addrow"><input type="text" id="ci-path" placeholder="예: C:\Users\이름\Documents  또는  \\fileserver\문서"><button class="btn primary" id="ci-add">추가</button><button class="btn" id="ci-refresh">지금 갱신</button><button class="btn" id="ci-sched">색인 일정</button></div>
     <div class="err" id="ci-err"></div>
     <p style="margin-top:12px">읽는 형식: 텍스트·코드 파일(UTF-8, UTF-16, EUC-KR), 한글(hwp, hwpx), Word(doc, docx), Excel(xls, xlsx), PowerPoint(ppt, pptx), PDF, OpenDocument. 암호가 걸린 문서와 스캔한 이미지 PDF는 읽지 못하며, 색인 현황에서 목록을 볼 수 있습니다.</p>
+  </div>
+  <div class="pane" id="p-sched">
+    <p>언제 다시 색인할지 정합니다. <b>주기</b>(몇 시간마다)와 <b>매일 정한 시각</b>을 함께 쓸 수 있고, 언제든 바꿀 수 있습니다. 바꾸면 바로 저장되고 적용됩니다. 둘 다 끄면 "지금 색인"을 누를 때만 색인합니다.</p>
+    <div class="cards" id="sc-cards"></div>
   </div>
   <div class="pane" id="p-keys">
     <div class="card" style="margin-bottom:14px"><h5>어디서든 검색 창 부르기</h5>
@@ -1224,20 +1231,21 @@ async function openSettings(tab) {
 function switchTab(id) {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.p === id)); document.querySelectorAll("#dlg .pane").forEach(p => p.classList.toggle("on", p.id === id));
   if (id === "p-keys") loadDesktop();
+  if (id === "p-sched") loadSched();
   statusTick();
 }
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => switchTab(t.dataset.p));
 $("dlg-close").onclick = () => $("dlg").classList.remove("show");
 $("dlg").onclick = e => { if (e.target.id === "dlg") $("dlg").classList.remove("show"); };
-const HOURS = [[0.25, "15분마다"], [1, "1시간마다"], [6, "6시간마다"], [24, "하루마다"]];
 async function folderAction(body) { try { renderFolders(await api("/api/folders", { method: "POST", body: JSON.stringify(body) })); } catch (e) { $("f-err").textContent = e.message; } }
 function renderFolders(list) {
   $("f-list").replaceChildren(...(list.length ? list.map(f => {
     const r = el("div", "frow"); const info = el("div", "info"); info.append(el("div", "path", f.path));
-    info.append(el("div", "sub", `${f.count.toLocaleString()}개 · ${f.status || ""}${f.last > 0 ? " · 마지막 탐색 " + ago(f.last) : ""} · ${(HOURS.find(h => h[0] === f.hours) || [0, f.hours + "시간마다"])[1]}`));
+    info.append(el("div", "sub", `${f.count.toLocaleString()}개 · ${f.status || ""}${f.last > 0 ? " · 마지막 탐색 " + ago(f.last) : ""} · ${schedText(f.hours, f.at)}`));
     const rs = el("button", "btn", f.scanning ? "탐색 중" : "다시 탐색"); rs.disabled = f.scanning; rs.onclick = () => folderAction({ action: "rescan", id: f.id });
     const rm = el("button", "btn", "삭제"); rm.onclick = async () => { await folderAction({ action: "remove", id: f.id }); refresh(); };
-    r.append(info, rs, rm); return r;
+    const sc = el("button", "btn", "일정 바꾸기"); sc.onclick = () => switchTab("p-sched");
+    r.append(info, sc, rs, rm); return r;
   }) : [el("div", "empty-note", "추가한 폴더가 없습니다")]));
 }
 $("f-add").onclick = async () => {
@@ -1245,6 +1253,47 @@ $("f-add").onclick = async () => {
   try { renderFolders(await api("/api/folders", { method: "POST", body: JSON.stringify({ action: "add", path: $("f-path").value, hours: +$("f-hours").value }) })); $("f-path").value = ""; toast("폴더를 추가했습니다. 탐색이 끝나면 검색됩니다."); }
   catch (e) { $("f-err").textContent = e.message; }
 };
+// ---------- index schedules ----------
+const SCHED_HOURS = [[0, "사용 안 함"], [0.25, "15분마다"], [0.5, "30분마다"], [1, "1시간마다"], [3, "3시간마다"], [6, "6시간마다"], [12, "12시간마다"], [24, "하루마다"], [168, "일주일마다"]];
+function schedText(h, at) {
+  const p = []; const hh = SCHED_HOURS.find(x => x[0] === h);
+  if (h > 0) p.push(hh ? hh[1] : `${h}시간마다`);
+  if (at && at.length) p.push("매일 " + at.join(", "));
+  return p.length ? p.join(" + ") : "직접 할 때만";
+}
+async function loadSched(post) {
+  let list;
+  try { list = await api("/api/schedule", post ? { method: "POST", body: JSON.stringify(post) } : {}); }
+  catch (e) { toast(e.message); list = await api("/api/schedule"); }
+  $("sc-cards").replaceChildren(...list.map(it => {
+    const c = el("div", "card"), h = el("h5", null, it.name + " ");
+    h.append(it.busy ? pill("색인 중", "warn") : pill(schedText(it.hours, it.at), it.hours > 0 || it.at.length ? "ok" : ""));
+    c.append(h);
+    if (it.note) c.append(el("p", "hint", it.note));
+    const send = (hours, at) => loadSched({ target: it.target, id: it.id, hours, at }).then(() => toast("색인 일정을 저장했습니다"));
+    // interval
+    const r1 = el("div", "sched-row"); r1.append(el("span", null, "주기"));
+    const sel = el("select", "btn");
+    const opts = SCHED_HOURS.some(x => x[0] === it.hours) ? SCHED_HOURS : [...SCHED_HOURS, [it.hours, `${it.hours}시간마다`]];
+    for (const [v, l] of opts) { const o = el("option", null, l); o.value = v; sel.append(o); }
+    sel.value = it.hours; sel.onchange = () => send(+sel.value, it.at);
+    r1.append(sel); c.append(r1);
+    // times of day
+    const r2 = el("div", "sched-row"); r2.append(el("span", null, "매일 정한 시각"));
+    for (const t of it.at) { const ch = el("span", "chip", t); const x = el("button", null, "✕"); x.title = "이 시각 빼기"; x.onclick = () => send(it.hours, it.at.filter(a => a !== t)); ch.append(x); r2.append(ch); }
+    const tin = el("input"); tin.type = "time"; tin.value = "12:00";
+    const add = el("button", "btn", "시각 추가"); add.onclick = () => { if (tin.value) send(it.hours, [...it.at, tin.value]); };
+    r2.append(tin, add); c.append(r2);
+    // last / next / now
+    const r3 = el("div", "sched-row"); r3.append(el("span", null, "실행"));
+    r3.append(el("span", "hint", `마지막 ${it.last ? ago(it.last) : "아직 없음"} · 다음 ${it.next ? fmtDate(it.next) : "직접 할 때만"}`));
+    const now = el("button", "btn", it.busy ? "색인 중…" : "지금 색인"); now.disabled = it.busy;
+    now.onclick = () => loadSched({ target: it.target, id: it.id, now: true }).then(() => toast("색인을 시작했습니다"));
+    r3.append(now); c.append(r3);
+    return c;
+  }));
+}
+
 function renderCI(st) {
   $("ci-status").textContent = st.folders.length ? `색인된 파일 ${st.docs.toLocaleString()}개 · ${st.status || ""}` : "";
   $("ci-list").replaceChildren(...(st.folders.length ? st.folders.map(f => {
@@ -1258,6 +1307,7 @@ $("ci-add").onclick = async () => {
   try { renderCI(await api("/api/cindex", { method: "POST", body: JSON.stringify({ action: "add", path: $("ci-path").value }) })); $("ci-path").value = ""; toast("백그라운드에서 내용 색인을 시작합니다"); }
   catch (e) { $("ci-err").textContent = e.message; }
 };
+$("ci-sched").onclick = () => switchTab("p-sched");
 $("ci-refresh").onclick = async () => { await api("/api/cindex", { method: "POST", body: JSON.stringify({ action: "refresh" }) }); toast("바뀐 파일을 다시 확인합니다"); };
 $("b-quit").onclick = async () => {
   if (!confirm("REA Search를 완전히 종료할까요? 다시 실행할 때까지 바뀐 파일이 실시간으로 반영되지 않습니다.")) return;
