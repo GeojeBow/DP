@@ -196,6 +196,10 @@ type SliceFacets struct {
 	Cats      map[string]int `json:"cats"`
 	Exts      []ExtCount     `json:"exts"`
 	Folder    FolderFacet    `json:"folder"`
+	// Parents are the folders that directly hold results (full paths),
+	// most results first: the side panel's "결과가 있는 폴더".
+	Parents     []FolderCount `json:"parents"`
+	ParentsMore int           `json:"parentsMore"`
 	Under     string         `json:"under"` // folder the panel shows (may be deeper than asked)
 	Dates     []RangeCount   `json:"dates"`
 	Sizes     []RangeCount   `json:"sizes"`
@@ -300,6 +304,7 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 	}
 	r := newRefiner(v, sl.Under)
 	byFolder := map[uint64]int{}
+	byParent := map[uint64]int{}
 	byExt := map[string]int{}
 	here := 0
 	out := make([]uint64, 0, min(len(keys), 1<<16))
@@ -370,6 +375,9 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 			byExt[e]++
 		}
 		if pass == dimAll {
+			if hasPar {
+				byParent[par]++
+			}
 			if b == k && sl.Under != 0 {
 				here++ // directly in the folder (a matching subfolder counts here)
 			} else {
@@ -402,6 +410,7 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 	fac.Total = len(out)
 	fac.Dates, fac.Sizes = dates, sizes
 	fac.Folder = folderFacet(v, sl.Under, byFolder, here)
+	fac.Parents, fac.ParentsMore = parentFacet(v, byParent)
 	for e, n := range byExt {
 		fac.Exts = append(fac.Exts, ExtCount{Ext: e, Count: n})
 	}
@@ -414,6 +423,41 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 	})
 	fac.Under = keyStr(sl.Under)
 	return out, fac
+}
+
+// parentFacet lists the folders holding results, biggest first, with paths
+// looked up only for the ones shown.
+func parentFacet(v *View, byParent map[uint64]int) ([]FolderCount, int) {
+	type pc struct {
+		k uint64
+		n int
+	}
+	list := make([]pc, 0, len(byParent))
+	for k, n := range byParent {
+		list = append(list, pc{k, n})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].n != list[j].n {
+			return list[i].n > list[j].n
+		}
+		return list[i].k < list[j].k
+	})
+	const show = 100
+	more := 0
+	if len(list) > show {
+		more, list = len(list)-show, list[:show]
+	}
+	out := make([]FolderCount, 0, len(list))
+	for _, p := range list {
+		out = append(out, FolderCount{Key: keyStr(p.k), Name: v.Path(p.k), Count: p.n})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out, more
 }
 
 func folderFacet(v *View, under uint64, byFolder map[uint64]int, here int) FolderFacet {

@@ -342,12 +342,17 @@ func (s *server) schedule(w http.ResponseWriter, r *http.Request) {
 			Hours  float64  `json:"hours"`
 			At     []string `json:"at"`
 			Now    bool     `json:"now"`
+			Stop   bool     `json:"stop"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			bad(w, "잘못된 요청")
 			return
 		}
-		if req.Now {
+		if req.Stop {
+			if req.Target == "content" {
+				s.eng.Content.Stop()
+			}
+		} else if req.Now {
 			switch req.Target {
 			case "main":
 				s.startReindex()

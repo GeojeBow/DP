@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,6 +119,38 @@ func TestSliceDateSize(t *testing.T) {
 	_, groups, _ := GroupBy(v, keys, "date")
 	if len(groups) != 2 || groups[0].Key != "today" || groups[1].Key != "older" {
 		t.Fatalf("date groups %+v", groups)
+	}
+}
+
+// The side panel lists the folders that directly hold results, by count.
+func TestSliceParents(t *testing.T) {
+	dir := t.TempDir()
+	for _, p := range []string{"a/x/r1.txt", "a/x/r2.txt", "a/y/r3.txt", "b/r4.txt", "b/other.md"} {
+		f := filepath.Join(dir, filepath.FromSlash(p))
+		os.MkdirAll(filepath.Dir(f), 0o755)
+		os.WriteFile(f, nil, 0o644)
+	}
+	b := NewBuilder()
+	if err := walkInto(b, []string{dir}, 1<<56, nil); err != nil {
+		t.Fatal(err)
+	}
+	v := NewView([]*Index{b.Build(nil)}, []uint64{1})
+	_, fac := ApplySlice(v, v.Search("r .txt"), noSlice(), true)
+	var got []string
+	for _, f := range fac.Parents {
+		got = append(got, fmt.Sprintf("%s=%d", filepath.Base(f.Name), f.Count))
+	}
+	if strings.Join(got, " ") != "x=2 y=1 b=1" {
+		t.Fatalf("parents %v", got)
+	}
+	// narrowed to a: only a's folders remain
+	k, _ := parseKey(fac.Parents[0].Key)
+	par, _ := v.Parent(k)
+	sl := noSlice()
+	sl.Under = par
+	_, fac = ApplySlice(v, v.Search("r .txt"), sl, true)
+	if len(fac.Parents) != 2 || fac.Total != 3 {
+		t.Fatalf("under a: %+v total %d", fac.Parents, fac.Total)
 	}
 }
 

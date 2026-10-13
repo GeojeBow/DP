@@ -36,6 +36,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
@@ -202,6 +203,7 @@ type CIndex struct {
 	smu    sync.Mutex
 	status string
 	busy   bool
+	stop   atomic.Bool // Stop asked the running refresh to end
 	walked time.Time
 	sched  Schedule
 	report CIndexReport
@@ -427,6 +429,17 @@ func (c *CIndex) RemoveFolder(p string) {
 	c.walkSoon()
 }
 
+// Stop ends a running refresh soon: what was read so far is kept and the
+// rest waits for the next scheduled (or manual) run.
+func (c *CIndex) Stop() {
+	c.smu.Lock()
+	busy := c.busy
+	c.smu.Unlock()
+	if busy {
+		c.stop.Store(true)
+	}
+}
+
 // walkSoon asks for a full folder check now, or right after the current one.
 func (c *CIndex) walkSoon() {
 	c.smu.Lock()
@@ -494,6 +507,7 @@ func (c *CIndex) Refresh(full bool) {
 	}
 	c.busy = true
 	c.smu.Unlock()
+	c.stop.Store(false)
 	defer func() {
 		c.smu.Lock()
 		c.busy = false
@@ -551,6 +565,9 @@ func (c *CIndex) Refresh(full bool) {
 					}
 					return nil
 				}
+				if c.stop.Load() {
+					return filepath.SkipAll
+				}
 				if d.IsDir() {
 					return nil
 				}
@@ -575,7 +592,7 @@ func (c *CIndex) Refresh(full bool) {
 		rep.Checked = len(seen)
 		c.mu.Lock()
 		for lp, i := range c.byPath {
-			if !seen[lp] {
+			if !seen[lp] && !c.stop.Load() { // a stopped walk did not see everything
 				c.docs[i].Dead = true
 				delete(c.byPath, lp)
 				removed++
@@ -626,13 +643,16 @@ func (c *CIndex) Refresh(full bool) {
 	c.smu.Lock()
 	c.report = rep
 	c.smu.Unlock()
-	if full && (len(work) > 0 || removed > 0 || rep.Skips.Count > 0) {
+	if full && !c.stop.Load() && (len(work) > 0 || removed > 0 || rep.Skips.Count > 0) {
 		logf("내용 색인 갱신: 새로 읽음 %d, 지움 %d, %.1f초", len(work), removed, rep.Secs)
 		if rep.Skips.Count > 0 {
 			warnf("내용 색인: 열 수 없는 폴더 %d개 (예: %s)", rep.Skips.Count, rep.Skips.Examples[0])
 		}
 	}
-	if len(folders) == 0 {
+	if c.stop.Load() {
+		logf("내용 색인을 멈췄습니다 (읽은 파일까지 저장, 나머지는 다음 일정에)")
+		c.setStatus(fmt.Sprintf("내용 색인 멈춤: 파일 %d개 (다음 일정에 이어서)", st.Docs))
+	} else if len(folders) == 0 {
 		c.setStatus("")
 	} else {
 		c.setStatus(fmt.Sprintf("내용 색인 완료: 파일 %d개", st.Docs))
@@ -667,6 +687,9 @@ func (c *CIndex) indexFiles(work []ctask) {
 	}
 	go func() {
 		for _, t := range work {
+			if c.stop.Load() {
+				break
+			}
 			in <- t
 		}
 		close(in)

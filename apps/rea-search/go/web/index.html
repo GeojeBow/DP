@@ -427,7 +427,7 @@ tr.ghead2:hover td { color:var(--fg); }
     <p>내용을 자주 검색하는 폴더를 추가하면 문서의 글자를 미리 색인해 둡니다. 수십만 개 파일도 몇 초 안에 찾고, 바뀐 파일만 다시 읽습니다. 색인하지 않은 폴더도 내용 검색은 되지만 검색할 때마다 파일을 직접 읽어 느립니다.</p>
     <div id="ci-status" class="hint"></div>
     <div id="ci-list"></div>
-    <div class="addrow"><input type="text" id="ci-path" placeholder="예: C:\Users\이름\Documents  또는  \\fileserver\문서"><button class="btn primary" id="ci-add">추가</button><button class="btn" id="ci-refresh">지금 갱신</button><button class="btn" id="ci-sched">색인 일정</button></div>
+    <div class="addrow"><input type="text" id="ci-path" placeholder="예: C:\Users\이름\Documents  또는  \\fileserver\문서"><button class="btn primary" id="ci-add">추가</button><button class="btn" id="ci-refresh">지금 갱신</button><button class="btn" id="ci-stop" hidden>지금 정지</button><button class="btn" id="ci-sched">색인 일정</button></div>
     <div class="err" id="ci-err"></div>
     <p style="margin-top:12px">읽는 형식: 텍스트·코드 파일(UTF-8, UTF-16, EUC-KR), 한글(hwp, hwpx), Word(doc, docx), Excel(xls, xlsx), PowerPoint(ppt, pptx), PDF, OpenDocument. 암호가 걸린 문서와 스캔한 이미지 PDF는 읽지 못하며, 색인 현황에서 목록을 볼 수 있습니다.</p>
   </div>
@@ -690,6 +690,7 @@ let popKind = null, popAt = null, popExtQ = "", popDraft = {};
 function openPop(kind, anchor, draft) {
   if (popKind === kind) return closePop();
   popKind = kind; popAt = anchor.getBoundingClientRect(); popExtQ = ""; popDraft = draft || {};
+  if (!fac && idle() && FNAMES[kind]) loadFacets(seq);
   renderPop(true); renderPills();
 }
 function closePop() { if (!popKind) return; if (popKind === "theme") applyTheme(themePicked, true); popKind = null; $("pop").classList.remove("show"); renderPills(); }
@@ -912,6 +913,17 @@ let fseq = 0;
 // in the content modes the list shows what the content search found, not
 // the set of files it was searching in
 function contentShown() { return !!job || (S.mode !== "name" && !S.view); }
+// Nothing searched yet (empty box, no filter, no special view): the list
+// and the folder panel stay empty instead of showing every file.
+function idle() { return !S.view && !job && !S.q.trim() && !filtersOn(); }
+function showIdle() {
+  ++seq; fac = null; rows = []; total = loaded = 0; selected.clear(); cursor = null;
+  $("rows").replaceChildren(); paintSel(); paintAll(null);
+  $("t-title").textContent = "검색 결과"; $("dupbar").hidden = true; $("count").textContent = ""; $("sumbar").hidden = true;
+  refineNote("검색하면 결과가 들어 있는 폴더가 여기에 나옵니다");
+  $("fold").classList.remove("stale");
+  blank("찾을 파일 이름을 입력하세요", S.mode === "name" ? "입력하는 즉시 찾습니다. 예: 보고서  ·  견적 | 발주  ·  보고서 ext:hwp  ·  dm:7d" : '예: 예산 보고서  ·  계약 | 발주  ·  회의 !취소  ·  "분기 실적"');
+}
 function staleFold() {
   const f = $("fold"), mine = fseq; f.classList.add("stale");
   setTimeout(() => { if (mine === fseq && f.classList.contains("stale") && !contentShown()) f.replaceChildren(el("div", "empty-note", "세는 중…")); }, 350);
@@ -942,6 +954,7 @@ async function loadFacets(my) {
   try { d = await api("/api/facets?" + params()); } catch (e) { if (mine === fseq) { fac = null; refineNote(e.message); renderSummary(); } return; }
   if (mine !== fseq || my !== seq) return;
   fac = d;
+  if (idle()) { if (popKind) renderPop(); return; } // counts for the filter popovers only
   if (!contentShown()) renderFold();
   renderSummary(); renderPills();
   if (popKind) renderPop();
@@ -965,26 +978,21 @@ function renderFold() {
   if (ff.here) info.push(`이 폴더 바로 안 ${ff.here.toLocaleString()}개`);
   if (info.length) cb.append(el("span", "info", info.join(" · ")));
   cb.hidden = false;
-  // folder list in the side panel
-  const max = Math.max(1, ...(ff.folders || []).map(f => f.count));
-  const base = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") : "";
-  const items = (ff.folders || []).map(f => {
-    const path = base ? base + "\\" + f.name : f.name;
-    const b = el("button", "fitem fold"); b.title = path + " 안의 결과만 보기";
-    b.append(icon("folder", true), el("span", "nmx", f.name), el("span", "n", f.count.toLocaleString()));
-    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * f.count / max) + "%"; b.append(bar);
-    b.onclick = () => setUnder(f.key, path);
-    return b;
-  });
-  if (ff.here && items.length) items.push(el("div", "empty-note", `그 밖에 이 폴더 바로 안 ${ff.here.toLocaleString()}개`));
-  if (ff.more) items.push(el("div", "empty-note", `외 ${ff.more.toLocaleString()}곳 (개수가 많은 순)`));
-  if (!items.length) items.push(el("div", "empty-note", fac.total ? "더 나눌 하위 폴더가 없습니다" : "결과 없음"));
-  if (crumbs.length > 1 || S.under) {
-    const up = el("button", "fitem"); up.append(el("span", null, "↑ 한 단계 위로"));
-    const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
-    up.onclick = () => parent ? setUnder(parent.key, crumbPath(crumbs, crumbs.length - 2)) : setUnder("");
-    items.unshift(up);
+  // side panel: the folders that directly hold the results, most first.
+  // Clicking one keeps only the results inside it (and its subfolders).
+  const items = [];
+  if (S.under) { const up = el("button", "fitem"); up.append(el("span", null, "↑ 폴더 해제 (모든 폴더 보기)")); up.title = S.underPath; up.onclick = () => setUnder(""); items.push(up); }
+  const ps = fac.parents || [], pmax = Math.max(1, ...ps.map(f => f.count));
+  for (const f of ps) {
+    const parts = f.name.split(/[\\/]/).filter(Boolean);
+    const b = el("button", "fitem fold" + (f.key === S.under ? " on" : "")); b.title = f.name + "\n누르면 이 폴더 안의 결과만 봅니다";
+    b.append(icon("folder", true), el("span", "nmx", parts.slice(-2).join("\\") || f.name), el("span", "n", f.count.toLocaleString()));
+    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * f.count / pmax) + "%"; b.append(bar);
+    b.onclick = () => { if (f.key !== S.under) setUnder(f.key, f.name); };
+    items.push(b);
   }
+  if (fac.parentsMore) items.push(el("div", "empty-note", `외 ${fac.parentsMore.toLocaleString()}곳 (결과가 많은 폴더부터)`));
+  if (!ps.length) items.push(el("div", "empty-note", "결과 없음"));
   $("fold").replaceChildren(...items);
 }
 // summary line: how many, how big, what kinds (click a colour to keep only
@@ -1259,6 +1267,7 @@ async function refresh(keepScroll = false) {
   renderSide(); renderPills(); renderHead(); if (popKind) renderPop();
   fseq++; $("sumbar").classList.add("stale"); staleFold();
   if (S.view === "recent") { refineNote("최근 바뀐 파일 보기에서는 쓰지 않습니다"); $("sumbar").hidden = true; return loadRecent(); }
+  if (idle()) return showIdle();
   if (S.mode === "content" && !S.view) { contentOnly(); loadFacets(seq); return; }
   const my = ++seq;
   $("t-title").textContent = { dups: "중복 파일", fsize: "폴더 용량" }[S.view] || "검색 결과";
@@ -1916,12 +1925,20 @@ async function loadSched(post) {
     r3.append(el("span", "hint", `마지막 ${it.last ? ago(it.last) : "아직 없음"} · 다음 ${it.next ? fmtDate(it.next) : "직접 할 때만"}`));
     const now = el("button", "btn", it.busy ? "색인 중…" : "지금 색인"); now.disabled = it.busy;
     now.onclick = () => loadSched({ target: it.target, id: it.id, now: true }).then(() => toast("색인을 시작했습니다"));
-    r3.append(now); c.append(r3);
+    r3.append(now);
+    if (it.busy && it.target === "content") { const st = el("button", "btn", "지금 정지"); st.title = "읽은 파일까지 저장하고 멈춥니다. 나머지는 다음 일정에 합니다."; st.onclick = () => stopContent().then(() => loadSched()); r3.append(st); }
+    c.append(r3);
     return c;
   }));
 }
 
+async function stopContent() {
+  try { await api("/api/schedule", { method: "POST", body: JSON.stringify({ target: "content", stop: true }) }); toast("내용 색인을 멈춥니다. 읽은 파일까지 저장하고 나머지는 다음 일정에 합니다."); }
+  catch (e) { toast(e.message); }
+}
+$("ci-stop").onclick = stopContent;
 function renderCI(st) {
+  $("ci-stop").hidden = !st.busy;
   $("ci-status").textContent = st.folders.length ? `색인된 파일 ${st.docs.toLocaleString()}개 · ${st.status || ""}` : "";
   $("ci-list").replaceChildren(...(st.folders.length ? st.folders.map(f => {
     const r = el("div", "frow"); const info = el("div", "info"); info.append(el("div", "path", f));
@@ -2037,6 +2054,7 @@ async function poll() {
     const nf = s.folders.length ? ` · 추가 폴더 ${s.folders.length}개` : "";
     $("state").textContent = `전체 ${s.total.toLocaleString()}개 · ${mode}${nf} · ${s.status}`;
     $("cstate").textContent = s.content.folders.length ? `내용 색인 ${s.content.docs.toLocaleString()}개${s.content.busy ? " · " + s.content.status : ""}` : "";
+    if (s.content.busy) { const b = linkBtn("정지", stopContent); b.title = "내용 색인을 지금 멈추고 나머지는 다음 일정에"; $("cstate").append(" ", b); }
     $("about-text").textContent = `색인 방식: ${mode} · 항목 ${s.total.toLocaleString()}개. 색인과 설정은 %LOCALAPPDATA%\\REASearch 폴더에 저장됩니다.`;
     if (s.version !== version && !busy && !job && !dupJob && S.view !== "recent" && (S.mode === "name" || S.view)) refresh(true);
     if (poll.focus != null && s.focus !== poll.focus) { window.focus(); $("q").focus(); $("q").select(); }
