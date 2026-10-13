@@ -380,7 +380,7 @@ public partial class MainWindow : Window, IPaneHost
             new() { Name = "다운로드", Path = KnownFolders.Downloads, Glyph = "", Usage = -1 },
             new() { Name = "문서", Path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Glyph = "", Usage = -1 },
             new() { Name = "사진", Path = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), Glyph = "", Usage = -1 },
-        };
+        });
         return links.Where(l => l.Path == PathCrumbs.ThisPc || Directory.Exists(l.Path)).ToList();
     }
 
