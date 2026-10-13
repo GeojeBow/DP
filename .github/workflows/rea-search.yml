@@ -103,6 +103,10 @@ jobs:
     needs: windows
     if: github.event_name == 'push' && github.ref == 'refs/heads/rea-search'
     runs-on: ubuntu-latest
+    # two quick pushes must not delete and recreate the release at the same time
+    concurrency:
+      group: rea-search-publish
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
