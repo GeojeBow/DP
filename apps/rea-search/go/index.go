@@ -1,12 +1,20 @@
 package main
 
-// In-memory file name index.
+// In-memory file name index, laid out for millions of entries.
 //
-// Every file or folder is one entry: name + parent key + is-dir. Full paths
-// are rebuilt on demand from parent links. Entries are sorted by lower-cased
-// name once at build time, so search results come out sorted for free.
+// Every file or folder is one entry: name + parent + is-dir. Full paths are
+// rebuilt on demand from parent links. Entries are sorted by lower-cased name
+// once at build time, so search results come out sorted for free.
+//
+// Memory: names are not kept as millions of separate strings. All names are
+// packed into one byte arena (plus one for the lower-cased copy used by the
+// search loop) with 4-byte offsets, parents are 4-byte positions, and key
+// lookups use a sorted position table instead of a hash map. That is about
+// 25 bytes per entry plus twice the name length: roughly 75 bytes for a
+// typical name, so 5 million files fit in well under 0.5 GB.
+//
 // Live changes (NTFS change journal) go into a small overlay that is folded
-// back in by compact().
+// back in by Compact().
 
 import (
 	"path/filepath"
@@ -14,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unsafe"
 )
 
 type rec struct {
@@ -24,92 +33,197 @@ type rec struct {
 
 // Builder collects raw records, then builds an Index.
 type Builder struct {
-	recs  map[uint64]rec
-	roots map[uint64]bool
+	keys, pkeys []uint64
+	names       []string
+	dirs        []bool
+	sizes, mods []int64 // size/date known at scan time; mod -1 = unknown
+	roots       map[uint64]bool
 }
 
 func NewBuilder() *Builder {
-	return &Builder{recs: make(map[uint64]rec, 1<<16), roots: map[uint64]bool{}}
+	return &Builder{roots: map[uint64]bool{}}
 }
 
 func (b *Builder) AddRoot(key uint64, display string) {
 	b.roots[key] = true
-	b.recs[key] = rec{name: display, dir: true}
+	b.Add(key, 0, display, true)
 }
 
 func (b *Builder) Add(key, parent uint64, name string, dir bool) {
-	b.recs[key] = rec{parent: parent, name: name, dir: dir}
+	b.keys = append(b.keys, key)
+	b.pkeys = append(b.pkeys, parent)
+	b.names = append(b.names, name)
+	b.dirs = append(b.dirs, dir)
+	b.sizes = append(b.sizes, 0)
+	b.mods = append(b.mods, -1)
 }
 
-func (b *Builder) Len() int { return len(b.recs) }
+// AddMeta records size and modification time of the record just added, when
+// the scanner already has them (folder walking gets them for free on Windows).
+func (b *Builder) AddMeta(key uint64, size, mod int64) {
+	if n := len(b.keys); n > 0 && b.keys[n-1] == key {
+		b.sizes[n-1], b.mods[n-1] = size, mod
+	}
+}
+
+func (b *Builder) Len() int { return len(b.keys) }
 
 // Build sorts entries by name. orphanRoot maps an entry whose parent is
 // unknown to the root it should hang under (or false to leave it parentless).
 func (b *Builder) Build(orphanRoot func(key uint64) (uint64, bool)) *Index {
-	n := len(b.recs)
-	type item struct {
-		key uint64
-		low string
+	n := len(b.keys)
+	lows := make([]string, n)
+	for i, nm := range b.names {
+		lows[i] = strings.ToLower(nm)
 	}
-	items := make([]item, 0, n)
-	for k, r := range b.recs {
-		items = append(items, item{k, strings.ToLower(r.name)})
+	order := make([]int32, n) // order[pos] = builder record
+	for i := range order {
+		order[i] = int32(i)
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].low < items[j].low })
-	keys := make([]uint64, n)
-	for i, it := range items {
-		keys[i] = it.key
-	}
+	sort.Slice(order, func(a, c int) bool { return lows[order[a]] < lows[order[c]] })
 
-	ix := &Index{
-		keys:    keys,
-		names:   make([]string, n),
-		lower:   make([]string, n),
-		parent:  make([]uint64, n),
-		hasPar:  make([]bool, n),
-		dir:     make([]bool, n),
-		keyIdx:  make(map[uint64]int32, n),
-		roots:   b.roots,
-		extra:   map[uint64]rec{},
-		removed: map[int32]bool{},
-		pcache:  map[uint64]string{},
+	ix := newIndex()
+	ix.keys = make([]uint64, n)
+	ix.off = make([]uint32, n+1)
+	ix.loff = make([]uint32, n+1)
+	ix.parent = make([]int32, n)
+	ix.dir = make([]bool, n)
+	ix.size = make([]int64, n)
+	ix.mod = make([]int64, n)
+	total, ltotal := 0, 0
+	for i := range b.names {
+		total += len(b.names[i])
+		ltotal += len(lows[i])
 	}
-	for i, k := range keys {
-		ix.keyIdx[k] = int32(i)
+	ix.arena = make([]byte, 0, total)
+	ix.larena = make([]byte, 0, ltotal)
+	for pos, r := range order {
+		ix.keys[pos] = b.keys[r]
+		ix.off[pos] = uint32(len(ix.arena))
+		ix.loff[pos] = uint32(len(ix.larena))
+		ix.arena = append(ix.arena, b.names[r]...)
+		ix.larena = append(ix.larena, lows[r]...)
+		ix.dir[pos] = b.dirs[r]
+		ix.size[pos], ix.mod[pos] = b.sizes[r], b.mods[r]
 	}
-	for i, k := range keys {
-		r := b.recs[k]
-		ix.names[i] = r.name
-		ix.lower[i] = items[i].low
-		ix.dir[i] = r.dir
+	ix.off[n], ix.loff[n] = uint32(len(ix.arena)), uint32(len(ix.larena))
+	ix.buildByKey()
+	for pos, r := range order {
+		k := b.keys[r]
+		ix.parent[pos] = -1
 		if b.roots[k] {
 			continue
 		}
-		if _, ok := b.recs[r.parent]; ok {
-			ix.parent[i], ix.hasPar[i] = r.parent, true
-		} else if orphanRoot != nil {
-			if p, ok := orphanRoot(k); ok {
-				ix.parent[i], ix.hasPar[i] = p, true
+		p := ix.pos(b.pkeys[r])
+		if p < 0 && orphanRoot != nil {
+			if rk, ok := orphanRoot(k); ok {
+				p = ix.pos(rk)
 			}
 		}
+		ix.parent[pos] = int32(p)
+	}
+	for k := range b.roots {
+		ix.roots[k] = true
 	}
 	return ix
 }
 
 type Index struct {
-	mu      sync.RWMutex
-	keys    []uint64
-	names   []string
-	lower   []string
-	parent  []uint64
-	hasPar  []bool
-	dir     []bool
-	keyIdx  map[uint64]int32
-	roots   map[uint64]bool
-	extra   map[uint64]rec // live additions / renames
-	removed map[int32]bool // main entries deleted or superseded by extra
-	pmu     sync.Mutex
-	pcache  map[uint64]string // folder key -> full path
+	mu     sync.RWMutex
+	keys   []uint64 // by position (name order)
+	arena  []byte   // names, packed
+	off    []uint32 // name of position i = arena[off[i]:off[i+1]]
+	larena []byte   // lower-cased names, packed
+	loff   []uint32
+	parent []int32 // parent position, -1 = none
+	dir    []bool
+	bykey  []int32 // positions sorted by key, for lookups
+	roots  map[uint64]bool
+
+	metaMu sync.RWMutex
+	size   []int64 // -1 for folders once known
+	mod    []int64 // unix seconds; -1 = not read yet
+
+	extra     map[uint64]rec  // live additions / renames
+	extraMeta map[uint64]meta // their sizes/dates
+	removed   map[int32]bool  // main entries deleted or superseded by extra
+
+	pmu    sync.Mutex
+	pcache map[uint64]string // folder key -> full path
+}
+
+func newIndex() *Index {
+	return &Index{off: []uint32{0}, loff: []uint32{0}, roots: map[uint64]bool{}, extra: map[uint64]rec{},
+		extraMeta: map[uint64]meta{}, removed: map[int32]bool{}, pcache: map[uint64]string{}}
+}
+
+func (ix *Index) buildByKey() {
+	ix.bykey = make([]int32, len(ix.keys))
+	for i := range ix.bykey {
+		ix.bykey[i] = int32(i)
+	}
+	sort.Slice(ix.bykey, func(a, b int) bool { return ix.keys[ix.bykey[a]] < ix.keys[ix.bykey[b]] })
+}
+
+// pos finds the position of a key in the main arrays, or -1.
+func (ix *Index) pos(key uint64) int {
+	bk := ix.bykey
+	i := sort.Search(len(bk), func(i int) bool { return ix.keys[bk[i]] >= key })
+	if i < len(bk) && ix.keys[bk[i]] == key {
+		return int(bk[i])
+	}
+	return -1
+}
+
+func bstr(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(&b[0], len(b))
+}
+
+func (ix *Index) name(i int) string  { return bstr(ix.arena[ix.off[i]:ix.off[i+1]]) }
+func (ix *Index) lower(i int) string { return bstr(ix.larena[ix.loff[i]:ix.loff[i+1]]) }
+
+// IndexState is the on-disk form of an Index (see cache.go).
+type IndexState struct {
+	Keys          []uint64
+	Arena, LArena []byte
+	Off, LOff     []uint32
+	Parent        []int32
+	Dir           []bool
+	Size, Mod     []int64
+	Roots         []uint64
+}
+
+func (ix *Index) State() *IndexState {
+	if ix.OverlaySize() > 0 {
+		ix = ix.Compact()
+	}
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	ix.metaMu.RLock()
+	defer ix.metaMu.RUnlock()
+	st := &IndexState{Keys: ix.keys, Arena: ix.arena, LArena: ix.larena, Off: ix.off, LOff: ix.loff,
+		Parent: ix.parent, Dir: ix.dir, Size: append([]int64{}, ix.size...), Mod: append([]int64{}, ix.mod...)}
+	for k := range ix.roots {
+		st.Roots = append(st.Roots, k)
+	}
+	return st
+}
+
+func IndexFromState(st *IndexState) *Index {
+	ix := newIndex()
+	ix.keys, ix.arena, ix.larena, ix.off, ix.loff = st.Keys, st.Arena, st.LArena, st.Off, st.LOff
+	ix.parent, ix.dir, ix.size, ix.mod = st.Parent, st.Dir, st.Size, st.Mod
+	if len(ix.off) == 0 {
+		ix.off, ix.loff = []uint32{0}, []uint32{0}
+	}
+	for _, k := range st.Roots {
+		ix.roots[k] = true
+	}
+	ix.buildByKey()
+	return ix
 }
 
 func (ix *Index) Len() int {
@@ -129,10 +243,13 @@ func (ix *Index) OverlaySize() int {
 func (ix *Index) Upsert(key, parent uint64, name string, dir bool) {
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	if i, ok := ix.keyIdx[key]; ok {
-		ix.removed[i] = true
+	if i := ix.pos(key); i >= 0 {
+		ix.removed[int32(i)] = true
 	}
 	ix.extra[key] = rec{parent: parent, name: name, dir: dir}
+	ix.metaMu.Lock()
+	delete(ix.extraMeta, key) // re-read on demand
+	ix.metaMu.Unlock()
 	if dir {
 		ix.clearPaths()
 	}
@@ -142,8 +259,8 @@ func (ix *Index) Remove(key uint64) {
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
 	wasDir := false
-	if i, ok := ix.keyIdx[key]; ok {
-		ix.removed[i] = true
+	if i := ix.pos(key); i >= 0 {
+		ix.removed[int32(i)] = true
 		wasDir = ix.dir[i]
 	}
 	if r, ok := ix.extra[key]; ok {
@@ -165,35 +282,51 @@ func (ix *Index) clearPaths() {
 func (ix *Index) Compact() *Index {
 	ix.mu.RLock()
 	b := NewBuilder()
+	ix.metaMu.RLock()
 	for i, k := range ix.keys {
 		if ix.removed[int32(i)] {
 			continue
 		}
 		if ix.roots[k] {
-			b.AddRoot(k, ix.names[i])
+			b.AddRoot(k, ix.name(i))
 		} else {
-			b.Add(k, ix.parent[i], ix.names[i], ix.dir[i])
+			var pk uint64
+			if p := ix.parent[i]; p >= 0 {
+				pk = ix.keys[p]
+			}
+			b.Add(k, pk, strings.Clone(ix.name(i)), ix.dir[i])
+		}
+		if ix.mod[i] >= 0 {
+			b.AddMeta(k, ix.size[i], ix.mod[i])
 		}
 	}
 	for k, r := range ix.extra {
 		b.Add(k, r.parent, r.name, r.dir)
+		if m, ok := ix.extraMeta[k]; ok && m.ok {
+			b.AddMeta(k, m.size, m.mod)
+		}
 	}
+	ix.metaMu.RUnlock()
 	ix.mu.RUnlock()
 	return b.Build(nil)
 }
 
 // ---- entry access ----
 
-// Node returns (name, parent, hasParent, isDir, found), live overlay first.
+// node returns (name, parent key, hasParent, isDir, found), live overlay first.
 func (ix *Index) node(key uint64) (string, uint64, bool, bool, bool) {
 	if r, ok := ix.extra[key]; ok {
 		return r.name, r.parent, !ix.roots[key], r.dir, true
 	}
-	i, ok := ix.keyIdx[key]
-	if !ok {
+	i := ix.pos(key)
+	if i < 0 || ix.removed[int32(i)] {
 		return "", 0, false, false, false
 	}
-	return ix.names[i], ix.parent[i], ix.hasPar[i], ix.dir[i], true
+	p := ix.parent[i]
+	if p < 0 {
+		return ix.name(i), 0, false, ix.dir[i], true
+	}
+	return ix.name(i), ix.keys[p], true, ix.dir[i], true
 }
 
 func (ix *Index) Node(key uint64) (name string, dir bool, ok bool) {
@@ -206,6 +339,55 @@ func (ix *Index) Node(key uint64) (name string, dir bool, ok bool) {
 func (ix *Index) Exists(key uint64) bool {
 	_, _, ok := ix.Node(key)
 	return ok
+}
+
+// Meta returns the cached size/date of a key.
+func (ix *Index) Meta(key uint64) (meta, bool) {
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	ix.metaMu.RLock()
+	defer ix.metaMu.RUnlock()
+	if _, ok := ix.extra[key]; ok {
+		m, ok := ix.extraMeta[key]
+		return m, ok
+	}
+	i := ix.pos(key)
+	if i < 0 || ix.mod[i] < 0 {
+		return meta{}, false
+	}
+	return meta{size: ix.size[i], mod: ix.mod[i], ok: ix.mod[i] > 0 || ix.size[i] != 0}, true
+}
+
+func (ix *Index) setMeta(batch map[uint64]meta) {
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	ix.metaMu.Lock()
+	defer ix.metaMu.Unlock()
+	for k, m := range batch {
+		if _, ok := ix.extra[k]; ok {
+			ix.extraMeta[k] = m
+			continue
+		}
+		if i := ix.pos(k); i >= 0 {
+			if m.ok {
+				ix.size[i], ix.mod[i] = m.size, m.mod
+			} else {
+				ix.size[i], ix.mod[i] = 0, 0 // could not be read
+			}
+		}
+	}
+}
+
+// Forget drops cached size/date so they are read again.
+func (ix *Index) Forget(key uint64) {
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	ix.metaMu.Lock()
+	defer ix.metaMu.Unlock()
+	delete(ix.extraMeta, key)
+	if i := ix.pos(key); i >= 0 {
+		ix.mod[i] = -1
+	}
 }
 
 // Path rebuilds the full path by following parent links.
@@ -254,11 +436,17 @@ func (ix *Index) folderPath(key uint64) string {
 		}
 		k = par
 	}
+	if len(parts) == 0 {
+		return ""
+	}
 	p = parts[len(parts)-1]
 	for i := len(parts) - 2; i >= 0; i-- {
 		p = joinPath(p, parts[i])
 	}
 	ix.pmu.Lock()
+	if len(ix.pcache) > 300000 { // bound memory on huge trees
+		ix.pcache = map[uint64]string{}
+	}
 	ix.pcache[key] = p
 	ix.pmu.Unlock()
 	return p
@@ -289,9 +477,21 @@ func joinPath(dir, name string) string {
 
 // ---- search ----
 
+// NameOpts are the search-box toggles.
+type NameOpts struct {
+	Case  bool // match case
+	Path  bool // match plain terms against the full path, not just the name
+	Regex bool // the whole query is one regular expression
+}
+
 // Search returns matching keys sorted by name (live changes listed first).
-func (ix *Index) Search(text string) []uint64 {
-	groups := ParseQuery(text)
+func (ix *Index) Search(text string) []uint64 { return ix.SearchOpts(text, NameOpts{}) }
+
+func (ix *Index) SearchOpts(text string, o NameOpts) []uint64 {
+	groups, err := ParseQueryOpts(text, o)
+	if err != nil {
+		return nil
+	}
 	ix.mu.RLock()
 	defer ix.mu.RUnlock()
 	if len(groups) == 1 {
@@ -313,11 +513,14 @@ func (ix *Index) Search(text string) []uint64 {
 func (ix *Index) searchGroup(q *Query) []uint64 {
 	var out []uint64
 	for k, r := range ix.extra {
-		if ix.match(q, k, strings.ToLower(r.name), r.dir) {
+		if ix.match(q, k, r.name, strings.ToLower(r.name), r.dir) {
 			out = append(out, k)
 		}
 	}
 	n := len(ix.keys)
+	if q.Empty() && len(ix.removed) == 0 {
+		return append(out, ix.keys...)
+	}
 	workers := runtime.NumCPU()
 	if n < 50000 {
 		workers = 1
@@ -341,7 +544,7 @@ func (ix *Index) searchGroup(q *Query) []uint64 {
 				if len(ix.removed) > 0 && ix.removed[int32(i)] {
 					continue
 				}
-				if ix.match(q, ix.keys[i], ix.lower[i], ix.dir[i]) {
+				if ix.match(q, ix.keys[i], ix.name(i), ix.lower(i), ix.dir[i]) {
 					res = append(res, ix.keys[i])
 				}
 			}
@@ -355,22 +558,7 @@ func (ix *Index) searchGroup(q *Query) []uint64 {
 	return out
 }
 
-func (ix *Index) match(q *Query, key uint64, low string, dir bool) bool {
-	for _, t := range q.Plain {
-		if !strings.Contains(low, t) {
-			return false
-		}
-	}
-	for _, t := range q.Negated {
-		if strings.Contains(low, t) {
-			return false
-		}
-	}
-	for _, w := range q.Wildcards {
-		if !wildMatch(w, low) {
-			return false
-		}
-	}
+func (ix *Index) match(q *Query, key uint64, name, low string, dir bool) bool {
 	if q.Only == "file" && dir || q.Only == "folder" && !dir {
 		return false
 	}
@@ -383,8 +571,43 @@ func (ix *Index) match(q *Query, key uint64, low string, dir bool) bool {
 			return false
 		}
 	}
+	subject := low
+	if q.Case {
+		subject = name
+	}
+	if q.InPath {
+		subject = ix.path(key)
+		if !q.Case {
+			subject = strings.ToLower(subject)
+		}
+	}
+	if q.Re != nil {
+		return q.Re.MatchString(subject)
+	}
+	for _, t := range q.Plain {
+		if !strings.Contains(subject, t) {
+			return false
+		}
+	}
+	for _, t := range q.Negated {
+		if strings.Contains(subject, t) {
+			return false
+		}
+	}
+	for _, w := range q.Wildcards {
+		ws := low
+		if q.Case {
+			ws = name
+		}
+		if !wildMatch(w, ws) {
+			return false
+		}
+	}
 	if len(q.Paths) > 0 {
-		p := strings.ReplaceAll(strings.ToLower(ix.path(key)), "/", `\`)
+		p := strings.ReplaceAll(ix.path(key), "/", `\`)
+		if !q.Case {
+			p = strings.ToLower(p)
+		}
 		for _, t := range q.Paths {
 			if !strings.Contains(p, t) {
 				return false

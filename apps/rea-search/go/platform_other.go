@@ -24,3 +24,9 @@ func openBrowser(u string) error {
 func relaunchElevated() bool { return false }
 
 func isAdminUser() bool { return os.Geteuid() == 0 }
+
+func fileCreated(st os.FileInfo) int64 { return 0 }
+
+func alert(msg string) { logf("%s", msg) }
+
+func openWindow(url string) error { return openBrowser(url) }

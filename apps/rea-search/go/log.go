@@ -14,15 +14,25 @@ var (
 	logMu  sync.Mutex
 	logOut io.Writer = os.Stdout
 	// LogPath is where the log is kept so problems can be reported even if
-	// the window closes: %TEMP%\REASearch.log
-	LogPath = filepath.Join(os.TempDir(), "REASearch.log")
+	// there is no console: %LOCALAPPDATA%\REASearch\REASearch.log
+	LogPath = filepath.Join(dataDir(), "REASearch.log")
 )
 
 func initLog() {
+	os.MkdirAll(dataDir(), 0o755)
 	f, err := os.OpenFile(LogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err == nil {
-		logOut = io.MultiWriter(os.Stdout, f)
+		logOut = tee{f}
 	}
+}
+
+// tee always writes the log file and copies to the console when there is
+// one; a windowed build has no console, and that must not stop the file.
+type tee struct{ f io.Writer }
+
+func (t tee) Write(p []byte) (int, error) {
+	os.Stdout.Write(p)
+	return t.f.Write(p)
 }
 
 func logf(format string, args ...any) {
@@ -31,13 +41,12 @@ func logf(format string, args ...any) {
 	fmt.Fprintf(logOut, time.Now().Format("15:04:05 ")+format+"\n", args...)
 }
 
-// recoverLog turns a crash into a logged message and keeps the window open,
-// instead of the console vanishing with no explanation.
+// recoverLog turns a crash into a logged message and a message box, instead
+// of the program vanishing with no explanation.
 func recoverLog(where string) {
 	if r := recover(); r != nil {
 		logf("오류(%s): %v\n%s", where, r, debug.Stack())
-		logf("로그 파일: %s", LogPath)
-		pause()
+		alert(fmt.Sprintf("REA Search 오류(%s): %v\n\n자세한 내용: %s", where, r, LogPath))
 		os.Exit(2)
 	}
 }

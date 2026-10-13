@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -56,3 +57,47 @@ func relaunchElevated() bool {
 }
 
 func isAdminUser() bool { return isAdmin() }
+
+func fileCreated(st os.FileInfo) int64 {
+	if d, ok := st.Sys().(*syscall.Win32FileAttributeData); ok {
+		return d.CreationTime.Nanoseconds() / 1e9
+	}
+	return 0
+}
+
+var (
+	user32          = syscall.NewLazyDLL("user32.dll")
+	procMessageBoxW = user32.NewProc("MessageBoxW")
+)
+
+// alert shows a message box (the app has no console window).
+func alert(msg string) {
+	logf("%s", msg)
+	t, _ := syscall.UTF16PtrFromString("REA Search")
+	m, _ := syscall.UTF16PtrFromString(msg)
+	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x30) // MB_ICONWARNING
+}
+
+// openWindow opens the search page as an app window (Edge or Chrome
+// "--app" mode: no tabs or address bar), falling back to the default browser.
+func openWindow(url string) error {
+	var cands []string
+	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
+		base := os.Getenv(env)
+		if base == "" {
+			continue
+		}
+		cands = append(cands,
+			filepath.Join(base, `Microsoft\Edge\Application\msedge.exe`),
+			filepath.Join(base, `Google\Chrome\Application\chrome.exe`))
+	}
+	for _, exe := range cands {
+		if _, err := os.Stat(exe); err == nil {
+			c := exec.Command(exe, "--app="+url, "--window-size=1280,820")
+			if c.Start() == nil {
+				return nil
+			}
+		}
+	}
+	return openBrowser(url)
+}

@@ -12,3 +12,7 @@ func defaultRoots() []string {
 	home, _ := os.UserHomeDir()
 	return []string{home}
 }
+
+func resumeNTFS(saved map[string][2]int64, log func(string)) (watcher, bool) { return nil, false }
+
+func canNTFS() bool { return false }

@@ -19,23 +19,53 @@ type Query struct {
 	Plain, Negated, Wildcards, Paths []string
 	Exts                             map[string]bool
 	Only                             string
+	Case, InPath                     bool
+	Re                               *regexp.Regexp // regex mode: replaces the term lists
+}
+
+func (q *Query) Empty() bool {
+	return len(q.Plain)+len(q.Negated)+len(q.Wildcards)+len(q.Paths) == 0 && q.Exts == nil && q.Only == "" && q.Re == nil
 }
 
 var tokenRe = regexp.MustCompile(`!?"[^"]*"|\S+`)
 var orRe = regexp.MustCompile(`\s*\|\s*`)
 
 func ParseQuery(text string) []*Query {
+	q, _ := ParseQueryOpts(text, NameOpts{})
+	return q
+}
+
+// ParseQueryOpts applies the search-box toggles. In regex mode the whole text
+// is one expression (case-insensitive unless Case is on).
+func ParseQueryOpts(text string, o NameOpts) ([]*Query, error) {
+	if o.Regex {
+		expr := text
+		if !o.Case {
+			expr = "(?i)" + expr
+		}
+		re, err := regexp.Compile(expr)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(text) == "" {
+			re = nil
+		}
+		return []*Query{{Re: re, Case: true, InPath: o.Path}}, nil
+	}
 	var out []*Query
 	for _, g := range orRe.Split(text, -1) {
-		q := &Query{}
+		q := &Query{Case: o.Case, InPath: o.Path}
 		for _, tok := range tokenRe.FindAllString(g, -1) {
 			neg := strings.HasPrefix(tok, "!")
 			if neg {
 				tok = tok[1:]
 			}
-			tok = strings.ToLower(strings.Trim(tok, `"`))
+			tok = strings.Trim(tok, `"`)
 			if tok == "" {
 				continue
+			}
+			if low := strings.ToLower(tok); strings.HasPrefix(low, "ext:") || strings.HasSuffix(low, ":") || !o.Case {
+				tok = low
 			}
 			switch {
 			case strings.HasPrefix(tok, "ext:"):
@@ -61,7 +91,7 @@ func ParseQuery(text string) []*Query {
 		}
 		out = append(out, q)
 	}
-	return out
+	return out, nil
 }
 
 // wildMatch matches the whole string against a pattern with * and ?.

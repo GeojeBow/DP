@@ -86,7 +86,7 @@ func TestWalker(t *testing.T) {
 	os.MkdirAll(filepath.Join(d, "a", "b"), 0o755)
 	os.WriteFile(filepath.Join(d, "a", "b", "hello.txt"), nil, 0o644)
 	b := NewBuilder()
-	walkInto(b, []string{d}, nil)
+	walkInto(b, []string{d}, 1<<56, nil)
 	ix := b.Build(nil)
 	got := ix.Path(ix.Search("hello")[0])
 	if got != filepath.Join(d, "a", "b", "hello.txt") {

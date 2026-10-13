@@ -22,6 +22,7 @@ jobs:
           cache: false
       - run: go vet ./...
       - run: go test ./...
+      # Console build for the checks; the release build below has no console.
       - run: go build -trimpath -ldflags "-s -w" -o REASearch.exe .
       # Runners are administrators, so this exercises the NTFS MFT reader
       # and the change journal on a real Windows volume.
@@ -32,12 +33,24 @@ jobs:
           $p = Start-Process .\REASearch.exe -ArgumentList '-no-browser','-elevated','-port','18777' -PassThru
           Start-Sleep 5
           $r = Invoke-WebRequest http://127.0.0.1:18777/ -UseBasicParsing
+          if ($r.StatusCode -ne 200 -or $r.Content -notmatch 'const TOKEN = "(\w+)"') { Stop-Process $p.Id; exit 1 }
+          $h = @{ 'X-Token' = $Matches[1] }
+          for ($i = 0; $i -lt 60; $i++) {
+            $st = Invoke-RestMethod http://127.0.0.1:18777/api/status -Headers $h
+            if ($st.mode -ne 'loading') { break }
+            Start-Sleep 2
+          }
+          $s = Invoke-RestMethod 'http://127.0.0.1:18777/api/search?q=REASearch.exe&limit=5' -Headers $h
           Stop-Process $p.Id
-          if ($r.StatusCode -ne 200 -or $r.Content -notmatch 'REA Search') { exit 1 }
+          "status: $($st | ConvertTo-Json -Compress)"
+          "found: $($s.total)"
+          if ($s.total -lt 1) { exit 1 }
+      - name: Release build
+        run: go build -trimpath -ldflags "-H windowsgui -s -w" -o release\REASearch.exe .
       - name: Python version tests
         working-directory: apps/rea-search
         run: python -m unittest -v tests/test_index.py
       - uses: actions/upload-artifact@v4
         with:
           name: REASearch
-          path: apps/rea-search/go/REASearch.exe
+          path: apps/rea-search/go/release/REASearch.exe

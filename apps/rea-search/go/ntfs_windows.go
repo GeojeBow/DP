@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 )
@@ -39,11 +40,16 @@ const (
 	fileFlagBackupSemantics = 0x02000000
 	fileAttributeDirectory  = 0x10
 
-	reasonCreate  = 0x00000100
-	reasonDelete  = 0x00000200
-	reasonOldName = 0x00001000
-	reasonNewName = 0x00002000
-	watchMask     = reasonCreate | reasonDelete | reasonOldName | reasonNewName
+	reasonDataOverwrite = 0x00000001
+	reasonDataExtend    = 0x00000002
+	reasonDataTruncate  = 0x00000004
+	reasonCreate        = 0x00000100
+	reasonDelete        = 0x00000200
+	reasonOldName       = 0x00001000
+	reasonNewName       = 0x00002000
+	reasonClose         = 0x80000000
+	reasonData          = reasonDataOverwrite | reasonDataExtend | reasonDataTruncate
+	watchMask           = reasonCreate | reasonDelete | reasonOldName | reasonNewName | reasonData | reasonClose
 
 	frnMask = 1<<48 - 1 // record number; the sequence bits are dropped
 	bufSize = 1 << 20
@@ -97,6 +103,7 @@ type volume struct {
 	h         syscall.Handle
 	journalID uint64
 	nextUSN   int64
+	firstUSN  int64
 	rootKey   uint64
 }
 
@@ -132,6 +139,7 @@ func openVolume(letter string, no int) (*volume, error) {
 		return nil, fmt.Errorf("%s: 변경 기록 조회 실패: %w", letter, err)
 	}
 	v.journalID = binary.LittleEndian.Uint64(out[0:])
+	v.firstUSN = int64(binary.LittleEndian.Uint64(out[8:]))
 	v.nextUSN = int64(binary.LittleEndian.Uint64(out[16:]))
 
 	rp, _ := syscall.UTF16PtrFromString(letter + `:\`)
@@ -219,10 +227,28 @@ func (v *volume) enumerate(b *Builder, progress func(int, string)) error {
 }
 
 type ntfsWatcher struct {
-	vols []*volume
-	buf  []byte
+	vols   []*volume
+	buf    []byte
+	events []ChangeEvent
 }
 
+func (w *ntfsWatcher) Journals() map[string][2]int64 {
+	out := map[string][2]int64{}
+	for _, v := range w.vols {
+		out[v.letter] = [2]int64{int64(v.journalID), v.nextUSN}
+	}
+	return out
+}
+
+func (w *ntfsWatcher) Drain() []ChangeEvent {
+	ev := w.events
+	w.events = nil
+	return ev
+}
+
+// Poll reads the change journal. Only records written when a file handle is
+// closed are requested: by then the reason bits of everything that happened
+// to the file are combined, and the record carries its final name.
 func (w *ntfsWatcher) Poll(ix *Index) (int, error) {
 	total := 0
 	in := make([]byte, 40) // READ_USN_JOURNAL_DATA_V0
@@ -231,7 +257,7 @@ func (w *ntfsWatcher) Poll(ix *Index) (int, error) {
 		for {
 			le.PutUint64(in[0:], uint64(v.nextUSN))
 			le.PutUint32(in[8:], watchMask)
-			le.PutUint32(in[12:], 0) // ReturnOnlyOnClose
+			le.PutUint32(in[12:], 1) // ReturnOnlyOnClose
 			le.PutUint64(in[16:], 0) // Timeout
 			le.PutUint64(in[24:], 0) // BytesToWaitFor: return at once
 			le.PutUint64(in[32:], v.journalID)
@@ -242,7 +268,9 @@ func (w *ntfsWatcher) Poll(ix *Index) (int, error) {
 			got := 0
 			parseRecords(w.buf[8:n], func(r usnRec) {
 				got++
-				applyChange(ix, v, r)
+				if ev, ok := applyChange(ix, v, r); ok {
+					w.events = append(w.events, ev)
+				}
 			})
 			v.nextUSN = int64(le.Uint64(w.buf))
 			total += got
@@ -254,21 +282,79 @@ func (w *ntfsWatcher) Poll(ix *Index) (int, error) {
 	return total, nil
 }
 
-// applyChange: reason bits accumulate until the file is closed, so the
-// second record of a rename carries both OLD_NAME and NEW_NAME.
-func applyChange(ix *Index, v *volume, r usnRec) {
+func applyChange(ix *Index, v *volume, r usnRec) (ChangeEvent, bool) {
 	k, pk := v.key(r.frn), v.key(r.parent)
+	ev := ChangeEvent{Key: k, Name: r.name, Dir: r.dir, Time: time.Now().Unix()}
 	switch {
 	case r.reason&reasonDelete != 0:
+		if r.reason&reasonCreate != 0 && !ix.Exists(k) {
+			return ev, false // a temporary file created and deleted in between
+		}
+		ev.Path, ev.Kind = ix.Path(k), "삭제"
 		ix.Remove(k)
-	case r.reason&(reasonNewName|reasonCreate) != 0:
+	case r.reason&(reasonNewName|reasonCreate|reasonData) != 0:
 		if !ix.Exists(pk) {
 			pk = v.rootKey
 		}
 		ix.Upsert(k, pk, r.name, r.dir)
-	case r.reason&reasonOldName != 0:
-		ix.Remove(k)
+		ev.Path = ix.Path(k)
+		switch {
+		case r.reason&reasonCreate != 0:
+			ev.Kind = "생성"
+		case r.reason&reasonNewName != 0:
+			ev.Kind = "이름 변경"
+		default:
+			ev.Kind = "수정"
+		}
+	default:
+		return ev, false
 	}
+	return ev, true
+}
+
+func openAllVolumes(log func(string)) ([]*volume, bool) {
+	var vols []*volume
+	for i, d := range ntfsDrives() {
+		v, err := openVolume(d, i+1)
+		if err != nil {
+			log(err.Error())
+			for _, ov := range vols {
+				syscall.CloseHandle(ov.h)
+			}
+			return nil, false
+		}
+		vols = append(vols, v)
+	}
+	return vols, len(vols) > 0
+}
+
+// resumeNTFS reopens the volumes and continues from journal positions saved
+// with the cache. It fails if a drive changed or the journal was reset or
+// has already discarded records we have not read.
+func resumeNTFS(saved map[string][2]int64, log func(string)) (watcher, bool) {
+	if !isAdmin() || len(saved) == 0 {
+		return nil, false
+	}
+	vols, ok := openAllVolumes(log)
+	if !ok {
+		return nil, false
+	}
+	good := len(vols) == len(saved)
+	for _, v := range vols {
+		j, has := saved[v.letter]
+		if !has || uint64(j[0]) != v.journalID || j[1] < v.firstUSN || j[1] > v.nextUSN {
+			good = false
+			break
+		}
+		v.nextUSN = j[1]
+	}
+	if !good {
+		for _, v := range vols {
+			syscall.CloseHandle(v.h)
+		}
+		return nil, false
+	}
+	return &ntfsWatcher{vols: vols, buf: make([]byte, bufSize)}, true
 }
 
 func buildNTFS(progress func(int, string), log func(string)) (*Index, watcher, bool) {
@@ -276,25 +362,20 @@ func buildNTFS(progress func(int, string), log func(string)) (*Index, watcher, b
 		log("관리자 권한이 아니라서 폴더 탐색 방식으로 색인합니다 (더 느림).")
 		return nil, nil, false
 	}
-	drives := ntfsDrives()
-	if len(drives) == 0 {
+	vols, ok := openAllVolumes(log)
+	if !ok {
 		return nil, nil, false
 	}
 	b := NewBuilder()
-	w := &ntfsWatcher{buf: make([]byte, bufSize)}
-	for i, d := range drives {
-		v, err := openVolume(d, i+1)
-		if err == nil {
-			err = v.enumerate(b, progress)
-		}
-		if err != nil {
+	w := &ntfsWatcher{vols: vols, buf: make([]byte, bufSize)}
+	for _, v := range vols {
+		if err := v.enumerate(b, progress); err != nil {
 			log(err.Error())
-			for _, ov := range w.vols {
+			for _, ov := range vols {
 				syscall.CloseHandle(ov.h)
 			}
 			return nil, nil, false
 		}
-		w.vols = append(w.vols, v)
 	}
 	roots := map[uint64]uint64{}
 	for _, v := range w.vols {
@@ -306,3 +387,5 @@ func buildNTFS(progress func(int, string), log func(string)) (*Index, watcher, b
 	})
 	return ix, w, true
 }
+
+func canNTFS() bool { return isAdmin() && len(ntfsDrives()) > 0 }
