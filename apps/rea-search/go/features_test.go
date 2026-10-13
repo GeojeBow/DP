@@ -213,6 +213,7 @@ func TestContentIndex(t *testing.T) {
 	}
 	dir := t.TempDir()
 	c := OpenCIndex(dir)
+	t.Cleanup(c.Close)
 	c.AddFolder(src)
 	waitIdle(c)
 	q, _ := ParseContentQuery("프로젝트 보고서", CQOpts{})
@@ -227,6 +228,7 @@ func TestContentIndex(t *testing.T) {
 	c.Refresh(true)
 	c.Close()
 	c2 := OpenCIndex(dir)
+	t.Cleanup(c2.Close)
 	set, _ = c2.Candidates(q)
 	got := []string{}
 	for id := range set {
@@ -248,6 +250,7 @@ func TestContentIndexSegmentsMerge(t *testing.T) {
 		os.WriteFile(filepath.Join(src, fmt.Sprintf("n%02d.md", i)), []byte(fmt.Sprintf("공통 단어 고유%02d", i)), 0o644)
 	}
 	c := OpenCIndex(t.TempDir())
+	t.Cleanup(c.Close)
 	c.Folders = []string{src}
 	// force tiny segments to exercise flushing and merging
 	for i := 0; i < 40; i++ {

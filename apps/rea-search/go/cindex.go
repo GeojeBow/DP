@@ -917,9 +917,15 @@ func (c *CIndex) Run(walkEvery time.Duration) {
 }
 
 // Close writes pending documents so nothing indexed is lost on exit.
+// Close saves pending work and closes the segment files (Windows cannot
+// delete or replace files that are still open).
 func (c *CIndex) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.flushLocked()
 	c.saveLocked()
+	for _, s := range c.segs {
+		s.f.Close()
+	}
+	c.segs = nil
 }

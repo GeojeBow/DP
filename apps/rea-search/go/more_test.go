@@ -88,12 +88,14 @@ func TestCIndexReportsFailures(t *testing.T) {
 	os.WriteFile(filepath.Join(d, "bad.pdf"), []byte("%PDF-1.4 garbage"), 0o644)
 	os.WriteFile(filepath.Join(d, "bad.docx"), []byte("not a zip"), 0o644)
 	c := OpenCIndex(t.TempDir())
+	t.Cleanup(c.Close)
 	if err := c.AddFolder(d); err != nil {
 		t.Fatal(err)
 	}
-	c.Refresh(true)
+	waitIdle(c)
+	c.Refresh(true) // in case the background refresh had not started yet
 	r := c.Report()
-	if r.Failed != 2 || r.Indexed != 3 || r.LastRun == 0 {
+	if r.Failed != 2 || r.Checked != 3 || r.LastRun == 0 {
 		t.Fatalf("report %+v", r)
 	}
 	if r.Reasons["글자가 없는 PDF (스캔한 이미지일 수 있음)"] != 1 {
