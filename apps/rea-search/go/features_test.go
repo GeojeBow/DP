@@ -297,3 +297,23 @@ func sortStrings(s []string) {
 		}
 	}
 }
+
+func TestExtractOldFormatsAndPDF(t *testing.T) {
+	cases := map[string][]string{
+		"testdata/sample.doc":        {"분기 실적 보고서", "회의 예산은 Budget 2026 apple", "셀하나\t셀둘"},
+		"testdata/sample.xls":        {"사과", "회의예산"},
+		"testdata/sample-office.pdf": {"분기 실적 보고서", "회의 예산은 Budget 2026 apple"},
+		"testdata/sample-chrome.pdf": {"크롬 PDF 시험", "Hello World"},
+	}
+	for p, wants := range cases {
+		s, err := ExtractText(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		for _, w := range wants {
+			if !strings.Contains(s, w) {
+				t.Errorf("%s: missing %q in %q", p, w, s)
+			}
+		}
+	}
+}

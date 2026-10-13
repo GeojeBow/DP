@@ -46,6 +46,15 @@ type watcher interface {
 	Poll(ix *Index) (int, error)
 	Journals() map[string][2]int64
 	Drain() []ChangeEvent
+	Volumes() []VolumeInfo
+}
+
+// VolumeInfo describes one NTFS drive followed by the change journal.
+type VolumeInfo struct {
+	Letter  string `json:"letter"`
+	No      int    `json:"-"`
+	Journal int64  `json:"journal"` // next change-journal position
+	Count   int    `json:"count"`
 }
 
 // FolderSource is an extra folder (often a network share) indexed by walking.
@@ -62,10 +71,31 @@ type source struct {
 	scanning bool
 	last     time.Time
 	err      string
+	secs     float64
+	skips    ScanSkips
 }
 
 type Settings struct {
 	Folders []FolderSource `json:"folders"`
+	Hotkey  string         `json:"hotkey"` // "" = default, "off" = none
+}
+
+const defaultHotkey = "Ctrl+Alt+F"
+
+func (e *Engine) Hotkey() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.settings.Hotkey == "" {
+		return defaultHotkey
+	}
+	return e.settings.Hotkey
+}
+
+func (e *Engine) SetHotkey(h string) {
+	e.mu.Lock()
+	e.settings.Hotkey = h
+	e.saveSettingsLocked()
+	e.mu.Unlock()
 }
 
 type Engine struct {
@@ -82,6 +112,12 @@ type Engine struct {
 	recent   []ChangeEvent
 	saved    int // Version at the last cache save
 	mainLast time.Time
+	started  time.Time
+	mainFrom string  // "build" or "cache"
+	mainSecs float64 // how long the last build or cache load took
+	mainSkip ScanSkips
+	saveAt   time.Time
+	saveErr  string
 
 	Content *CIndex
 }
@@ -100,7 +136,7 @@ func NewEngine(roots []string) *Engine {
 
 func NewEngineAt(roots []string, dir string) *Engine {
 	os.MkdirAll(dir, 0o755)
-	e := &Engine{main: emptyIndex, Mode: "loading", Status: "색인 준비 중...", roots: roots, dataDir: dir}
+	e := &Engine{main: emptyIndex, Mode: "loading", Status: "색인 준비 중...", roots: roots, dataDir: dir, started: time.Now()}
 	e.loadSettings()
 	for _, f := range e.settings.Folders {
 		e.folders = append(e.folders, &source{FolderSource: f, ix: emptyIndex})
@@ -189,6 +225,7 @@ func (e *Engine) Build() {
 	var ix *Index
 	mode := "walk"
 	var w watcher
+	var skips ScanSkips
 	if len(e.roots) == 0 {
 		if nix, nw, ok := buildNTFS(progress, e.setStatus); ok {
 			ix, w, mode = nix, nw, "ntfs"
@@ -200,10 +237,17 @@ func (e *Engine) Build() {
 			roots = defaultRoots()
 		}
 		b := NewBuilder()
-		walkInto(b, roots, walkMainTop<<56, progress)
+		if err := walkInto(b, roots, walkMainTop<<56, progress); err != nil {
+			warnf("색인할 폴더를 열 수 없습니다: %s", errText(err))
+		}
+		if b.Skips.Count > 0 {
+			warnf("열 수 없는 폴더 %d개는 건너뛰었습니다 (예: %s). 색인 현황에서 목록을 볼 수 있습니다.", b.Skips.Count, b.Skips.Examples[0])
+		}
+		skips = b.Skips
 		ix = b.Build(nil)
 	}
 	e.mu.Lock()
+	e.mainFrom, e.mainSecs, e.mainSkip = "build", time.Since(start).Seconds(), skips
 	e.main, e.Mode, e.watcher = ix, mode, w
 	e.Version++
 	e.mainLast = time.Now()
@@ -247,7 +291,8 @@ func (e *Engine) pollOnce() {
 	}
 	n, err := w.Poll(ix)
 	if err != nil {
-		e.setStatus("변경 감시 오류, 다시 색인합니다: " + err.Error())
+		errorf("변경 감시 오류, 다시 색인합니다: %v", err)
+		e.setStatus("변경 감시 오류, 다시 색인합니다")
 		e.Build()
 		return
 	}
@@ -388,6 +433,7 @@ func (e *Engine) scanFolder(src *source) {
 	e.mu.Unlock()
 	start := time.Now()
 	b := NewBuilder()
+	logf("추가 폴더 탐색 시작: %s", src.Path)
 	err := walkInto(b, []string{src.Path}, uint64(src.ID)<<56, func(n int, where string) {
 		e.mu.Lock()
 		src.status = fmt.Sprintf("탐색 중... %d개", n)
@@ -397,14 +443,20 @@ func (e *Engine) scanFolder(src *source) {
 	src.scanning = false
 	src.last = time.Now()
 	if err != nil {
-		src.status, src.err = "연결 안 됨: 이전 색인으로 검색합니다", err.Error()
+		src.status, src.err = "연결 안 됨: 이전 색인으로 검색합니다", errText(err)
 		e.mu.Unlock()
-		logf("%s: %v", src.Path, err)
+		warnf("추가 폴더에 접근할 수 없습니다 %s: %s (이전 색인을 유지하고 나중에 다시 시도합니다)", src.Path, errText(err))
 		return
 	}
 	src.ix = b.Build(nil)
-	src.status = fmt.Sprintf("%d개, %.0f초", src.ix.Len(), time.Since(start).Seconds())
+	src.secs = time.Since(start).Seconds()
+	src.skips = b.Skips
+	src.status = fmt.Sprintf("%d개, %.0f초", src.ix.Len(), src.secs)
 	src.err = ""
+	logf("추가 폴더 탐색 완료: %s, %d개, %.1f초", src.Path, src.ix.Len(), src.secs)
+	if b.Skips.Count > 0 {
+		warnf("%s: 열 수 없는 폴더 %d개 (예: %s)", src.Path, b.Skips.Count, b.Skips.Examples[0])
+	}
 	e.Version++
 	e.mu.Unlock()
 	e.saveFolder(src)
@@ -513,11 +565,15 @@ func (e *Engine) Save() {
 	c.Index = ix.State()
 	start := time.Now()
 	if err := writeGob(filepath.Join(e.dataDir, "names-main.gob"), &c); err != nil {
-		logf("캐시 저장 실패: %v", err)
+		errorf("색인 캐시 저장 실패: %v", err)
+		e.mu.Lock()
+		e.saveErr = err.Error()
+		e.mu.Unlock()
 		return
 	}
 	e.mu.Lock()
 	e.saved = version
+	e.saveAt, e.saveErr = time.Now(), ""
 	e.mu.Unlock()
 	logf("캐시 저장: %d개, %.1f초", len(c.Index.Keys), time.Since(start).Seconds())
 }
@@ -525,10 +581,19 @@ func (e *Engine) Save() {
 func (e *Engine) loadMainCache() bool {
 	start := time.Now()
 	var c mainCache
-	if err := readGob(filepath.Join(e.dataDir, "names-main.gob"), &c); err != nil || c.Ver != cacheVer || c.Index == nil {
+	err := readGob(filepath.Join(e.dataDir, "names-main.gob"), &c)
+	switch {
+	case os.IsNotExist(err):
+		logf("저장된 색인이 없어 처음부터 색인합니다")
 		return false
-	}
-	if strings.Join(c.Roots, "|") != strings.Join(e.roots, "|") {
+	case err != nil:
+		warnf("저장된 색인을 읽을 수 없어 다시 색인합니다: %v", err)
+		return false
+	case c.Ver != cacheVer || c.Index == nil:
+		logf("프로그램이 바뀌어 다시 색인합니다")
+		return false
+	case strings.Join(c.Roots, "|") != strings.Join(e.roots, "|"):
+		logf("색인할 폴더가 바뀌어 다시 색인합니다")
 		return false
 	}
 	ix := IndexFromState(c.Index)
@@ -540,9 +605,11 @@ func (e *Engine) loadMainCache() bool {
 			return false
 		}
 	} else if len(e.roots) == 0 && canNTFS() {
+		logf("관리자 권한으로 실행되어 빠른 NTFS 방식으로 다시 색인합니다")
 		return false // admin rights now: build the fast NTFS index instead
 	}
 	e.mu.Lock()
+	e.mainFrom, e.mainSecs = "cache", time.Since(start).Seconds()
 	e.main, e.Mode, e.watcher = ix, c.Mode, w
 	e.Version++
 	e.saved = e.Version
@@ -565,7 +632,9 @@ func (e *Engine) saveFolder(src *source) {
 	ix := src.ix
 	e.mu.RUnlock()
 	c.Index = ix.State()
-	writeGob(filepath.Join(e.dataDir, fmt.Sprintf("names-%d.gob", src.ID)), &c)
+	if err := writeGob(filepath.Join(e.dataDir, fmt.Sprintf("names-%d.gob", src.ID)), &c); err != nil {
+		errorf("추가 폴더 색인 저장 실패 %s: %v", src.Path, err)
+	}
 }
 
 func (e *Engine) loadFolderCache(src *source) {

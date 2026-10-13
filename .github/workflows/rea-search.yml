@@ -41,7 +41,12 @@ jobs:
             Start-Sleep 2
           }
           $s = Invoke-RestMethod 'http://127.0.0.1:18777/api/search?q=REASearch.exe&limit=5' -Headers $h
+          $rep = Invoke-RestMethod http://127.0.0.1:18777/api/report -Headers $h
+          $log = Invoke-RestMethod http://127.0.0.1:18777/api/log -Headers $h
           Stop-Process $p.Id
+          "drives: $($rep.main.volumes | ConvertTo-Json -Compress)"
+          "warnings: $($rep.warnings) errors: $($rep.errors)"
+          $log | Where-Object { $_.level -ne 'info' } | ForEach-Object { "  [$($_.level)] $($_.msg)" }
           "status: $($st | ConvertTo-Json -Compress)"
           "found: $($s.total)"
           if ($s.total -lt 1) { exit 1 }

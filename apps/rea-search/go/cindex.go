@@ -203,7 +203,35 @@ type CIndex struct {
 	status string
 	busy   bool
 	walked time.Time
+	report CIndexReport
+	fails  map[string]CFail // lower-cased path -> why it could not be read
 }
+
+// CFail is a file the content index could not read.
+type CFail struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+	Time   int64  `json:"time"`
+}
+
+// CIndexReport describes the last refresh for the status screen.
+type CIndexReport struct {
+	LastRun   int64          `json:"lastRun"`
+	Secs      float64        `json:"secs"`
+	Full      bool           `json:"full"`
+	Checked   int            `json:"checked"`
+	Indexed   int            `json:"indexed"`
+	Removed   int            `json:"removed"`
+	TooBig    int            `json:"tooBig"`
+	Skips     ScanSkips      `json:"skips"`
+	Missing   []string       `json:"missing"` // folders that could not be opened
+	Reasons   map[string]int `json:"reasons"`
+	Failed    int            `json:"failed"`
+	Fails     []CFail        `json:"fails"`
+	DiskBytes int64          `json:"diskBytes"`
+}
+
+const maxFails = 5000
 
 type cindexDisk struct {
 	Folders  []string
@@ -213,7 +241,7 @@ type cindexDisk struct {
 }
 
 func OpenCIndex(dir string) *CIndex {
-	c := &CIndex{dir: dir, byPath: map[string]uint32{}, pending: map[uint64][]uint32{}, dirty: map[string]bool{}}
+	c := &CIndex{dir: dir, byPath: map[string]uint32{}, pending: map[uint64][]uint32{}, dirty: map[string]bool{}, fails: map[string]CFail{}}
 	os.MkdirAll(dir, 0o755)
 	keep := map[string]bool{"content.gob": true}
 	if f, err := os.Open(filepath.Join(dir, "content.gob")); err == nil {
@@ -285,6 +313,63 @@ func (c *CIndex) Status() CIndexStatus {
 	st.Status, st.Busy = c.status, c.busy
 	c.smu.Unlock()
 	return st
+}
+
+// Report returns details of the last refresh, failures (newest first) and
+// the index's size on disk.
+func (c *CIndex) Report() CIndexReport {
+	c.smu.Lock()
+	r := c.report
+	r.Reasons = map[string]int{}
+	r.Fails = make([]CFail, 0, len(c.fails))
+	for _, f := range c.fails {
+		r.Reasons[f.Reason]++
+		r.Fails = append(r.Fails, f)
+	}
+	c.smu.Unlock()
+	r.Failed = len(r.Fails)
+	sort.Slice(r.Fails, func(i, j int) bool {
+		return r.Fails[i].Time > r.Fails[j].Time || r.Fails[i].Time == r.Fails[j].Time && r.Fails[i].Path < r.Fails[j].Path
+	})
+	if len(r.Fails) > 500 {
+		r.Fails = r.Fails[:500]
+	}
+	if ents, err := os.ReadDir(c.dir); err == nil {
+		for _, e := range ents {
+			if info, err := e.Info(); err == nil {
+				r.DiskBytes += info.Size()
+			}
+		}
+	}
+	return r
+}
+
+func (c *CIndex) noteResult(p string, err error) {
+	lp := strings.ToLower(p)
+	c.smu.Lock()
+	defer c.smu.Unlock()
+	if err == nil {
+		delete(c.fails, lp)
+		return
+	}
+	if len(c.fails) < maxFails {
+		c.fails[lp] = CFail{Path: p, Reason: failReason(err), Time: time.Now().Unix()}
+	}
+}
+
+func (c *CIndex) IsFailed(p string) bool {
+	c.smu.Lock()
+	defer c.smu.Unlock()
+	f, ok := c.fails[strings.ToLower(p)]
+	return ok && f.Path == p
+}
+
+func failReason(err error) string {
+	switch err {
+	case errNotText, errEncrypted, errBroken, errNoPDFText:
+		return err.Error()
+	}
+	return errText(err)
 }
 
 func (c *CIndex) setStatus(s string) {
@@ -395,6 +480,8 @@ func (c *CIndex) Refresh(full bool) {
 	folders := append([]string{}, c.Folders...)
 	c.mu.RUnlock()
 
+	started := time.Now()
+	rep := CIndexReport{Full: full}
 	var work []ctask
 	removed := 0
 	check := func(p string, size, mod int64) {
@@ -419,15 +506,41 @@ func (c *CIndex) Refresh(full bool) {
 		seen := map[string]bool{}
 		n := 0
 		for _, root := range folders {
+			if _, err := os.Stat(root); err != nil {
+				rep.Missing = append(rep.Missing, root+": "+errText(err))
+				warnf("내용 색인 폴더에 접근할 수 없습니다 %s: %s (이전 색인을 유지합니다)", root, errText(err))
+				// keep what was indexed there: mark it seen
+				c.mu.RLock()
+				prefix := strings.ToLower(strings.TrimRight(root, `\/`))
+				for lp := range c.byPath {
+					if underAny(lp, []string{prefix}) {
+						seen[lp] = true
+					}
+				}
+				c.mu.RUnlock()
+				continue
+			}
 			filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-				if err != nil || d.IsDir() {
+				if err != nil {
+					if d == nil || d.IsDir() {
+						rep.Skips.add(p, err)
+					}
+					return nil
+				}
+				if d.IsDir() {
 					return nil
 				}
 				if n++; n%5000 == 0 {
 					c.setStatus(fmt.Sprintf("내용 색인: 폴더 확인 중... %d개", n))
 				}
 				info, err := d.Info()
-				if err != nil || !indexable(d.Name(), info.Size()) {
+				if err != nil {
+					return nil
+				}
+				if contentKind(d.Name()) != "" && info.Size() > maxFileBytes {
+					rep.TooBig++
+				}
+				if !indexable(d.Name(), info.Size()) {
 					return nil
 				}
 				seen[strings.ToLower(p)] = true
@@ -435,6 +548,7 @@ func (c *CIndex) Refresh(full bool) {
 				return nil
 			})
 		}
+		rep.Checked = len(seen)
 		c.mu.Lock()
 		for lp, i := range c.byPath {
 			if !seen[lp] {
@@ -468,6 +582,7 @@ func (c *CIndex) Refresh(full bool) {
 		}
 	}
 
+	rep.Removed, rep.Indexed = removed, len(work)
 	c.indexFiles(work)
 	c.mu.Lock()
 	c.flushLocked()
@@ -477,6 +592,22 @@ func (c *CIndex) Refresh(full bool) {
 	c.mu.Unlock()
 	c.maybeMerge()
 	st := c.Status()
+	rep.LastRun, rep.Secs = started.Unix(), time.Since(started).Seconds()
+	if !full { // keep the walk details from the last full refresh
+		c.smu.Lock()
+		prev := c.report
+		rep.Skips, rep.Missing, rep.TooBig, rep.Checked = prev.Skips, prev.Missing, prev.TooBig, prev.Checked
+		c.smu.Unlock()
+	}
+	c.smu.Lock()
+	c.report = rep
+	c.smu.Unlock()
+	if full && (len(work) > 0 || removed > 0 || rep.Skips.Count > 0) {
+		logf("내용 색인 갱신: 새로 읽음 %d, 지움 %d, %.1f초", len(work), removed, rep.Secs)
+		if rep.Skips.Count > 0 {
+			warnf("내용 색인: 열 수 없는 폴더 %d개 (예: %s)", rep.Skips.Count, rep.Skips.Examples[0])
+		}
+	}
 	if len(folders) == 0 {
 		c.setStatus("")
 	} else {
@@ -501,7 +632,11 @@ func (c *CIndex) indexFiles(work []ctask) {
 		go func() {
 			defer wg.Done()
 			for t := range in {
-				text, _ := ExtractText(t.path) // unreadable files are recorded with no text
+				text, err := ExtractText(t.path) // unreadable files are recorded with no text
+				if err == errNotText && contentKind(t.path) == "sniff" {
+					err = nil // unknown extensions that turn out not to be text are expected
+				}
+				c.noteResult(t.path, err)
 				out <- done{t, uniqueGrams(text)}
 			}
 		}()

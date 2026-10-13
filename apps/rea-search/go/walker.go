@@ -4,6 +4,8 @@ package main
 // is not available (no admin rights, non-NTFS drive, or not Windows).
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +40,8 @@ func walkInto(b *Builder, roots []string, base uint64, progress func(n int, wher
 			if err != nil {
 				if it.key == rk && firstErr == nil {
 					firstErr = err // the root itself is unreachable (e.g. network share offline)
+				} else {
+					b.Skips.add(it.path, err)
 				}
 				continue
 			}
@@ -63,4 +67,15 @@ func walkInto(b *Builder, roots []string, base uint64, progress func(n int, wher
 		}
 	}
 	return firstErr
+}
+
+// errText explains common file errors in plain words.
+func errText(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		return "접근 권한 없음"
+	case errors.Is(err, fs.ErrNotExist):
+		return "없음 (지워졌거나 이동됨)"
+	}
+	return err.Error()
 }

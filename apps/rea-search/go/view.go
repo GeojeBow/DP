@@ -172,3 +172,12 @@ func (ix *Index) Lower(key uint64) string {
 	}
 	return ""
 }
+
+// FolderSizes returns the total size under every folder of every index.
+func (v *View) FolderSizes() map[uint64]FolderTotal {
+	out := map[uint64]FolderTotal{}
+	for _, ix := range v.srcs {
+		ix.FolderSizes(out)
+	}
+	return out
+}

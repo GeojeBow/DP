@@ -7,8 +7,10 @@ package main
 //   - Office Open XML / ODF / HWPX documents are zip files of XML; their text
 //     is read straight from the XML parts (docx, xlsx, pptx, odt, ods, odp, hwpx)
 //
-// Binary files are skipped. PDF and the old binary HWP/DOC/XLS formats are not
-// supported yet.
+//   - the older binary hwp, doc, xls and ppt files (oldoffice.go) and PDF
+//     (pdf.go)
+//
+// Other binary files are skipped.
 
 import (
 	"archive/zip"
@@ -32,7 +34,11 @@ const (
 	maxTextBytes = 8 << 20  // extracted text is cut at this size
 )
 
-var errNotText = errors.New("not a text file")
+var (
+	errNotText   = errors.New("읽을 수 있는 글자가 없는 형식")
+	errEncrypted = errors.New("암호가 걸린 문서")
+	errBroken    = errors.New("파일이 손상되었거나 해석하지 못함")
+)
 
 var plainExts = map[string]bool{}
 var docExts = map[string]bool{"docx": true, "xlsx": true, "xlsm": true, "pptx": true, "odt": true, "ods": true, "odp": true, "hwpx": true}
@@ -55,19 +61,34 @@ func contentKind(name string) string {
 		return "text"
 	case docExts[e]:
 		return "doc"
+	case e == "hwp" || e == "doc" || e == "xls" || e == "ppt":
+		return "cfb"
+	case e == "pdf":
+		return "pdf"
 	}
 	switch categoryOf(name, false) {
 	case "image", "video", "audio", "archive", "exe":
 		return ""
 	}
-	if e == "pdf" || e == "hwp" || e == "doc" || e == "xls" || e == "ppt" || e == "dll" || e == "sys" || e == "bin" || e == "dat" || e == "db" {
+	if e == "dll" || e == "sys" || e == "bin" || e == "dat" || e == "db" {
 		return ""
 	}
 	return "sniff"
 }
 
-// ExtractText returns the searchable text of a file.
-func ExtractText(p string) (string, error) {
+// ExtractText returns the searchable text of a file. A damaged file that
+// trips up a reader is reported as an error, never a crash.
+func ExtractText(p string) (text string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			text, err = "", errBroken
+			warnf("내용 읽기 실패 %s: %v", p, r)
+		}
+	}()
+	return extractText(p)
+}
+
+func extractText(p string) (string, error) {
 	kind := contentKind(path.Base(strings.ReplaceAll(p, `\`, "/")))
 	if kind == "" {
 		return "", errNotText
@@ -79,8 +100,13 @@ func ExtractText(p string) (string, error) {
 	if st.IsDir() || st.Size() > maxFileBytes {
 		return "", errNotText
 	}
-	if kind == "doc" {
+	switch kind {
+	case "doc":
 		return extractZipXML(p, st.Size())
+	case "cfb":
+		return extractCFB(p, extOf(p))
+	case "pdf":
+		return extractPDF(p)
 	}
 	f, err := os.Open(p)
 	if err != nil {
@@ -92,6 +118,15 @@ func ExtractText(p string) (string, error) {
 		return "", err
 	}
 	return decodeText(b, kind == "sniff")
+}
+
+func readLimited(p string) ([]byte, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(io.LimitReader(f, maxFileBytes))
 }
 
 func decodeText(b []byte, strict bool) (string, error) {
@@ -169,6 +204,14 @@ func docParts(ext string, files []*zip.File) []*zip.File {
 func extractZipXML(p string, size int64) (string, error) {
 	zr, err := zip.OpenReader(p)
 	if err != nil {
+		if f, e := os.Open(p); e == nil {
+			head := make([]byte, 512)
+			n, _ := io.ReadFull(f, head)
+			f.Close()
+			if isCFB(head[:n]) { // a password-protected Office file is a compound file
+				return "", errEncrypted
+			}
+		}
 		return "", errNotText
 	}
 	defer zr.Close()

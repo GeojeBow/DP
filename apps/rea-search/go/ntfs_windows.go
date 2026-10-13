@@ -240,6 +240,14 @@ func (w *ntfsWatcher) Journals() map[string][2]int64 {
 	return out
 }
 
+func (w *ntfsWatcher) Volumes() []VolumeInfo {
+	var out []VolumeInfo
+	for _, v := range w.vols {
+		out = append(out, VolumeInfo{Letter: v.letter, No: int(v.base >> 48), Journal: v.nextUSN})
+	}
+	return out
+}
+
 func (w *ntfsWatcher) Drain() []ChangeEvent {
 	ev := w.events
 	w.events = nil
@@ -312,16 +320,16 @@ func applyChange(ix *Index, v *volume, r usnRec) (ChangeEvent, bool) {
 	return ev, true
 }
 
+// openAllVolumes opens every local NTFS drive. A drive that cannot be
+// opened (locked by BitLocker, no change journal, ...) is left out with a
+// warning instead of stopping the others.
 func openAllVolumes(log func(string)) ([]*volume, bool) {
 	var vols []*volume
 	for i, d := range ntfsDrives() {
 		v, err := openVolume(d, i+1)
 		if err != nil {
-			log(err.Error())
-			for _, ov := range vols {
-				syscall.CloseHandle(ov.h)
-			}
-			return nil, false
+			warnf("%s 드라이브를 색인에서 뺐습니다: %v", d, err)
+			continue
 		}
 		vols = append(vols, v)
 	}
@@ -370,7 +378,7 @@ func buildNTFS(progress func(int, string), log func(string)) (*Index, watcher, b
 	w := &ntfsWatcher{vols: vols, buf: make([]byte, bufSize)}
 	for _, v := range vols {
 		if err := v.enumerate(b, progress); err != nil {
-			log(err.Error())
+			errorf("%s 드라이브 MFT 읽기 실패, 폴더 탐색 방식으로 바꿉니다: %v", v.letter, err)
 			for _, ov := range vols {
 				syscall.CloseHandle(ov.h)
 			}

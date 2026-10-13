@@ -38,6 +38,21 @@ type Builder struct {
 	dirs        []bool
 	sizes, mods []int64 // size/date known at scan time; mod -1 = unknown
 	roots       map[uint64]bool
+	Skips       ScanSkips // folders the walker could not open
+}
+
+// ScanSkips counts folders that could not be read during a walk, with a
+// few examples for the status screen.
+type ScanSkips struct {
+	Count    int      `json:"count"`
+	Examples []string `json:"examples"`
+}
+
+func (s *ScanSkips) add(path string, err error) {
+	s.Count++
+	if len(s.Examples) < 20 {
+		s.Examples = append(s.Examples, path+": "+errText(err))
+	}
 }
 
 func NewBuilder() *Builder {
@@ -615,4 +630,45 @@ func (ix *Index) match(q *Query, key uint64, name, low string, dir bool) bool {
 		}
 	}
 	return true
+}
+
+// FolderTotal is the size of everything under a folder.
+type FolderTotal struct {
+	Bytes int64
+	Files int32
+	Known bool // false while some sizes are still unknown
+}
+
+// FolderSizes adds every file's size to all of its parent folders. Live
+// changes not yet merged are left out.
+func (ix *Index) FolderSizes(out map[uint64]FolderTotal) {
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	ix.metaMu.RLock()
+	defer ix.metaMu.RUnlock()
+	n := len(ix.keys)
+	bytes := make([]int64, n)
+	files := make([]int32, n)
+	unknown := make([]bool, n)
+	for i := 0; i < n; i++ {
+		if ix.dir[i] || ix.removed[int32(i)] {
+			continue
+		}
+		sz, missing := ix.size[i], ix.mod[i] < 0
+		if sz < 0 {
+			sz = 0
+		}
+		for p, depth := ix.parent[i], 0; p >= 0 && depth < 1024; p, depth = ix.parent[p], depth+1 {
+			bytes[p] += sz
+			files[p]++
+			if missing {
+				unknown[p] = true
+			}
+		}
+	}
+	for i := 0; i < n; i++ {
+		if ix.dir[i] {
+			out[ix.keys[i]] = FolderTotal{bytes[i], files[i], !unknown[i]}
+		}
+	}
 }

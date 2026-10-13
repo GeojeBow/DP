@@ -33,12 +33,19 @@ func main() {
 	noBrowser := flag.Bool("no-browser", false, "검색 창을 자동으로 열지 않음")
 	port := flag.Int("port", defaultPort, "포트")
 	test := flag.Bool("selftest", false, "색인과 검색을 점검하고 결과를 출력한 뒤 종료")
+	startup := flag.Bool("startup", false, "로그인할 때 창 없이 시작 (Windows 시작 시 실행)")
 	flag.Parse()
 	roots := flag.Args() // optional: only index these folders
 
 	if *test {
 		initLog()
 		os.Exit(selfTest(roots))
+	}
+	if *startup {
+		*noBrowser = true
+		if isRunning() {
+			return
+		}
 	}
 	if !*noBrowser && openRunning() {
 		return // already running: a new window was opened on it
@@ -87,6 +94,12 @@ func main() {
 	writeInstance(instance{Port: ln.Addr().(*net.TCPAddr).Port, Token: s.token})
 	url := "http://" + s.host + "/"
 	logf("검색 화면: %s", url)
+	s.url = url
+	var hkErr error
+	s.setHotkey, hkErr = startHotkey(eng.Hotkey(), s.summon)
+	if hkErr != nil {
+		s.hotkeyErr = hkErr.Error()
+	}
 	if !*noBrowser {
 		go func() {
 			time.Sleep(200 * time.Millisecond)
@@ -108,27 +121,36 @@ func writeInstance(in instance) {
 	os.WriteFile(instancePath(), b, 0o600)
 }
 
+func isRunning() bool {
+	_, ok := runningHost()
+	return ok
+}
+
 // openRunning opens a window on an already running instance, if any.
 func openRunning() bool {
+	host, ok := runningHost()
+	if ok {
+		openWindow("http://" + host + "/")
+	}
+	return ok
+}
+
+func runningHost() (string, bool) {
 	b, err := os.ReadFile(instancePath())
 	if err != nil {
-		return false
+		return "", false
 	}
 	var in instance
 	if json.Unmarshal(b, &in) != nil || in.Port == 0 {
-		return false
+		return "", false
 	}
 	host := fmt.Sprintf("127.0.0.1:%d", in.Port)
 	req, _ := http.NewRequest("GET", "http://"+host+"/api/ping", nil)
 	req.Header.Set("X-Token", in.Token)
 	resp, err := (&http.Client{Timeout: 2 * time.Second}).Do(req)
 	if err != nil {
-		return false
+		return "", false
 	}
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return false
-	}
-	openWindow("http://" + host + "/")
-	return true
+	return host, resp.StatusCode == 200
 }

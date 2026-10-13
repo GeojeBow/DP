@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,8 @@ type row struct {
 	Mod    int64  `json:"mod"`  // unix seconds, 0 unknown
 	Cat    string `json:"cat"`
 	Group  int    `json:"group,omitempty"`
+	Files  int32  `json:"files,omitempty"`  // folder size view: files inside
+	Approx bool   `json:"approx,omitempty"` // folder size still being read
 }
 
 type cached struct {
@@ -37,6 +40,7 @@ type cached struct {
 	keys      []uint64
 	facets    map[string]int
 	groups    map[uint64]int
+	fsizes    map[uint64]FolderTotal
 	truncated bool
 	err       string
 }
@@ -52,6 +56,157 @@ type server struct {
 
 	jmu  sync.Mutex
 	jobs map[string]*cjob
+	dmu  sync.Mutex
+	djob map[string]*dupJob
+
+	url       string
+	setHotkey func(string) error
+	hotkeyErr string
+	focusSeq  atomic.Int64 // bumped when the shortcut asks the page to focus search
+
+	reindexing atomic.Bool
+}
+
+// reindex rebuilds the main name index from scratch (status screen).
+func (s *server) reindex(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.reindexing.CompareAndSwap(false, true) {
+		bad(w, "이미 다시 색인하는 중입니다")
+		return
+	}
+	logf("사용자 요청으로 이름 색인을 다시 만듭니다")
+	go func() {
+		defer s.reindexing.Store(false)
+		defer recoverLog("reindex")
+		s.eng.Build()
+		s.eng.Save()
+	}()
+	writeJSON(w, "ok")
+}
+
+// summon brings up the search window (the global shortcut).
+func (s *server) summon() {
+	if !bringWindow() {
+		openWindow(s.url)
+	}
+	s.focusSeq.Add(1)
+}
+
+func (s *server) desktop(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var req struct {
+			Hotkey    *string `json:"hotkey"`
+			Autostart *bool   `json:"autostart"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			bad(w, "잘못된 요청")
+			return
+		}
+		if req.Hotkey != nil {
+			if _, ok := hotkeyKeys[*req.Hotkey]; !ok && *req.Hotkey != "off" {
+				bad(w, "알 수 없는 단축키")
+				return
+			}
+			s.eng.SetHotkey(*req.Hotkey)
+			s.hotkeyErr = ""
+			if s.setHotkey != nil {
+				if err := s.setHotkey(*req.Hotkey); err != nil {
+					s.hotkeyErr = err.Error()
+				}
+			}
+		}
+		if req.Autostart != nil {
+			if err := setAutostart(*req.Autostart); err != nil {
+				errorf("시작 시 실행 설정 실패: %v", err)
+				bad(w, err.Error())
+				return
+			}
+			logf("Windows 시작 시 실행: %v", *req.Autostart)
+		}
+	}
+	keys := []string{}
+	for k := range hotkeyKeys {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	on, how := autostart()
+	writeJSON(w, map[string]any{"hotkey": s.eng.Hotkey(), "hotkeys": keys, "hotkeyErr": s.hotkeyErr,
+		"autostart": on, "autostartHow": how, "admin": isAdminUser(), "windows": runtime.GOOS == "windows"})
+}
+
+type dupJob struct {
+	prog  DupProgress
+	stop  atomic.Bool
+	done  atomic.Bool
+	start time.Time
+}
+
+// dupStart compares the contents of same-size files among the current
+// results (name search and filters), in the background.
+func (s *server) dupStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	p := parseSearch(r)
+	p.dups = 0
+	c := s.run(p)
+	if c.err != "" {
+		bad(w, c.err)
+		return
+	}
+	keys := c.keys
+	j := &dupJob{start: time.Now()}
+	id := newToken()[:12]
+	s.dmu.Lock()
+	if s.djob == nil {
+		s.djob = map[string]*dupJob{}
+	}
+	for k, old := range s.djob { // one comparison at a time
+		old.stop.Store(true)
+		if old.done.Load() {
+			delete(s.djob, k)
+		}
+	}
+	s.djob[id] = j
+	s.dmu.Unlock()
+	go func() {
+		defer recoverLog("duplicates")
+		HashDuplicates(s.eng.View(), keys, &j.prog, &j.stop)
+		s.mu.Lock()
+		s.last = nil // results with dups=2 depend on the new hashes
+		s.mu.Unlock()
+		if n := j.prog.Failed.Load(); n > 0 {
+			warnf("중복 비교: 파일 %d개를 읽지 못했습니다", n)
+		}
+		j.done.Store(true)
+	}()
+	writeJSON(w, map[string]any{"id": id})
+}
+
+func (s *server) dupPoll(w http.ResponseWriter, r *http.Request) {
+	s.dmu.Lock()
+	j := s.djob[r.URL.Query().Get("id")]
+	s.dmu.Unlock()
+	if j == nil {
+		bad(w, "작업을 찾을 수 없습니다")
+		return
+	}
+	writeJSON(w, map[string]any{"pass": j.prog.Pass.Load(), "files": j.prog.Files.Load(), "filesDone": j.prog.FilesDone.Load(),
+		"bytes": j.prog.Bytes.Load(), "bytesDone": j.prog.BytesDone.Load(), "failed": j.prog.Failed.Load(),
+		"done": j.done.Load(), "stopped": j.stop.Load(), "ms": time.Since(j.start).Milliseconds()})
+}
+
+func (s *server) dupCancel(w http.ResponseWriter, r *http.Request) {
+	s.dmu.Lock()
+	if j := s.djob[r.URL.Query().Get("id")]; j != nil {
+		j.stop.Store(true)
+	}
+	s.dmu.Unlock()
+	writeJSON(w, "ok")
 }
 
 func newToken() string {
@@ -96,6 +251,14 @@ func (s *server) routes() *http.ServeMux {
 		"/api/content/poll":   s.contentPoll,
 		"/api/content/cancel": s.contentCancel,
 		"/api/quit":           s.quitHandler,
+		"/api/report":         func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.eng.Report()) },
+		"/api/log":            s.logHandler,
+		"/api/desktop":        s.desktop,
+		"/api/reindex":        s.reindex,
+		"/api/dups/start":     s.dupStart,
+		"/api/dups/poll":      s.dupPoll,
+		"/api/dups/cancel":    s.dupCancel,
+		"/api/reveal":         s.revealHandler,
 	} {
 		m.HandleFunc(path, s.guard(h))
 	}
@@ -128,16 +291,18 @@ func bad(w http.ResponseWriter, msg string) {
 func (s *server) status(w http.ResponseWriter, r *http.Request) {
 	mode, status, version, total := s.eng.Info()
 	writeJSON(w, map[string]any{"mode": mode, "status": status, "version": version, "total": total,
-		"folders": s.eng.Folders(), "content": s.eng.Content.Status(), "recent": len(s.eng.Recent())})
+		"folders": s.eng.Folders(), "content": s.eng.Content.Status(), "recent": len(s.eng.Recent()),
+		"focus": s.focusSeq.Load(), "warnings": logWarnCount()})
 }
 
 // ---- search ----
 
 type searchParams struct {
-	q    string
-	opts NameOpts
-	f    Filter
-	dups bool
+	q     string
+	opts  NameOpts
+	f     Filter
+	dups  int  // 1 same name and size, 2 same content
+	fsize bool // folders by total size
 }
 
 func num(r *http.Request, k string, def int64) int64 {
@@ -151,16 +316,23 @@ func num(r *http.Request, k string, def int64) int64 {
 func parseSearch(r *http.Request) searchParams {
 	g := r.URL.Query().Get
 	on := func(k string) bool { return g(k) == "1" }
-	return searchParams{
+	p := searchParams{
 		q:    g("q"),
 		opts: NameOpts{Case: on("case"), Path: on("path"), Regex: on("regex")},
 		f: Filter{Category: g("cat"), MinSize: num(r, "min", -1), MaxSize: num(r, "max", -1),
 			After: num(r, "after", 0), Before: num(r, "before", 0), Sort: g("sort"), Desc: on("desc")},
-		dups: on("dups"),
+		dups:  int(num(r, "dups", 0)),
+		fsize: on("fsize"),
 	}
+	if !p.opts.Regex {
+		p.q = extractFilterTokens(p.q, &p.f, time.Now())
+	}
+	return p
 }
 
-func (p searchParams) sig() string { return fmt.Sprintf("%q|%v|%+v|%v", p.q, p.opts, p.f, p.dups) }
+func (p searchParams) sig() string {
+	return fmt.Sprintf("%q|%v|%+v|%v|%v", p.q, p.opts, p.f, p.dups, p.fsize)
+}
 
 // run returns the full (cached) result list for the parameters.
 func (s *server) run(p searchParams) *cached {
@@ -181,9 +353,32 @@ func (s *server) run(p searchParams) *cached {
 	}
 	keys := v.SearchOpts(p.q, p.opts)
 	c.facets = Facets(v, keys)
+	if p.fsize {
+		c.fsizes = v.FolderSizes()
+		f := p.f
+		f.Category, f.Sort = "folder", ""
+		keys, c.truncated = Apply(v, keys, f, nil)
+		keys = append([]uint64{}, keys...)
+		sort.SliceStable(keys, func(i, j int) bool {
+			a, b := c.fsizes[keys[i]], c.fsizes[keys[j]]
+			if p.f.Sort == "name" {
+				return false // keep name order
+			}
+			if p.f.Desc || p.f.Sort == "" {
+				return a.Bytes > b.Bytes
+			}
+			return a.Bytes < b.Bytes
+		})
+		c.keys = keys
+		s.last = c
+		return c
+	}
 	keys, c.truncated = Apply(v, keys, p.f, nil)
-	if p.dups {
+	switch p.dups {
+	case 1:
 		keys, c.groups = Duplicates(v, keys, nil)
+	case 2:
+		keys, c.groups = DuplicatesByContent(v, keys)
 	}
 	c.keys = keys
 	s.last = c
@@ -225,6 +420,9 @@ func (s *server) search(w http.ResponseWriter, r *http.Request) {
 	rows := []row{}
 	for _, k := range page {
 		if rw, ok := s.rowFor(v, k, c.groups); ok {
+			if t, ok := c.fsizes[k]; ok && rw.Dir {
+				rw.Size, rw.Files, rw.Approx = t.Bytes, t.Files, !t.Known
+			}
 			rows = append(rows, rw)
 		}
 	}
@@ -265,6 +463,42 @@ func (s *server) open(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"path": p})
+}
+
+func (s *server) logHandler(w http.ResponseWriter, r *http.Request) {
+	since, _ := strconv.Atoi(r.URL.Query().Get("since"))
+	writeJSON(w, LogSince(since))
+}
+
+// revealHandler shows the log file, the data folder, or a file the content
+// index could not read, in Explorer. Arbitrary paths are refused.
+func (s *server) revealHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var err error
+	switch r.URL.Query().Get("what") {
+	case "log":
+		err = revealPath(LogPath)
+	case "data":
+		err = openPath(s.eng.dataDir)
+	case "fail":
+		p := r.URL.Query().Get("path")
+		if !s.eng.Content.IsFailed(p) {
+			bad(w, "목록에 없는 파일입니다")
+			return
+		}
+		err = revealPath(p)
+	default:
+		bad(w, "알 수 없는 요청")
+		return
+	}
+	if err != nil {
+		bad(w, err.Error())
+		return
+	}
+	writeJSON(w, "ok")
 }
 
 // ---- preview ----
@@ -395,6 +629,8 @@ func (s *server) raw(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) export(w http.ResponseWriter, r *http.Request) {
 	var keys []uint64
+	var fsizes map[uint64]FolderTotal
+	var groups map[uint64]int
 	hits := map[uint64]int{}
 	if id := r.URL.Query().Get("job"); id != "" {
 		s.jmu.Lock()
@@ -413,7 +649,7 @@ func (s *server) export(w http.ResponseWriter, r *http.Request) {
 		j.mu.Unlock()
 	} else {
 		c := s.run(parseSearch(r))
-		keys = c.keys
+		keys, fsizes, groups = c.keys, c.fsizes, c.groups
 	}
 	if len(keys) > 1000000 {
 		keys = keys[:1000000]
@@ -430,9 +666,15 @@ func (s *server) export(w http.ResponseWriter, r *http.Request) {
 	if len(hits) > 0 {
 		head = append(head, "일치한 줄 수")
 	}
+	if fsizes != nil {
+		head = append(head, "안의 파일 수")
+	}
+	if groups != nil {
+		head = append(head, "중복 묶음")
+	}
 	cw.Write(head)
 	for _, k := range keys {
-		rw, ok := s.rowFor(v, k, nil)
+		rw, ok := s.rowFor(v, k, groups)
 		if !ok {
 			continue
 		}
@@ -440,12 +682,22 @@ func (s *server) export(w http.ResponseWriter, r *http.Request) {
 		if rw.Size >= 0 && !rw.Dir {
 			size = strconv.FormatInt(rw.Size, 10)
 		}
+		t, hasT := fsizes[k]
+		if hasT {
+			size = strconv.FormatInt(t.Bytes, 10)
+		}
 		if rw.Mod > 0 {
 			mod = time.Unix(rw.Mod, 0).Format("2006-01-02 15:04:05")
 		}
 		rec := []string{rw.Name, rw.Folder, joinPath(rw.Folder, rw.Name), size, mod, catLabel[rw.Cat]}
 		if len(hits) > 0 {
 			rec = append(rec, strconv.Itoa(hits[k]))
+		}
+		if fsizes != nil {
+			rec = append(rec, strconv.Itoa(int(t.Files)))
+		}
+		if groups != nil {
+			rec = append(rec, strconv.Itoa(rw.Group))
 		}
 		cw.Write(rec)
 	}
@@ -557,6 +809,8 @@ type cjob struct {
 	done    bool
 	start   time.Time
 	ended   time.Time
+	fails   map[string]int // why files could not be read, with counts
+	failEx  []CFail        // a few examples
 }
 
 const (
@@ -675,6 +929,16 @@ func (s *server) contentStart(w http.ResponseWriter, r *http.Request) {
 					}
 					j.mu.Lock()
 					j.scanned++
+					if err != nil && !(err == errNotText && contentKind(it.path) == "sniff") {
+						why := failReason(err)
+						if j.fails == nil {
+							j.fails = map[string]int{}
+						}
+						j.fails[why]++
+						if len(j.failEx) < 200 {
+							j.failEx = append(j.failEx, CFail{Path: it.path, Reason: why})
+						}
+					}
 					if res != nil && len(j.results) < maxMatches {
 						j.results = append(j.results, *res)
 						if len(j.results) >= maxMatches {
@@ -695,6 +959,18 @@ func (s *server) contentStart(w http.ResponseWriter, r *http.Request) {
 		wg.Wait()
 		j.mu.Lock()
 		j.done, j.ended = true, time.Now()
+		nf := 0
+		for _, n := range j.fails {
+			nf += n
+		}
+		if nf > 0 {
+			var why []string
+			for w, n := range j.fails {
+				why = append(why, fmt.Sprintf("%s %d개", w, n))
+			}
+			sort.Strings(why)
+			warnf("내용 검색 [%s]: 파일 %d개를 읽지 못했습니다 (%s)", req.CQ, nf, strings.Join(why, ", "))
+		}
 		j.mu.Unlock()
 	}()
 	writeJSON(w, map[string]any{"id": j.id, "total": j.total, "indexed": len(indexed), "live": len(live),
@@ -721,7 +997,8 @@ func (s *server) contentPoll(w http.ResponseWriter, r *http.Request) {
 		end = j.ended
 	}
 	writeJSON(w, map[string]any{"results": res, "matched": len(j.results), "scanned": j.scanned, "total": j.total,
-		"done": j.done, "stopped": j.stop.Load(), "ms": end.Sub(j.start).Milliseconds(), "limit": maxMatches})
+		"done": j.done, "stopped": j.stop.Load(), "ms": end.Sub(j.start).Milliseconds(), "limit": maxMatches,
+		"fails": j.fails, "failEx": j.failEx})
 }
 
 func (s *server) contentCancel(w http.ResponseWriter, r *http.Request) {
