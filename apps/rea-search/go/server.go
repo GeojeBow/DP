@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-//go:embed web/index.html
+//go:embed web/index.html web/manual.md
 var webFS embed.FS
 
 type row struct {
@@ -268,6 +268,7 @@ func (s *server) routes() *http.ServeMux {
 		"/api/status":         s.status,
 		"/api/search":         s.search,
 		"/api/facets":         s.facets,
+		"/api/manual":         s.manual,
 		"/api/open":           s.open,
 		"/api/preview":        s.preview,
 		"/api/raw":            s.raw,
@@ -291,6 +292,13 @@ func (s *server) routes() *http.ServeMux {
 		m.HandleFunc(path, s.guard(h))
 	}
 	return m
+}
+
+// manual is the user guide (a copy of README.md) for the in-app help.
+func (s *server) manual(w http.ResponseWriter, r *http.Request) {
+	b, _ := webFS.ReadFile("web/manual.md")
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Write(b)
 }
 
 func (s *server) page(w http.ResponseWriter, r *http.Request) {
