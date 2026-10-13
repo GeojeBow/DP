@@ -25,6 +25,7 @@ type row struct {
 	Key    string `json:"key"`
 	Name   string `json:"name"`
 	Folder string `json:"folder"`
+	Parent string `json:"parent,omitempty"` // folder key, for "only this folder"
 	Dir    bool   `json:"dir"`
 	Size   int64  `json:"size"` // -1 unknown
 	Mod    int64  `json:"mod"`  // unix seconds, 0 unknown
@@ -41,6 +42,12 @@ type cached struct {
 	facets    map[string]int
 	groups    map[uint64]int
 	fsizes    map[uint64]FolderTotal
+	base      []uint64 // before the facet panel's narrowing
+	rf        Refine
+	facetOnce sync.Once
+	folder    FolderFacet
+	exts      []ExtCount
+	under     uint64 // folder the facet panel shows (may be deeper than asked)
 	truncated bool
 	err       string
 }
@@ -65,6 +72,9 @@ type server struct {
 	focusSeq  atomic.Int64 // bumped when the shortcut asks the page to focus search
 
 	reindexing atomic.Bool
+
+	elevated     bool        // started by the administrator request
+	restartAdmin func() bool // restart as administrator; false if refused
 }
 
 // reindex rebuilds the main name index from scratch (status screen).
@@ -98,8 +108,10 @@ func (s *server) summon() {
 func (s *server) desktop(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		var req struct {
-			Hotkey    *string `json:"hotkey"`
-			Autostart *bool   `json:"autostart"`
+			Hotkey       *string `json:"hotkey"`
+			Autostart    *bool   `json:"autostart"`
+			Admin        *bool   `json:"admin"`
+			RestartAdmin bool    `json:"restartAdmin"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			bad(w, "잘못된 요청")
@@ -126,6 +138,20 @@ func (s *server) desktop(w http.ResponseWriter, r *http.Request) {
 			}
 			logf("Windows 시작 시 실행: %v", *req.Autostart)
 		}
+		if req.Admin != nil {
+			s.eng.SetAdmin(*req.Admin)
+			logf("시작할 때 관리자 권한 요청: %v", *req.Admin)
+		}
+		if req.RestartAdmin {
+			if isAdminUser() || s.restartAdmin == nil {
+				bad(w, "이미 관리자 권한으로 실행 중입니다")
+				return
+			}
+			if !s.restartAdmin() {
+				bad(w, "관리자 권한 요청이 취소되었거나 허용되지 않았습니다")
+				return
+			}
+		}
 	}
 	keys := []string{}
 	for k := range hotkeyKeys {
@@ -134,7 +160,8 @@ func (s *server) desktop(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(keys)
 	on, how := autostart()
 	writeJSON(w, map[string]any{"hotkey": s.eng.Hotkey(), "hotkeys": keys, "hotkeyErr": s.hotkeyErr,
-		"autostart": on, "autostartHow": how, "admin": isAdminUser(), "windows": runtime.GOOS == "windows"})
+		"autostart": on, "autostartHow": how, "admin": isAdminUser(), "wantAdmin": s.eng.Admin(),
+		"windows": runtime.GOOS == "windows"})
 }
 
 type dupJob struct {
@@ -240,6 +267,7 @@ func (s *server) routes() *http.ServeMux {
 		"/api/ping":           func(w http.ResponseWriter, r *http.Request) { writeJSON(w, "pong") },
 		"/api/status":         s.status,
 		"/api/search":         s.search,
+		"/api/facets":         s.facets,
 		"/api/open":           s.open,
 		"/api/preview":        s.preview,
 		"/api/raw":            s.raw,
@@ -303,6 +331,7 @@ type searchParams struct {
 	f     Filter
 	dups  int  // 1 same name and size, 2 same content
 	fsize bool // folders by total size
+	rf    Refine
 }
 
 func num(r *http.Request, k string, def int64) int64 {
@@ -324,6 +353,10 @@ func parseSearch(r *http.Request) searchParams {
 		dups:  int(num(r, "dups", 0)),
 		fsize: on("fsize"),
 	}
+	p.rf.Under, _ = parseKey(g("under"))
+	if e := g("ext"); e != "" {
+		p.rf.Exts = strings.Split(strings.ToLower(e), ",")
+	}
 	if !p.opts.Regex {
 		p.q = extractFilterTokens(p.q, &p.f, time.Now())
 	}
@@ -331,7 +364,7 @@ func parseSearch(r *http.Request) searchParams {
 }
 
 func (p searchParams) sig() string {
-	return fmt.Sprintf("%q|%v|%+v|%v|%v", p.q, p.opts, p.f, p.dups, p.fsize)
+	return fmt.Sprintf("%q|%v|%+v|%v|%v|%v", p.q, p.opts, p.f, p.dups, p.fsize, p.rf)
 }
 
 // run returns the full (cached) result list for the parameters.
@@ -358,7 +391,7 @@ func (s *server) run(p searchParams) *cached {
 		f := p.f
 		f.Category, f.Sort = "folder", ""
 		keys, c.truncated = Apply(v, keys, f, nil)
-		keys = append([]uint64{}, keys...)
+		keys = append([]uint64{}, c.refine(v, keys, p.rf)...)
 		sort.SliceStable(keys, func(i, j int) bool {
 			a, b := c.fsizes[keys[i]], c.fsizes[keys[j]]
 			if p.f.Sort == "name" {
@@ -374,6 +407,7 @@ func (s *server) run(p searchParams) *cached {
 		return c
 	}
 	keys, c.truncated = Apply(v, keys, p.f, nil)
+	keys = c.refine(v, keys, p.rf)
 	switch p.dups {
 	case 1:
 		keys, c.groups = Duplicates(v, keys, nil)
@@ -385,6 +419,33 @@ func (s *server) run(p searchParams) *cached {
 	return c
 }
 
+// refine keeps the list before the facet panel's narrowing (for its counts)
+// and returns the narrowed list.
+func (c *cached) refine(v *View, keys []uint64, rf Refine) []uint64 {
+	c.base, c.rf = keys, rf
+	if !rf.active() {
+		return keys
+	}
+	out, _, _ := ApplyRefine(v, keys, rf)
+	return out
+}
+
+// facets answers the panel next to the results: subfolders and extensions
+// with counts. It is asked for after the results are on screen, so a large
+// result list never waits for it.
+func (s *server) facets(w http.ResponseWriter, r *http.Request) {
+	p := parseSearch(r)
+	c := s.run(p)
+	if c.err != "" {
+		bad(w, c.err)
+		return
+	}
+	c.facetOnce.Do(func() {
+		_, c.folder, c.exts, c.under = RefineAuto(s.eng.View(), c.base, c.rf)
+	})
+	writeJSON(w, map[string]any{"folder": c.folder, "exts": c.exts, "under": keyStr(c.under), "total": len(c.keys)})
+}
+
 func (s *server) rowFor(v *View, k uint64, groups map[uint64]int) (row, bool) {
 	name, dir, ok := v.Node(k)
 	if !ok {
@@ -393,6 +454,9 @@ func (s *server) rowFor(v *View, k uint64, groups map[uint64]int) (row, bool) {
 	rw := row{Key: strconv.FormatUint(k, 10), Name: name, Folder: v.Folder(k), Dir: dir, Size: -1, Cat: categoryOf(name, dir)}
 	if m, ok := v.Meta(k); ok && m.ok {
 		rw.Size, rw.Mod = m.size, m.mod
+	}
+	if par, ok := v.Parent(k); ok {
+		rw.Parent = keyStr(par)
 	}
 	if groups != nil {
 		rw.Group = groups[k]

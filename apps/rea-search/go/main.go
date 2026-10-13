@@ -28,7 +28,7 @@ type instance struct {
 }
 
 func main() {
-	noElevate := flag.Bool("no-admin", false, "관리자 권한 요청 없이 실행 (느린 폴더 탐색 방식)")
+	noElevate := flag.Bool("no-admin", false, "설정과 관계없이 관리자 권한을 요청하지 않음")
 	elevated := flag.Bool("elevated", false, "내부용")
 	noBrowser := flag.Bool("no-browser", false, "검색 창을 자동으로 열지 않음")
 	port := flag.Int("port", defaultPort, "포트")
@@ -50,7 +50,9 @@ func main() {
 	if !*noBrowser && openRunning() {
 		return // already running: a new window was opened on it
 	}
-	if !*noElevate && !*elevated && len(roots) == 0 && relaunchElevated() {
+	// Administrator rights (fast NTFS index) are asked for only when the
+	// user turned them on in settings; otherwise folders are walked.
+	if !*noElevate && !*elevated && len(roots) == 0 && wantAdmin() && relaunchElevated() {
 		return // the administrator copy takes over
 	}
 	initLog()
@@ -65,6 +67,12 @@ func main() {
 	}()
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *port))
+	for i := 0; err != nil && *elevated && i < 50; i++ {
+		// restarted as administrator from the window: the old copy is
+		// still letting go of the port
+		time.Sleep(200 * time.Millisecond)
+		ln, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *port))
+	}
 	if err != nil {
 		ln, err = net.Listen("tcp", "127.0.0.1:0")
 	}
@@ -72,7 +80,7 @@ func main() {
 		alert("서버를 시작하지 못했습니다: " + err.Error())
 		return
 	}
-	s := &server{eng: eng, token: newToken(), host: ln.Addr().String()}
+	s := &server{eng: eng, token: newToken(), host: ln.Addr().String(), elevated: *elevated}
 	quitOnce := make(chan struct{})
 	s.quit = func() {
 		select {
@@ -86,6 +94,18 @@ func main() {
 		eng.Content.Close()
 		os.Remove(instancePath())
 		os.Exit(0)
+	}
+	s.restartAdmin = func() bool {
+		eng.Save()
+		eng.Content.Flush()
+		os.Remove(instancePath()) // or the new copy would just open a window on this one
+		if relaunchElevated() {
+			logf("관리자 권한으로 다시 시작합니다")
+			os.Exit(0)
+		}
+		logf("관리자 권한 요청이 취소되었습니다")
+		writeInstance(instance{Port: ln.Addr().(*net.TCPAddr).Port, Token: s.token})
+		return false
 	}
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM) // console close / logoff / shutdown

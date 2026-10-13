@@ -78,6 +78,30 @@ type source struct {
 type Settings struct {
 	Folders []FolderSource `json:"folders"`
 	Hotkey  string         `json:"hotkey"` // "" = default, "off" = none
+	// Admin asks for administrator rights at start for the fast NTFS index.
+	// Off by default: on company PCs the request is a security prompt.
+	Admin bool `json:"admin"`
+}
+
+// wantAdmin reads the Admin setting before the engine exists (at start,
+// to decide whether to ask for administrator rights).
+func wantAdmin() bool {
+	var st Settings
+	b, err := os.ReadFile(filepath.Join(dataDir(), "settings.json"))
+	return err == nil && json.Unmarshal(b, &st) == nil && st.Admin
+}
+
+func (e *Engine) Admin() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.settings.Admin
+}
+
+func (e *Engine) SetAdmin(on bool) {
+	e.mu.Lock()
+	e.settings.Admin = on
+	e.saveSettingsLocked()
+	e.mu.Unlock()
 }
 
 const defaultHotkey = "Ctrl+Alt+F"

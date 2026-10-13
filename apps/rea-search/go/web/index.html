@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>REA Search</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%274%27 fill=%27%232563eb%27/%3E%3Ccircle cx=%277%27 cy=%277%27 r=%273.2%27 fill=%27none%27 stroke=%27white%27 stroke-width=%271.6%27/%3E%3Cpath d=%27M9.5 9.5l3 3%27 stroke=%27white%27 stroke-width=%271.6%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22 xmlns:c2pa=%22http://c2pa.org/manifest%22%3E%3Cmetadata%3E%3Cc2pa:manifest%3EAAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYToyNWI2Mjg5Ni1kMjc5LTQyMzItOTc1My03ZDJhMDQ5YmQ3NjEAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaEEiJ5P5PJWGvNMu1bBlDO4AAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDpiYTA2MTVhNi05ZDg1LTQ3OWMtYTRhMy05NWYzOWY5ZDY5MWJscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoARCdQraMmUMMb8Zn64oAfgAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg3PfZ%2BlWIP1QDTm%2B9rVKPldMdeFkX/HbpG3T7NUdpk0qkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaK0Fe09N1q%2BBZOKEFQhYjkUAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCA5j15b2Lj61zhdFJR/tlMGLof%2BLUYC08kzLA7bDtwJ92RuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBh9Zmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjI1YjYyODk2LWQyNzktNDIzMi05NzUzLTdkMmEwNDliZDc2MS9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjBhYzdlMTM4LWFlZWItNGVlOS1hYzAzLWJiN2JlNmI5MmU5ZHJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDc99n6VYg/VANOb72tUo%2BV0x14WRf8dukbdPs1R2mTSqJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggCBvkUEl%2B17s669rAhxKU39laacK3FTbaHl05GEh8VZ2iY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggefbSq5OjPM%2B9DhDU2JJg6CXEdMQNVnPniVDBLA4%2B/UN0Y2xhaW1fZ2VuZXJhdG9yX2luZm%2BjZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj%2BOPEz5o%2BnMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1%2BUCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9%2B1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQLnAZfnAQNZICARJMoy9zbWJkakbmkOhdgnjLJFZveByc3FFItS7EK7EaZeq1SdLbwn%2BIuIs4uULAmdNFlrEIEA=%3C/c2pa:manifest%3E%3C/metadata%3E%3Cdefs%3E%3ClinearGradient id=%22bg%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%233b82f6%22/%3E%3Cstop offset=%221%22 stop-color=%22%231e40af%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22lens%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23fde68a%22/%3E%3Cstop offset=%221%22 stop-color=%22%23f59e0b%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x=%228%22 y=%228%22 width=%22240%22 height=%22240%22 rx=%2256%22 fill=%22url%28%23bg%29%22/%3E%3Crect x=%2248%22 y=%2258%22 width=%22112%22 height=%2222%22 rx=%2211%22 fill=%22%23ffffff%22/%3E%3Crect x=%2248%22 y=%22100%22 width=%2280%22 height=%2222%22 rx=%2211%22 fill=%22%23ffffff%22 opacity=%22.85%22/%3E%3Crect x=%2248%22 y=%22142%22 width=%2252%22 height=%2222%22 rx=%2211%22 fill=%22%23ffffff%22 opacity=%22.7%22/%3E%3Cpath d=%22M176 176 L214 214%22 stroke=%22%23ffffff%22 stroke-width=%2226%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%22150%22 cy=%22150%22 r=%2246%22 fill=%22%231e3a8a%22 stroke=%22url%28%23lens%29%22 stroke-width=%2220%22/%3E%3Ccircle cx=%22150%22 cy=%22150%22 r=%2246%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-opacity=%22.25%22 stroke-width=%224%22/%3E%3C/svg%3E">
 <style>
 :root {
   --bg:#f6f7f9; --panel:#ffffff; --fg:#1b1d21; --muted:#6b7079; --faint:#9aa0a8; --line:#e3e6ea; --hover:#f0f2f5;
@@ -176,7 +176,26 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
 .rowbtns { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
 .flist { max-height:46vh; overflow:auto; }
 .flist .frow .path { font-weight:500; font-size:12px; }
-@media (max-width:900px) { aside#side { display:none; } #preview { width:300px; } .c-type, .c-mod { display:none; } }
+#crumbs { display:flex; align-items:center; gap:2px; flex-wrap:wrap; padding:4px 10px; border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); min-height:29px; }
+#crumbs button { border:0; background:transparent; cursor:pointer; padding:2px 6px; border-radius:5px; color:var(--accent); font-size:12px; }
+#crumbs button:hover { background:var(--hover); }
+#crumbs button.cur { color:var(--fg); font-weight:600; cursor:default; }
+#crumbs .sep { color:var(--faint); }
+#crumbs .info { margin-left:8px; color:var(--faint); }
+.fitem.fold .nmx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.fitem .bar2 { position:absolute; left:0; bottom:1px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--c-folder) 55%, transparent); }
+.fitem.fold { position:relative; }
+.fitem.ext .chk { width:13px; height:13px; border:1.5px solid var(--faint); border-radius:3px; flex:none; display:grid; place-items:center; font-size:10px; line-height:1; }
+.fitem.ext.on .chk { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
+.fitem.ext.on { background:transparent; font-weight:600; }
+.side-more { border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:12px; padding:3px 8px; }
+#b-side.on { background:var(--sel); }
+body.noside aside#side { display:none; }
+@media (max-width:900px) {
+  aside#side { display:none; position:fixed; z-index:12; top:48px; bottom:28px; left:0; box-shadow:var(--shadow); }
+  body.sideopen aside#side { display:block; }
+  #preview { width:300px; } .c-type, .c-mod { display:none; }
+}
 @media (max-width:600px) { body.pv #preview { position:fixed; inset:0; width:auto; z-index:15; } .c-folder { display:none; } .c-name { width:70%; } .brand span { display:none; } }
 </style>
 </head>
@@ -219,6 +238,10 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
 <div class="main">
   <aside id="side">
     <h4>보기</h4><div id="views"></div>
+    <div id="refine-side">
+    <h4 title="지금 결과가 들어 있는 폴더. 누르면 그 폴더 안의 결과만 봅니다">결과가 있는 폴더</h4><div id="fold"></div>
+    <h4 title="지금 결과의 확장자. 여러 개를 골라 그것만 볼 수 있습니다">확장자</h4><div id="exts"></div>
+    </div>
     <h4>유형</h4><div id="cats"></div>
     <h4>수정한 날짜</h4><div id="dates"></div>
     <div class="custom" id="date-custom"><input type="date" id="d-from" title="시작일"><input type="date" id="d-to" title="종료일"></div>
@@ -228,6 +251,7 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
   </aside>
   <section class="results">
     <div class="toolbar">
+      <button class="btn icon" id="b-side" title="필터 패널 보이기/숨기기"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12l-4.5 5.5V13l-3 1.5v-6z"/></svg></button>
       <span class="title" id="t-title">검색 결과</span>
       <div class="chips" id="chips"></div>
       <span id="dupbar" hidden><span class="seg"><button data-m="1">이름·크기가 같은</button><button data-m="2">내용까지 같은</button></span> <span class="hint" id="dup-text"></span> <button class="btn" id="dup-stop" hidden>중지</button></span>
@@ -235,6 +259,7 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
       <button class="btn" id="b-save" title="지금 검색을 저장"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 1.5h9v13L8 11l-4.5 3.5z"/></svg>저장</button>
       <button class="btn" id="b-export" title="결과를 CSV로 내보내기 (Excel)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 12v2h11v-2"/></svg>CSV</button>
     </div>
+    <div id="crumbs" hidden></div>
     <div id="list"><table><thead><tr id="thead"></tr></thead><tbody id="rows"></tbody></table><div id="blank"></div></div>
   </section>
   <aside id="preview"></aside>
@@ -244,7 +269,7 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
 <div class="menu" id="menu"></div>
 <div id="dlg"><div class="dlg">
   <div class="dlg-head"><h3>설정</h3><div class="spacer"></div><button class="btn icon" id="dlg-close" title="닫기">✕</button></div>
-  <div class="tabs"><button class="tab" data-p="p-status">색인 현황</button><button class="tab" data-p="p-log">로그</button><button class="tab on" data-p="p-folders">검색할 폴더</button><button class="tab" data-p="p-content">내용 색인</button><button class="tab" data-p="p-keys">단축키·시작</button><button class="tab" data-p="p-help">검색 문법</button><button class="tab" data-p="p-about">정보</button></div>
+  <div class="tabs"><button class="tab" data-p="p-status">색인 현황</button><button class="tab" data-p="p-log">로그</button><button class="tab on" data-p="p-folders">검색할 폴더</button><button class="tab" data-p="p-content">내용 색인</button><button class="tab" data-p="p-keys">단축키·시작·권한</button><button class="tab" data-p="p-help">검색 문법</button><button class="tab" data-p="p-about">정보</button></div>
   <div class="pane" id="p-status"><div class="cards" id="st-cards"></div><div class="rowbtns"><button class="btn" id="st-reindex">이름 색인 처음부터 다시 만들기</button><button class="btn" id="st-ci">내용 색인 지금 갱신</button><span class="hint" id="st-time"></span></div></div>
   <div class="pane" id="p-log">
     <div class="rowbtns" style="margin:0 0 10px"><span class="seg" id="log-filter"><button data-f="" class="on">전체</button><button data-f="warn">경고·오류만</button></span><div class="spacer"></div><button class="btn" id="log-copy">복사</button><button class="btn" id="log-file">로그 파일 위치 열기</button><button class="btn" id="log-data">데이터 폴더 열기</button></div>
@@ -272,6 +297,10 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
     <div class="card" style="margin-bottom:14px"><h5>Windows 시작 시 실행</h5>
       <label class="hint"><input type="checkbox" id="as-on"> 로그인하면 창 없이 백그라운드로 시작해 색인을 최신으로 유지</label>
       <p class="hint" style="margin:6px 0 0" id="as-how"></p></div>
+    <div class="card" style="margin-bottom:14px"><h5>빠른 색인 (관리자 권한) <span class="pill" id="ad-now"></span></h5>
+      <p class="hint" style="margin:0 0 8px">이 프로그램은 아무것도 설치하지 않습니다. 관리자 권한은 드라이브의 파일 목록(NTFS)을 직접 읽어 수백만 개도 몇 초에 색인하고 바뀐 내용을 즉시 반영하는 데만 씁니다. 권한 없이도 모든 기능을 쓸 수 있고, 그때는 폴더를 하나씩 훑어서 색인합니다(처음 색인이 느리고, 바뀐 파일은 몇 분 뒤 반영).</p>
+      <label class="hint"><input type="checkbox" id="ad-want"> 켤 때마다 관리자 권한 요청 (회사 PC에서는 보안 창이 뜰 수 있어 기본은 꺼짐)</label>
+      <div class="rowbtns"><button class="btn" id="ad-now-btn">지금 관리자 권한으로 다시 시작</button><span class="hint" id="ad-msg"></span></div></div>
     <div class="keys">
     <span><kbd>Ctrl</kbd>+<kbd>F</kbd></span><span>이름 검색창으로</span>
     <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></span><span>내용 검색 열기/닫기</span>
@@ -332,7 +361,8 @@ const VIEWS = [["", "검색 결과"], ["dups", "중복 파일 찾기"], ["fsize"
 const COLS = [["name", "이름", "c-name"], ["path", "경로", "c-folder"], ["size", "크기", "c-size"], ["mod", "수정한 날짜", "c-mod"], ["type", "유형", "c-type"]];
 
 const S = { q: "", case: false, path: false, regex: false, cat: "", date: "", from: "", to: "", size: "", sort: "name", desc: false, view: "",
-  content: false, cq: "", ccase: false, cword: false, cregex: false, cidx: false, dupMode: 1, mode: "name", skipSys: true };
+  content: false, cq: "", ccase: false, cword: false, cregex: false, cidx: false, dupMode: 1, mode: "name", skipSys: true,
+  under: "", underPath: "", exts: [] };
 let rows = [], total = 0, loaded = 0, busy = false, seq = 0, version = -1, facets = {};
 let selected = new Set(), anchor = null, cursor = null;
 let job = null, jobDone = false, jobFrom = 0, jobTimer = null;
@@ -388,6 +418,8 @@ function params() {
   if (S.sort !== "name" || S.desc) { p.set("sort", S.sort); if (S.desc) p.set("desc", 1); }
   if (S.view === "dups") p.set("dups", S.dupMode);
   if (S.view === "fsize") p.set("fsize", 1);
+  if (S.under) p.set("under", S.under);
+  if (S.exts.length) p.set("ext", S.exts.join(","));
   return p;
 }
 
@@ -414,12 +446,90 @@ function renderSide() {
 }
 function chips() {
   const list = [];
+  if (S.under) { const parts = S.underPath.split(/[\\/]/).filter(Boolean); list.push(["폴더: " + (parts.length > 2 ? "…\\" + parts.slice(-2).join("\\") : S.underPath), () => { S.under = ""; S.underPath = ""; }, S.underPath]); }
+  if (S.exts.length) list.push(["확장자: " + S.exts.map(extLabel).join(", "), () => S.exts = []]);
   if (S.cat) list.push([CATNAME[S.cat], () => S.cat = ""]);
   if (S.date) list.push([S.date === "custom" ? `${S.from || "…"} ~ ${S.to || "…"}` : DATES.find(d => d[0] === S.date)[1], () => S.date = ""]);
   if (S.size) list.push([SIZES.find(s => s[0] === S.size)[1], () => S.size = ""]);
   if (S.sort !== "name" || S.desc) list.push([`정렬: ${COLS.find(c => c[0] === S.sort)[1]} ${S.desc ? "↓" : "↑"}`, () => { S.sort = "name"; S.desc = false; }]);
-  $("chips").replaceChildren(...list.map(([label, clear]) => { const c = el("span", "chip", label); const b = el("button", null, "✕"); b.title = "필터 해제"; b.onclick = () => { clear(); refresh(); }; c.append(b); return c; }));
+  $("chips").replaceChildren(...list.map(([label, clear, tip]) => { const c = el("span", "chip", label); if (tip) c.title = tip; const b = el("button", null, "✕"); b.title = "필터 해제"; b.onclick = () => { clear(); refresh(); }; c.append(b); return c; }));
 }
+// ---------- narrowing inside the results (folder and extension panel) ----------
+let fseq = 0, extsAll = false;
+function extLabel(e) { return e === "/" ? "폴더" : e === "" ? "(확장자 없음)" : "." + e; }
+function setUnder(key, path) { S.under = key || ""; S.underPath = key ? path : ""; refresh(); }
+function toggleExt(e) { const i = S.exts.indexOf(e); if (i >= 0) S.exts.splice(i, 1); else S.exts.push(e); refresh(); }
+function crumbPath(crumbs, upto) {
+  let p = "";
+  for (const c of crumbs.slice(0, upto + 1)) p = p ? p.replace(/[\\]$/, "") + "\\" + c.name : c.name;
+  return p;
+}
+function refineNote(text) {
+  $("fold").replaceChildren(el("div", "empty-note", text)); $("exts").replaceChildren(); $("crumbs").hidden = true;
+}
+async function loadFacets(my) {
+  const mine = ++fseq;
+  $("fold").replaceChildren(el("div", "empty-note", "세는 중…"));
+  let d;
+  try { d = await api("/api/facets?" + params()); } catch (e) { if (mine === fseq) refineNote(e.message); return; }
+  if (mine !== fseq || my !== seq) return;
+  const ff = d.folder || {}, crumbs = ff.crumbs || [];
+  // breadcrumb above the results: where the results are, and a way back up
+  const cb = $("crumbs"); cb.replaceChildren(el("span", null, "위치"));
+  const all = el("button", crumbs.length ? "" : "cur", "전체"); all.onclick = () => { if (S.under) setUnder(""); }; cb.append(all);
+  crumbs.forEach((c, i) => {
+    cb.append(el("span", "sep", "›"));
+    const last = i === crumbs.length - 1;
+    const b = el("button", last && S.under === c.key ? "cur" : "", c.name);
+    b.title = crumbPath(crumbs, i) + (last && S.under !== c.key ? "  (결과가 모두 이 안에 있습니다. 누르면 이 폴더로 고정)" : "");
+    b.onclick = () => { if (S.under !== c.key) setUnder(c.key, crumbPath(crumbs, i)); };
+    cb.append(b);
+  });
+  const info = [];
+  if ((ff.folders || []).length) info.push(`하위 폴더 ${((ff.folders || []).length + (ff.more || 0)).toLocaleString()}곳`);
+  if (ff.here) info.push(`이 폴더 바로 안 ${ff.here.toLocaleString()}개`);
+  if (info.length) cb.append(el("span", "info", info.join(" · ")));
+  cb.hidden = false;
+  // folder list in the side panel
+  const max = Math.max(1, ...(ff.folders || []).map(f => f.count));
+  const items = (ff.folders || []).map(f => {
+    const path = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") + "\\" + f.name : f.name;
+    const b = el("button", "fitem fold"); b.title = path + " 안의 결과만 보기";
+    b.append(icon("folder", true), el("span", "nmx", f.name), el("span", "n", f.count.toLocaleString()));
+    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * f.count / max) + "%"; b.append(bar);
+    b.onclick = () => setUnder(f.key, path);
+    return b;
+  });
+  if (ff.here && items.length) items.push(el("div", "empty-note", `그 밖에 이 폴더 바로 안 ${ff.here.toLocaleString()}개`));
+  if (ff.more) items.push(el("div", "empty-note", `외 ${ff.more.toLocaleString()}곳 (개수가 많은 순)`));
+  if (!items.length) items.push(el("div", "empty-note", d.total ? "더 나눌 하위 폴더가 없습니다" : "결과 없음"));
+  if (crumbs.length > 1 || S.under) {
+    const up = el("button", "fitem"); up.append(el("span", null, "↑ 한 단계 위로"));
+    const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+    up.onclick = () => parent ? setUnder(parent.key, crumbPath(crumbs, crumbs.length - 2)) : setUnder("");
+    items.unshift(up);
+  }
+  $("fold").replaceChildren(...items);
+  // extensions: tick several to see only those
+  let ex = d.exts || [];
+  for (const e of S.exts) if (!ex.some(x => x.ext === e)) ex = [...ex, { ext: e, count: 0 }];
+  const shown = extsAll ? ex : ex.slice(0, 10).concat(ex.slice(10).filter(x => S.exts.includes(x.ext)));
+  const eb = shown.map(x => {
+    const on = S.exts.includes(x.ext);
+    const b = el("button", "fitem ext" + (on ? " on" : "")); b.append(el("span", "chk", on ? "✓" : ""), el("span", null, extLabel(x.ext)), el("span", "n", x.count.toLocaleString()));
+    b.onclick = () => toggleExt(x.ext);
+    return b;
+  });
+  if (ex.length > shown.length || extsAll && ex.length > 10) { const m = el("button", "side-more", extsAll ? "줄이기" : `모두 보기 (${ex.length}종류)`); m.onclick = () => { extsAll = !extsAll; loadFacets(seq); }; eb.push(m); }
+  if (S.exts.length) { const c = el("button", "side-more", "확장자 선택 해제"); c.onclick = () => { S.exts = []; refresh(); }; eb.push(c); }
+  $("exts").replaceChildren(...(eb.length ? eb : [el("div", "empty-note", "결과 없음")]));
+}
+function sideToggle() {
+  if (matchMedia("(max-width:900px)").matches) { document.body.classList.toggle("sideopen"); }
+  else { document.body.classList.toggle("noside"); store.set("noside", document.body.classList.contains("noside")); }
+  $("b-side").classList.toggle("on", document.body.classList.contains("sideopen") || !document.body.classList.contains("noside") && !matchMedia("(max-width:900px)").matches);
+}
+
 function setView(v) {
   const was = S.view; S.view = v;
   if (v && S.mode === "content") { S.mode = "name"; document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.m === "name")); paintAll(null); }
@@ -484,8 +594,9 @@ async function refresh(keepScroll = false) {
   if (job) stopJob(true);
   stopAll();
   renderSide(); chips(); renderHead();
-  if (S.view === "recent") return loadRecent();
-  if (S.mode === "content" && !S.view) return contentOnly();
+  fseq++;
+  if (S.view === "recent") { refineNote("최근 바뀐 파일 보기에서는 쓰지 않습니다"); return loadRecent(); }
+  if (S.mode === "content" && !S.view) { refineNote("내용 결과는 이름 모드에서 고른 폴더·확장자 안에서 찾습니다"); return contentOnly(); }
   const my = ++seq;
   $("t-title").textContent = { dups: "중복 파일", fsize: "폴더 용량" }[S.view] || "검색 결과";
   $("dupbar").hidden = S.view !== "dups";
@@ -510,6 +621,7 @@ async function refresh(keepScroll = false) {
     else if (S.view === "fsize") blank("폴더가 없습니다", "검색어에 맞는 폴더를 전체 용량이 큰 순서로 보여 줍니다.");
     else blank("찾는 파일이 없습니다", "검색어를 줄이거나 왼쪽 필터를 풀어 보세요.");
     updateScope();
+    loadFacets(my);
     if (S.mode === "both" && !S.view) { nameTotal = total; if (total > rows.length) $("count").textContent += ` (이름 일치는 처음 ${rows.length.toLocaleString()}개만 표시)`; scheduleAll(); }
   } catch (e) {
     if (my !== seq) return;
@@ -605,9 +717,11 @@ function showMenu(x, y, list) {
   if (list.length === 1) {
     m.append(el("hr"));
     const folder = folderOf(r);
-    item(r.dir ? "이 폴더 안에서 검색" : "같은 폴더에서 검색", () => addTerm(/\s/.test(folder) ? `"${folder}\\"` : folder + "\\"));
+    if (r.dir) item("결과에서 이 폴더 안만 보기", () => setUnder(r.key, folder));
+    else if (r.parent) item("결과에서 이 폴더만 보기", () => setUnder(r.parent, folder));
     const dot = r.name.lastIndexOf(".");
-    if (!r.dir && dot > 0) item(`같은 확장자만 보기 (.${r.name.slice(dot + 1)})`, () => addTerm("ext:" + r.name.slice(dot + 1).toLowerCase()));
+    const ext = r.dir ? "/" : dot > 0 ? r.name.slice(dot + 1).toLowerCase() : "";
+    if (!S.exts.includes(ext)) item(`결과에서 ${extLabel(ext)}만 보기`, () => { S.exts = [ext]; refresh(); });
     if (r.dir) item("이 폴더 내용 검색", () => { addTerm(/\s/.test(folder) ? `"${folder}\\"` : folder + "\\"); setContent(true); });
     if (r.dir) item("이 폴더를 내용 색인에 추가", async () => { try { await api("/api/cindex", { method: "POST", body: JSON.stringify({ action: "add", path: folder }) }); toast("내용 색인에 추가했습니다. 백그라운드에서 색인합니다."); } catch (e) { toast(e.message); } });
   }
@@ -887,7 +1001,7 @@ async function renderStatus() {
     ["마지막 색인", m.built ? `${ago(m.built)} · ${m.from === "cache" ? "저장된 색인에서 불러옴" : "새로 만듦"} (${m.secs.toFixed(1)}초)` : ""]];
   if (m.volumes && m.volumes.length) pairs.push(["드라이브", m.volumes.map(v => `${v.letter}: ${v.count.toLocaleString()}개`).join(" · ") + " (실시간 감시 중)"]);
   if (m.roots && m.roots.length) pairs.push(["색인한 폴더", m.roots.join(", ")]);
-  if (!m.admin) pairs.push(["관리자 권한", "없음. 폴더를 훑는 방식이라 느리고 실시간 반영이 안 됩니다. 관리자 권한으로 실행하면 빨라집니다."]);
+  if (!m.admin) { const w = el("span", null, "없음. 폴더를 훑는 방식이라 처음 색인이 느리고, 바뀐 파일은 몇 분 뒤 반영됩니다. "); w.append(linkBtn("빠른 색인 설정 보기", () => switchTab("p-keys"))); pairs.push(["관리자 권한", w]); }
   if (m.skips && m.skips.count) pairs.push(["열 수 없는 폴더", linkBtn(`${m.skips.count.toLocaleString()}개 (권한 없음 등) 보기`, () => showList("열 수 없어 건너뛴 폴더", `전체 ${m.skips.count.toLocaleString()}개 중 처음 ${m.skips.examples.length}개`, skipRows(m.skips)))]);
   pairs.push(["반영 대기 변경", m.pending ? `${m.pending.toLocaleString()}개 (모이면 합쳐집니다)` : "없음"]);
   pairs.push(["저장", m.saveErr ? "실패: " + m.saveErr : m.savedAt ? `${ago(m.savedAt)} · ${fmtSize(m.cacheBytes)}` : "아직 안 함"]);
@@ -963,7 +1077,20 @@ async function loadDesktop(post) {
   $("hk-err").textContent = d.windows ? d.hotkeyErr : "Windows에서만 쓸 수 있습니다";
   $("as-on").checked = d.autostart; $("as-on").disabled = !d.windows;
   $("as-how").textContent = d.autostart ? "등록 방식: " + d.autostartHow : d.admin ? "관리자 권한으로 등록되어 로그인할 때 권한 확인 창 없이 빠른 방식으로 시작합니다." : "지금은 관리자 권한이 아니라서 일반 권한으로 등록됩니다 (느린 폴더 탐색 방식).";
+  $("ad-now").textContent = d.admin ? "사용 중" : "사용 안 함"; $("ad-now").className = "pill" + (d.admin ? " ok" : "");
+  $("ad-want").checked = d.wantAdmin; $("ad-want").disabled = !d.windows;
+  $("ad-now-btn").hidden = d.admin || !d.windows;
 }
+$("ad-want").onchange = e => loadDesktop({ admin: e.target.checked });
+$("ad-now-btn").onclick = async () => {
+  $("ad-msg").textContent = "권한 확인 창에서 '예'를 누르면 새 창이 열립니다…";
+  try { await api("/api/desktop", { method: "POST", body: JSON.stringify({ restartAdmin: true }) }); $("ad-msg").textContent = ""; }
+  catch (e) {
+    if (/관리자/.test(e.message)) { $("ad-msg").textContent = e.message; return; }
+    $("ad-msg").textContent = "관리자 권한으로 다시 시작했습니다. 새 창이 열리면 이 창은 닫으셔도 됩니다.";
+    setTimeout(() => window.close(), 1500);
+  }
+};
 $("hk-sel").onchange = e => loadDesktop({ hotkey: e.target.value });
 $("as-on").onchange = e => loadDesktop({ autostart: e.target.checked });
 $("b-status").onclick = () => openSettings("p-status");
@@ -1035,11 +1162,14 @@ $("c-go").onclick = () => startJob();
 $("c-stop").onclick = () => stopJob(false);
 $("b-content").onclick = () => setContent(!S.content);
 $("b-preview").onclick = togglePreview;
+$("b-side").onclick = sideToggle;
+if (store.get("noside", false)) document.body.classList.add("noside");
+$("b-side").classList.toggle("on", !document.body.classList.contains("noside") && !matchMedia("(max-width:900px)").matches);
 $("b-settings").onclick = () => openSettings();
 $("b-theme").onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const next = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = next; store.set("theme", next); };
 $("b-save").onclick = () => {
   const label = prompt("이 검색의 이름", S.q || CATNAME[S.cat] || "검색"); if (!label) return;
-  const saved = store.get("saved", []); saved.unshift({ label, state: { ...S, content: false, view: S.view === "recent" ? "" : S.view } }); store.set("saved", saved.slice(0, 30)); renderSide(); toast("저장했습니다");
+  const saved = store.get("saved", []); saved.unshift({ label, state: { ...S, exts: [...S.exts], under: "", underPath: "", content: false, view: S.view === "recent" ? "" : S.view } }); store.set("saved", saved.slice(0, 30)); renderSide(); toast("저장했습니다");
 };
 $("b-export").onclick = async () => {
   try {
@@ -1053,6 +1183,7 @@ $("d-from").onchange = e => { S.from = e.target.value; refresh(); };
 $("d-to").onchange = e => { S.to = e.target.value; refresh(); };
 function applyState(st) {
   Object.assign(S, st); $("q").value = S.q;
+  S.exts = [...(st.exts || [])]; S.under = st.under || ""; S.underPath = st.underPath || "";
   for (const [id, k] of [["o-case", "case"], ["o-path", "path"], ["o-regex", "regex"]]) $(id).classList.toggle("on", S[k]);
   $("d-from").value = S.from || ""; $("d-to").value = S.to || "";
   refresh();
