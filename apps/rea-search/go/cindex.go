@@ -239,6 +239,7 @@ type cindexDisk struct {
 	Docs     []CDoc
 	Segments []string
 	NextSeg  int
+	Walked   int64 // last full folder check (Unix)
 }
 
 func OpenCIndex(dir string) *CIndex {
@@ -249,6 +250,9 @@ func OpenCIndex(dir string) *CIndex {
 		var d cindexDisk
 		if gob.NewDecoder(f).Decode(&d) == nil {
 			c.Folders, c.docs, c.nextSeg = d.Folders, d.Docs, d.NextSeg
+			if d.Walked > 0 {
+				c.walked = time.Unix(d.Walked, 0)
+			}
 			for _, name := range d.Segments {
 				if s, err := openSegment(dir, name); err == nil {
 					c.segs = append(c.segs, s)
@@ -278,6 +282,11 @@ func OpenCIndex(dir string) *CIndex {
 // saveLocked writes the document table; caller holds c.mu (read is enough).
 func (c *CIndex) saveLocked() error {
 	d := cindexDisk{Folders: c.Folders, Docs: c.docs[:c.flushed], NextSeg: c.nextSeg}
+	c.smu.Lock()
+	if !c.walked.IsZero() {
+		d.Walked = c.walked.Unix()
+	}
+	c.smu.Unlock()
 	for _, s := range c.segs {
 		d.Segments = append(d.Segments, s.Name)
 	}
@@ -916,10 +925,12 @@ func intersect(a, b []uint32) []uint32 {
 }
 
 // Run keeps the index current: changed paths every 20 seconds, and a full
-// folder check at start and every walkEvery.
-func (c *CIndex) Run() {
+// folder check on the schedule (and at start when atStart is set).
+func (c *CIndex) Run(atStart bool) {
 	defer recoverLog("content index")
-	c.Refresh(true)
+	if atStart || c.walkDue() {
+		c.Refresh(true)
+	}
 	for range time.Tick(20 * time.Second) {
 		full := c.walkDue()
 		c.dirtyMu.Lock()

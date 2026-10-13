@@ -279,6 +279,7 @@ func (s *server) routes() *http.ServeMux {
 		"/api/pickfolder":     s.pickFolderHandler,
 		"/api/summon":         func(w http.ResponseWriter, r *http.Request) { s.summon(); writeJSON(w, "ok") },
 		"/api/schedule":       s.schedule,
+		"/api/startindex":     s.startIndex,
 		"/api/manual":         s.manual,
 		"/api/open":           s.open,
 		"/api/preview":        s.preview,
@@ -318,6 +319,21 @@ type schedInfo struct {
 }
 
 // schedule lists and changes when each index is refreshed, and runs one now.
+// startIndex is the "index when the program starts" switch.
+func (s *server) startIndex(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var req struct {
+			On bool `json:"on"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			bad(w, "잘못된 요청")
+			return
+		}
+		s.eng.SetIndexAtStart(req.On)
+	}
+	writeJSON(w, map[string]bool{"on": s.eng.IndexAtStart()})
+}
+
 func (s *server) schedule(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		var req struct {
@@ -974,6 +990,7 @@ type cres struct {
 	Key     string    `json:"key"`
 	Name    string    `json:"name"`
 	Folder  string    `json:"folder"`
+	Parent  string    `json:"parent,omitempty"`
 	Size    int64     `json:"size"`
 	Mod     int64     `json:"mod"`
 	Cat     string    `json:"cat"`
@@ -1131,7 +1148,7 @@ func (s *server) contentStart(w http.ResponseWriter, r *http.Request) {
 						if ct := cq.prep(text); cq.Match(ct) {
 							snips, hits := cq.Snippets(text, contentSnips)
 							rw, _ := s.rowFor(v, it.key, nil)
-							res = &cres{Key: rw.Key, Name: rw.Name, Folder: rw.Folder, Size: rw.Size, Mod: rw.Mod,
+							res = &cres{Key: rw.Key, Name: rw.Name, Folder: rw.Folder, Parent: rw.Parent, Size: rw.Size, Mod: rw.Mod,
 								Cat: rw.Cat, Hits: hits, Snips: snips, Indexed: i < nIndexed}
 						}
 					}

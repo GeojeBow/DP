@@ -88,6 +88,25 @@ type Settings struct {
 	// content index. nil = default.
 	Main    *Schedule `json:"main,omitempty"`
 	Content *Schedule `json:"content,omitempty"`
+	// IndexAtStart re-walks the drives and re-reads the content folders
+	// when the program starts. Off = the saved index is used as is and
+	// only the schedules start a new run. nil = on.
+	IndexAtStart *bool `json:"indexAtStart,omitempty"`
+}
+
+// IndexAtStart reports whether a start of the program also starts indexing.
+func (e *Engine) IndexAtStart() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.settings.IndexAtStart == nil || *e.settings.IndexAtStart
+}
+
+func (e *Engine) SetIndexAtStart(on bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.settings.IndexAtStart = &on
+	e.saveSettingsLocked()
+	logf("켤 때 바로 색인: %v", map[bool]string{true: "켬", false: "끔 (일정에 맞춰서만)"}[on])
 }
 
 func (e *Engine) MainSchedule() Schedule {
@@ -368,7 +387,7 @@ func (e *Engine) Start() {
 	go e.metaFill()
 	go e.saveLoop()
 	e.Content.SetSchedule(e.ContentSchedule())
-	go e.Content.Run()
+	go e.Content.Run(e.IndexAtStart())
 }
 
 func (e *Engine) watchLoop() {
@@ -621,6 +640,7 @@ type mainCache struct {
 	Roots    []string
 	Journals map[string][2]int64
 	Index    *IndexState
+	Built    int64 // when the index was made (Unix), for the schedule
 }
 
 type folderCache struct {
@@ -665,7 +685,7 @@ func (e *Engine) Save() {
 		e.mu.RUnlock()
 		return
 	}
-	c := mainCache{Ver: cacheVer, Mode: e.Mode, Roots: e.roots}
+	c := mainCache{Ver: cacheVer, Mode: e.Mode, Roots: e.roots, Built: e.mainLast.Unix()}
 	ix, w, version := e.main, e.watcher, e.Version
 	e.mu.RUnlock()
 	if w != nil {
@@ -705,6 +725,7 @@ func (e *Engine) loadMainCache() bool {
 		logf("색인할 폴더가 바뀌어 다시 색인합니다")
 		return false
 	}
+	atStart := e.IndexAtStart()
 	ix := IndexFromState(c.Index)
 	var w watcher
 	if c.Mode == "ntfs" {
@@ -724,7 +745,11 @@ func (e *Engine) loadMainCache() bool {
 	e.saved = e.Version
 	e.mainLast = time.Now()
 	if c.Mode == "walk" && len(e.roots) == 0 {
-		e.mainLast = time.Time{} // refresh the walked drives soon
+		if atStart {
+			e.mainLast = time.Time{} // refresh the walked drives soon
+		} else if c.Built > 0 {
+			e.mainLast = time.Unix(c.Built, 0) // the schedule decides
+		}
 	}
 	e.Status = fmt.Sprintf("캐시에서 %d개를 %.1f초 만에 불러왔습니다", ix.Len(), time.Since(start).Seconds())
 	e.mu.Unlock()
