@@ -143,6 +143,14 @@ func TestSliceParents(t *testing.T) {
 	if strings.Join(got, " ") != "x=2 y=1 b=1" {
 		t.Fatalf("parents %v", got)
 	}
+	// the tree adds x and y up into a, under the walked root
+	tree := map[string]string{}
+	for _, t := range fac.Tree {
+		tree[t.Name] = fmt.Sprintf("%d/%d", t.N, t.Own)
+	}
+	if tree["a"] != "3/0" || tree["x"] != "2/2" || tree["b"] != "1/1" || len(fac.Tree) != 5 {
+		t.Fatalf("tree %v", tree)
+	}
 	// narrowed to a: only a's folders remain
 	k, _ := parseKey(fac.Parents[0].Key)
 	par, _ := v.Parent(k)

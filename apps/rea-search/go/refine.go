@@ -200,9 +200,12 @@ type SliceFacets struct {
 	// most results first: the side panel's "결과가 있는 폴더".
 	Parents     []FolderCount `json:"parents"`
 	ParentsMore int           `json:"parentsMore"`
-	Under       string        `json:"under"` // folder the panel shows (may be deeper than asked)
-	Dates       []RangeCount  `json:"dates"`
-	Sizes       []RangeCount  `json:"sizes"`
+	// Tree is the same folders with every folder above them, so the panel
+	// can show where they are; N counts results anywhere inside.
+	Tree  []TreeNode   `json:"tree"`
+	Under string       `json:"under"` // folder the panel shows (may be deeper than asked)
+	Dates []RangeCount `json:"dates"`
+	Sizes []RangeCount `json:"sizes"`
 }
 
 const (
@@ -411,6 +414,7 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 	fac.Dates, fac.Sizes = dates, sizes
 	fac.Folder = folderFacet(v, sl.Under, byFolder, here)
 	fac.Parents, fac.ParentsMore = parentFacet(v, byParent)
+	fac.Tree = folderTree(v, byParent, treeShow)
 	for e, n := range byExt {
 		fac.Exts = append(fac.Exts, ExtCount{Ext: e, Count: n})
 	}
@@ -423,6 +427,96 @@ func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *Slice
 	})
 	fac.Under = keyStr(sl.Under)
 	return out, fac
+}
+
+// TreeNode is one folder of the result tree. Up is the folder above it
+// ("" at a drive or share root). N counts results inside it at any depth,
+// Own those directly in it.
+type TreeNode struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Up   string `json:"up,omitempty"`
+	N    int    `json:"n"`
+	Own  int    `json:"own,omitempty"`
+}
+
+// treeShow is how many result folders the tree spells out; the rest are
+// still counted in the folders above them.
+const treeShow = 300
+
+// folderTree adds up the results of every folder in own into all the
+// folders above it, and returns the biggest show folders with their
+// ancestors, biggest first.
+func folderTree(v *View, own map[uint64]int, show int) []TreeNode {
+	type info struct {
+		name   string
+		up     uint64
+		hasUp  bool
+		n, own int
+	}
+	nodes := make(map[uint64]*info, len(own)*2)
+	get := func(k uint64) *info {
+		if in, ok := nodes[k]; ok {
+			return in
+		}
+		name, _, up, has, _ := v.nodeParent(k)
+		in := &info{name: name, up: up, hasUp: has}
+		nodes[k] = in
+		return in
+	}
+	type pc struct {
+		k uint64
+		n int
+	}
+	leaves := make([]pc, 0, len(own))
+	for k, n := range own {
+		leaves = append(leaves, pc{k, n})
+		get(k).own = n
+		for c := k; ; {
+			in := get(c)
+			in.n += n
+			if !in.hasUp {
+				break
+			}
+			c = in.up
+		}
+	}
+	sort.Slice(leaves, func(i, j int) bool {
+		if leaves[i].n != leaves[j].n {
+			return leaves[i].n > leaves[j].n
+		}
+		return leaves[i].k < leaves[j].k
+	})
+	if len(leaves) > show {
+		leaves = leaves[:show]
+	}
+	keep := map[uint64]bool{}
+	for _, l := range leaves {
+		for c := l.k; !keep[c]; {
+			keep[c] = true
+			in := nodes[c]
+			if !in.hasUp {
+				break
+			}
+			c = in.up
+		}
+	}
+	out := make([]TreeNode, 0, len(keep))
+	for k := range keep {
+		in := nodes[k]
+		t := TreeNode{Key: keyStr(k), Name: in.name, N: in.n, Own: in.own}
+		if in.hasUp {
+			t.Up = keyStr(in.up)
+		}
+		out = append(out, t)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].N != out[j].N {
+			return out[i].N > out[j].N
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out
 }
 
 // parentFacet lists the folders holding results, biggest first, with paths

@@ -280,6 +280,7 @@ func (s *server) routes() *http.ServeMux {
 		"/api/summon":         func(w http.ResponseWriter, r *http.Request) { s.summon(); writeJSON(w, "ok") },
 		"/api/schedule":       s.schedule,
 		"/api/startindex":     s.startIndex,
+		"/api/tree":           s.tree,
 		"/api/manual":         s.manual,
 		"/api/open":           s.open,
 		"/api/preview":        s.preview,
@@ -332,6 +333,25 @@ func (s *server) startIndex(w http.ResponseWriter, r *http.Request) {
 		s.eng.SetIndexAtStart(req.On)
 	}
 	writeJSON(w, map[string]bool{"on": s.eng.IndexAtStart()})
+}
+
+// tree builds the folder tree for results counted on the page (content
+// search): POST {"own": {"folder key": results directly in it}}.
+func (s *server) tree(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Own map[string]int `json:"own"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		bad(w, "잘못된 요청")
+		return
+	}
+	own := make(map[uint64]int, len(req.Own))
+	for ks, n := range req.Own {
+		if k, ok := parseKey(ks); ok && n > 0 {
+			own[k] = n
+		}
+	}
+	writeJSON(w, folderTree(s.eng.View(), own, treeShow))
 }
 
 func (s *server) schedule(w http.ResponseWriter, r *http.Request) {

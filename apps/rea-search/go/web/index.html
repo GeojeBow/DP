@@ -326,6 +326,9 @@ tr.ghead2:hover td { color:var(--fg); }
 .tile .sw { width:30px; height:22px; border-radius:5px; flex:none; border:1px solid rgba(127,127,127,.35); }
 .qx { font-size:13px; padding:1px 7px; }
 .qx:hover { color:var(--bad); }
+.fitem .tw { width:12px; flex:none; text-align:center; font-size:10px; color:var(--muted); }
+.fitem .tw:hover { color:var(--fg); }
+.fnote { font-size:11px; color:var(--faint); padding:2px 8px 4px; }
 #fold.stale { opacity:.45; transition:opacity .15s; }
 #dlg > .dlg { width:min(760px, calc(100vw - 32px)); height:min(680px, calc(100vh - 60px)); display:flex; flex-direction:column; overflow:hidden; }
 #dlg > .dlg > .pane { flex:1; overflow:auto; min-height:0; }
@@ -928,24 +931,80 @@ function staleFold() {
   const f = $("fold"), mine = fseq; f.classList.add("stale");
   setTimeout(() => { if (mine === fseq && f.classList.contains("stale") && !contentShown()) f.replaceChildren(el("div", "empty-note", "세는 중…")); }, 350);
 }
+// content search: the tree is built from the folders of the rows found so far
+let ctree = null, ctreeSig = "";
 function renderContentFold(running) {
-  const m = new Map();
-  for (const r of rows) { const k = r.folder || ""; const e = m.get(k) || { n: 0, parent: "" }; e.n++; if (!e.parent && r.parent) e.parent = r.parent; m.set(k, e); }
-  const list = [...m].sort((a, b) => b[1].n - a[1].n), items = [];
-  if (S.under) { const up = el("button", "fitem"); up.append(el("span", null, "↑ 폴더 해제 (전체에서 찾기)")); up.onclick = () => setUnder(""); items.push(up); }
-  const max = Math.max(1, ...list.map(x => x[1].n));
-  for (const [path, e] of list.slice(0, 60)) {
-    const parts = path.split(/[\\/]/).filter(Boolean);
-    const b = el("button", "fitem fold"); b.title = path + (e.parent ? "\n누르면 이 폴더 안에서만 찾습니다" : "");
-    b.append(icon("folder", true), el("span", "nmx", parts.slice(-2).join("\\") || path || "(맨 위)"), el("span", "n", e.n.toLocaleString()));
-    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * e.n / max) + "%"; b.append(bar);
-    if (e.parent) b.onclick = () => setUnder(e.parent, path);
-    items.push(b);
+  const own = {};
+  for (const r of rows) if (r.parent) own[r.parent] = (own[r.parent] || 0) + 1;
+  const sig = Object.entries(own).sort().join(",");
+  if (sig !== ctreeSig) {
+    ctreeSig = sig;
+    if (!sig) ctree = [];
+    else api("/api/tree", { method: "POST", body: JSON.stringify({ own }) }).then(d => {
+      if (sig === ctreeSig && contentShown()) { ctree = d; drawContentFold(running); }
+    }).catch(() => {});
   }
-  if (list.length > 60) items.push(el("div", "empty-note", `외 ${(list.length - 60).toLocaleString()}곳`));
-  if (!list.length) items.push(el("div", "empty-note", running ? "내용을 찾는 중…" : "결과 없음"));
-  $("fold").classList.remove("stale"); $("fold").replaceChildren(...items); $("crumbs").hidden = true;
+  drawContentFold(running);
   renderSummary(running);
+}
+function drawContentFold(running) {
+  const items = [];
+  if (S.under) { const up = el("button", "fitem"); up.append(el("span", null, "↑ 폴더 해제 (전체에서 찾기)")); up.onclick = () => setUnder(""); items.push(up); }
+  if (ctreeSig && ctree) items.push(...renderTree(ctree));
+  else if (ctreeSig) items.push(el("div", "empty-note", "폴더 정리 중…"));
+  else items.push(el("div", "empty-note", running ? "내용을 찾는 중…" : "결과 없음"));
+  $("fold").classList.remove("stale"); $("fold").replaceChildren(...items); $("crumbs").hidden = true;
+}
+// The side panel shows the folders holding the results as a tree, so the
+// folders above them stay visible. Chains of single folders are one line
+// (C:\Users\me\문서), the biggest branches open by themselves, and ▸ opens
+// or closes the rest. Clicking a folder keeps only the results inside it.
+const treeOpen = new Map(); // folder key -> opened (true) or closed (false) by hand
+function joinPath(a, b) { return a ? a.replace(/[\\/]+$/, "") + "\\" + b : b; }
+function renderTree(nodes) {
+  const by = new Map(nodes.map(n => [n.key, { ...n, own: n.own || 0, kids: [] }]));
+  const roots = [];
+  for (const n of by.values()) { const p = n.up && by.get(n.up); if (p) p.kids.push(n); else roots.push(n); }
+  const order = a => a.sort((x, y) => y.n - x.n || x.name.localeCompare(y.name));
+  const fold = (n, path, depth) => {
+    n.path = joinPath(path, n.name); n.label = n.name; n.depth = depth;
+    while (n.kids.length === 1 && !n.own && n.kids[0].n === n.n) {
+      const c = n.kids[0]; n.label = joinPath(n.label, c.name); n.path = joinPath(n.path, c.name);
+      n.key = c.key; n.own = c.own; n.kids = c.kids;
+    }
+    const segs = n.label.split(/[\\/]+/).filter(Boolean); // long chains: drive, …, last two
+    if (segs.length > 3) n.label = segs[0] + "\\…\\" + segs.slice(-2).join("\\");
+    order(n.kids); n.kids.forEach(c => fold(c, n.path, depth + 1));
+  };
+  order(roots); roots.forEach(r => fold(r, "", 0));
+  // open the biggest folders first while the panel stays short
+  const open = new Set(); let shown = roots.length; const cand = [...roots];
+  while (cand.length) {
+    cand.sort((a, b) => b.n - a.n); const n = cand.shift();
+    if (n.kids.length && shown + n.kids.length <= 40) { open.add(n.key); shown += n.kids.length; cand.push(...n.kids); }
+  }
+  // the folder the results are narrowed to is always in view
+  const mark = (n, trail) => { if (n.key === S.under) trail.forEach(t => open.add(t.key)); n.kids.forEach(c => mark(c, [...trail, n])); };
+  roots.forEach(r => mark(r, []));
+  const isOpen = n => n.kids.length > 0 && (treeOpen.has(n.key) ? treeOpen.get(n.key) : open.has(n.key));
+  const max = Math.max(1, ...roots.map(r => r.n)), items = [];
+  const row = n => {
+    const b = el("button", "fitem fold tree" + (n.key === S.under ? " on" : ""));
+    b.style.paddingLeft = (4 + n.depth * 14) + "px";
+    b.title = `${n.path}\n결과 ${n.n.toLocaleString()}개` + (n.own && n.kids.length ? ` (바로 안 ${n.own.toLocaleString()}개)` : "") + "\n누르면 이 폴더 안의 결과만 봅니다";
+    const tw = el("span", "tw", n.kids.length ? (isOpen(n) ? "▾" : "▸") : "");
+    if (n.kids.length) tw.onclick = e => { e.stopPropagation(); treeOpen.set(n.key, !isOpen(n)); if (contentShown()) drawContentFold(); else renderFold(); };
+    b.append(tw, icon("folder", true), el("span", "nmx", n.label), el("span", "n", n.n.toLocaleString()));
+    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * n.n / max) + "%"; b.append(bar);
+    b.onclick = () => { if (n.key !== S.under) setUnder(n.key, n.path); };
+    items.push(b);
+    if (!isOpen(n)) return;
+    n.kids.forEach(row);
+    const rest = n.n - n.own - n.kids.reduce((t, c) => t + c.n, 0);
+    if (rest > 0) { const d = el("div", "fnote", `그 밖의 하위 폴더에 ${rest.toLocaleString()}개`); d.style.paddingLeft = (22 + (n.depth + 1) * 14) + "px"; items.push(d); }
+  };
+  roots.forEach(row);
+  return items;
 }
 function refineNote(text) { $("fold").replaceChildren(el("div", "empty-note", text)); $("crumbs").hidden = true; }
 async function loadFacets(my) {
@@ -979,21 +1038,12 @@ function renderFold() {
   if (ff.here) info.push(`이 폴더 바로 안 ${ff.here.toLocaleString()}개`);
   if (info.length) cb.append(el("span", "info", info.join(" · ")));
   cb.hidden = false;
-  // side panel: the folders that directly hold the results, most first.
-  // Clicking one keeps only the results inside it (and its subfolders).
+  // side panel: the result folders as a tree (see renderTree)
   const items = [];
   if (S.under) { const up = el("button", "fitem"); up.append(el("span", null, "↑ 폴더 해제 (모든 폴더 보기)")); up.title = S.underPath; up.onclick = () => setUnder(""); items.push(up); }
-  const ps = fac.parents || [], pmax = Math.max(1, ...ps.map(f => f.count));
-  for (const f of ps) {
-    const parts = f.name.split(/[\\/]/).filter(Boolean);
-    const b = el("button", "fitem fold" + (f.key === S.under ? " on" : "")); b.title = f.name + "\n누르면 이 폴더 안의 결과만 봅니다";
-    b.append(icon("folder", true), el("span", "nmx", parts.slice(-2).join("\\") || f.name), el("span", "n", f.count.toLocaleString()));
-    const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * f.count / pmax) + "%"; b.append(bar);
-    b.onclick = () => { if (f.key !== S.under) setUnder(f.key, f.name); };
-    items.push(b);
-  }
-  if (fac.parentsMore) items.push(el("div", "empty-note", `외 ${fac.parentsMore.toLocaleString()}곳 (결과가 많은 폴더부터)`));
-  if (!ps.length) items.push(el("div", "empty-note", "결과 없음"));
+  const tree = fac.tree || [];
+  items.push(...renderTree(tree));
+  if (!tree.length) items.push(el("div", "empty-note", "결과 없음"));
   $("fold").replaceChildren(...items);
 }
 // summary line: how many, how big, what kinds (click a colour to keep only
