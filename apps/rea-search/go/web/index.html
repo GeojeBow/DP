@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REA Search</title>
+<style>
+:root { --bg:#fff; --fg:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --hover:#f2f2f7; --sel:#dbe9ff; --accent:#2f6fde; --input:#fff; }
+@media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --muted:#98989f; --line:#38383a; --hover:#2c2c2e; --sel:#22406e; --accent:#6aa2ff; --input:#2c2c2e; } }
+* { box-sizing:border-box; }
+html, body { height:100%; margin:0; }
+body { background:var(--bg); color:var(--fg); font:13px/1.4 "Segoe UI","Malgun Gothic",system-ui,sans-serif; display:flex; flex-direction:column; }
+header { padding:10px 12px 8px; border-bottom:1px solid var(--line); }
+#q { width:100%; font-size:16px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--input); color:var(--fg); outline:none; }
+#q:focus { border-color:var(--accent); }
+#help { color:var(--muted); font-size:12px; margin-top:6px; }
+#help code { background:var(--hover); padding:0 4px; border-radius:3px; }
+main { flex:1; overflow:auto; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th { position:sticky; top:0; background:var(--bg); text-align:left; font-weight:600; color:var(--muted); padding:6px 10px; border-bottom:1px solid var(--line); }
+td { padding:4px 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid var(--line); cursor:default; }
+tr:hover td { background:var(--hover); }
+tr.sel td { background:var(--sel); }
+.c-name { width:30%; } .c-folder { width:46%; } .c-size { width:10%; text-align:right; } .c-mod { width:14%; }
+td.c-size { text-align:right; font-variant-numeric:tabular-nums; }
+.ico { display:inline-block; width:16px; margin-right:6px; text-align:center; }
+footer { padding:5px 12px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; display:flex; gap:12px; }
+#menu { position:fixed; display:none; background:var(--bg); border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,.18); padding:4px 0; z-index:10; }
+#menu div { padding:6px 16px; cursor:pointer; } #menu div:hover { background:var(--hover); }
+@media (max-width:600px) { .c-folder, .c-mod { display:none; } .c-name { width:75%; } .c-size { width:25%; } }
+</style>
+</head>
+<body>
+<header>
+  <input id="q" placeholder="파일 이름을 입력하세요" autofocus autocomplete="off" spellcheck="false">
+  <div id="help"><code>a b</code> 모두 포함 · <code>a | b</code> 또는 · <code>!a</code> 제외 · <code>*.mp4</code> 와일드카드 · <code>ext:jpg;png</code> · <code>folder:</code> · <code>폴더\이름</code> 경로 검색</div>
+</header>
+<main id="list">
+  <table>
+    <thead><tr><th class="c-name">이름</th><th class="c-folder">경로</th><th class="c-size">크기</th><th class="c-mod">수정한 날짜</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+<footer><span id="count"></span><span id="state"></span></footer>
+<div id="menu"><div data-a="open">열기</div><div data-a="reveal">폴더에서 보기</div><div data-a="copy">전체 경로 복사</div></div>
+<script>
+const TOKEN = "__TOKEN__";
+const PAGE = 200;
+const $ = id => document.getElementById(id);
+let query = "", loaded = 0, total = 0, version = -1, busy = false, seq = 0, selected = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "X-Token": TOKEN } });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function fmtSize(n) {
+  if (n < 0) return "";
+  const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : n) + " " + u[i];
+}
+
+function rowEl(r) {
+  const tr = document.createElement("tr");
+  tr.dataset.key = r.key;
+  const td = (cls, text) => { const c = document.createElement("td"); c.className = cls; c.textContent = text; c.title = text; tr.appendChild(c); return c; };
+  const n = td("c-name", r.name);
+  const ic = document.createElement("span"); ic.className = "ico"; ic.textContent = r.dir ? "📁" : "📄"; n.prepend(ic);
+  td("c-folder", r.folder);
+  td("c-size", r.dir ? "" : fmtSize(r.size));
+  td("c-mod", r.mod);
+  return tr;
+}
+
+async function load(reset, keep = 0) {
+  const my = reset ? ++seq : seq;
+  if (!reset && (busy || loaded >= total)) return;
+  busy = true;
+  try {
+    const want = reset ? Math.max(PAGE, keep) : PAGE;
+    const d = await api(`/api/search?q=${encodeURIComponent(query)}&offset=${reset ? 0 : loaded}&limit=${Math.min(want, 1000)}`);
+    if (my !== seq) return;
+    if (reset) { $("rows").replaceChildren(); loaded = 0; }
+    const frag = document.createDocumentFragment();
+    d.rows.forEach(r => frag.appendChild(rowEl(r)));
+    $("rows").appendChild(frag);
+    loaded += d.rows.length; total = d.total; version = d.version;
+    if (reset) $("count").textContent = `${total.toLocaleString()}개 개체 · ${d.ms.toFixed(1)} ms`;
+  } catch (e) { $("count").textContent = "오류: " + e.message; }
+  finally { busy = false; }
+}
+
+let timer;
+$("q").addEventListener("input", () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => { query = $("q").value; $("list").scrollTop = 0; load(true); }, 40);
+});
+$("list").addEventListener("scroll", () => {
+  const el = $("list");
+  if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) load(false);
+});
+
+function select(tr) {
+  if (selected) selected.classList.remove("sel");
+  selected = tr; if (tr) { tr.classList.add("sel"); tr.scrollIntoView({ block: "nearest" }); }
+}
+async function act(how, tr = selected) {
+  if (!tr) return;
+  const d = await api(`/api/open?how=${how === "copy" ? "path" : how}&key=${tr.dataset.key}`, { method: "POST" });
+  if (how === "copy") { await navigator.clipboard.writeText(d.path); $("state").textContent = "경로를 복사했습니다"; }
+}
+$("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (tr) select(tr); });
+$("rows").addEventListener("dblclick", e => { const tr = e.target.closest("tr"); if (tr) act("open", tr); });
+$("rows").addEventListener("contextmenu", e => {
+  const tr = e.target.closest("tr"); if (!tr) return;
+  e.preventDefault(); select(tr);
+  const m = $("menu"); m.style.left = e.clientX + "px"; m.style.top = e.clientY + "px"; m.style.display = "block";
+});
+document.addEventListener("click", () => $("menu").style.display = "none");
+$("menu").addEventListener("click", e => { const a = e.target.dataset.a; if (a) act(a); });
+document.addEventListener("keydown", e => {
+  const rows = $("rows");
+  if (e.key === "ArrowDown") { e.preventDefault(); select(selected ? selected.nextElementSibling || selected : rows.firstElementChild); if (selected === rows.lastElementChild) load(false); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); if (selected && selected.previousElementSibling) select(selected.previousElementSibling); else { select(null); $("q").focus(); } }
+  else if (e.key === "Enter" && selected) { e.preventDefault(); act(e.ctrlKey ? "reveal" : "open"); }
+});
+
+// Poll engine status: show indexing progress and refresh when files change.
+async function poll() {
+  try {
+    const s = await api("/api/status");
+    $("state").textContent = s.mode === "loading" ? s.status : `전체 ${s.total.toLocaleString()}개 · ${s.mode === "ntfs" ? "NTFS 실시간" : "폴더 탐색"} · ${s.status}`;
+    if (s.version !== version && !busy) load(true, loaded);
+  } catch (e) { $("state").textContent = "프로그램이 종료되었습니다"; return; }
+  setTimeout(poll, 1000);
+}
+poll();
+</script>
+</body>
+</html>

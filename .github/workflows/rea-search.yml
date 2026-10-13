@@ -1,0 +1,43 @@
+name: REA Search
+
+on:
+  pull_request:
+    paths: ['apps/rea-search/**', '.github/workflows/rea-search.yml']
+  push:
+    branches: [main]
+    paths: ['apps/rea-search/**', '.github/workflows/rea-search.yml']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/rea-search/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/rea-search/go/go.mod
+          cache: false
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build -trimpath -ldflags "-s -w" -o REASearch.exe .
+      # Runners are administrators, so this exercises the NTFS MFT reader
+      # and the change journal on a real Windows volume.
+      - run: .\REASearch.exe -selftest
+      - name: Web page answers
+        shell: pwsh
+        run: |
+          $p = Start-Process .\REASearch.exe -ArgumentList '-no-browser','-elevated','-port','18777' -PassThru
+          Start-Sleep 5
+          $r = Invoke-WebRequest http://127.0.0.1:18777/ -UseBasicParsing
+          Stop-Process $p.Id
+          if ($r.StatusCode -ne 200 -or $r.Content -notmatch 'REA Search') { exit 1 }
+      - name: Python version tests
+        working-directory: apps/rea-search
+        run: python -m unittest -v tests/test_index.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: REASearch
+          path: apps/rea-search/go/REASearch.exe
