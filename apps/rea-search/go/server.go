@@ -826,6 +826,24 @@ type contentReq struct {
 	Regex       bool   `json:"regex"`
 	Force       bool   `json:"force"`
 	IndexedOnly bool   `json:"indexedOnly"`
+	DocsOnly    bool   `json:"docsOnly"`   // only known document and text types
+	SkipSystem  bool   `json:"skipSystem"` // leave out Windows, program and cache folders
+}
+
+// systemDirs are folders that hold program files rather than the user's
+// documents; searching every file's contents skips them unless asked.
+var systemDirs = []string{`\windows\`, `\windows.old\`, `\program files\`, `\program files (x86)\`, `\programdata\`,
+	`\appdata\`, `\$recycle.bin\`, `\system volume information\`, `\node_modules\`, `\.git\`, `\$windows.~bt\`,
+	`/proc/`, `/sys/`, `/usr/`, `/.cache/`, `/node_modules/`, `/.git/`}
+
+func inSystemDir(p string) bool {
+	lp := strings.ToLower(p)
+	for _, d := range systemDirs {
+		if strings.Contains(lp, d) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *server) contentStart(w http.ResponseWriter, r *http.Request) {
@@ -862,10 +880,17 @@ func (s *server) contentStart(w http.ResponseWriter, r *http.Request) {
 	var indexed, live []item
 	for _, k := range c.keys {
 		name, dir, ok := v.Node(k)
-		if !ok || dir || contentKind(name) == "" {
+		if !ok || dir {
+			continue
+		}
+		kind := contentKind(name)
+		if kind == "" || req.DocsOnly && kind == "sniff" {
 			continue
 		}
 		p := v.Path(k)
+		if req.SkipSystem && inSystemDir(p) {
+			continue
+		}
 		if id, ok := ci.Lookup(p); ok {
 			indexed = append(indexed, item{k, p, id})
 		} else {

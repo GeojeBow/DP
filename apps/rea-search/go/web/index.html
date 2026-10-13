@@ -47,6 +47,10 @@ header { display:flex; align-items:center; gap:10px; padding:10px 14px; backgrou
 .btn.icon { padding:6px; }
 .btn:disabled { opacity:.5; cursor:default; }
 
+#abar { display:none; gap:10px; align-items:center; padding:6px 14px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; font-size:12px; }
+body.allc #abar { display:flex; }
+#abar .bar { max-width:260px; }
+.badge.cnt { background:color-mix(in srgb, var(--ok) 16%, transparent); color:var(--ok); }
 #cbar { display:none; gap:8px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
 body.content #cbar { display:flex; }
 #cprog { flex-basis:100%; display:none; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
@@ -185,12 +189,20 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
     <button class="tog" id="o-path" title="이름 대신 전체 경로에서 찾기">경로</button>
     <button class="tog" id="o-regex" title="정규식">.*</button>
   </div>
-  <button class="btn" id="b-content" title="파일 내용 검색 (Ctrl+Shift+F)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 1.5h6l4 4v9H3z"/><path d="M9 1.5v4h4M5.5 9h5M5.5 11.5h3"/></svg>내용 검색</button>
+  <span class="seg" id="mode" title="검색창에 입력한 조건으로 무엇을 찾을지"><button data-m="name">이름</button><button data-m="both">이름+내용</button><button data-m="content">내용</button></span>
+  <button class="btn" id="b-content" title="찾은 파일 안에서 내용 검색 (Ctrl+Shift+F)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 1.5h6l4 4v9H3z"/><path d="M9 1.5v4h4M5.5 9h5M5.5 11.5h3"/></svg>내용 검색</button>
   <button class="btn icon" id="b-preview" title="미리보기 (Space)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg></button>
   <button class="btn" id="b-status" title="색인 현황과 로그"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13.5V9M6 13.5V5M10 13.5V7.5M14 13.5V2.5"/></svg>색인 현황<span class="num" id="warn-num" hidden></span></button>
   <button class="btn icon" id="b-theme" title="밝게/어둡게"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" fill="currentColor"/></svg></button>
   <button class="btn icon" id="b-settings" title="설정"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></button>
 </header>
+<div id="abar">
+  <span id="a-what" class="hint"></span>
+  <div class="bar" id="a-barbox"><i id="abar-fill"></i></div><span id="a-text"></span>
+  <button class="btn" id="a-more" hidden></button><button class="btn" id="a-stop" hidden>중지</button>
+  <div class="spacer"></div>
+  <label class="hint" title="Windows, Program Files, AppData 같은 프로그램 폴더는 문서가 아니라서 빼고 찾습니다"><input type="checkbox" id="a-sys"> 시스템·프로그램 폴더 제외</label>
+</div>
 <div id="cbar">
   <div class="searchbox">
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M3 1.5h6l4 4v9H3z"/><path d="M9 1.5v4h4"/></svg>
@@ -284,7 +296,7 @@ kbd { font:11px "Segoe UI",sans-serif; border:1px solid var(--line); border-bott
       <span><kbd>dm:today</kbd> <kbd>dm:7d</kbd> <kbd>dm:2024</kbd> <kbd>dm:2024-03</kbd></span><span>수정한 날짜 (오늘, 최근 7일, 연도, 월)</span>
       <span><kbd>dm:&gt;2024-01-01</kbd> <kbd>dm:2024-01-01..2024-03-31</kbd></span><span>날짜 이후, 기간</span>
     </div>
-    <p class="hint" style="margin-top:14px">내용 검색: <kbd>회의 예산</kbd> 모두, <kbd>계약 | 발주</kbd> 하나라도, <kbd>회의 !취소</kbd> 빼기, <kbd>"분기 실적"</kbd> 정확한 구문.</p>
+    <p class="hint" style="margin-top:14px">검색창 옆에서 <b>이름+내용</b>이나 <b>내용</b>을 고르면 같은 조건으로 파일 안의 글자도 찾습니다: <kbd>회의 예산</kbd> 모두, <kbd>계약 | 발주</kbd> 하나라도, <kbd>회의 !취소</kbd> 빼기, <kbd>"분기 실적"</kbd> 정확한 구문. <kbd>ext:</kbd> <kbd>size:</kbd> <kbd>dm:</kbd> <kbd>file:</kbd>, 경로(<kbd>D:\자료\</kbd>)는 어떤 파일을 읽을지 정하는 조건으로 쓰입니다. 예: <kbd>예산 !초안 ext:hwp;xlsx dm:2024</kbd> = 2024년에 고친 한글·엑셀 파일 중 내용에 '예산'이 있고 '초안'은 없는 파일. 대소문자(Aa)와 정규식(.*) 단추도 내용에 똑같이 적용됩니다.</p>
   </div>
   <div class="pane" id="p-about">
     <p id="about-text"></p>
@@ -320,7 +332,7 @@ const VIEWS = [["", "검색 결과"], ["dups", "중복 파일 찾기"], ["fsize"
 const COLS = [["name", "이름", "c-name"], ["path", "경로", "c-folder"], ["size", "크기", "c-size"], ["mod", "수정한 날짜", "c-mod"], ["type", "유형", "c-type"]];
 
 const S = { q: "", case: false, path: false, regex: false, cat: "", date: "", from: "", to: "", size: "", sort: "name", desc: false, view: "",
-  content: false, cq: "", ccase: false, cword: false, cregex: false, cidx: false, dupMode: 1 };
+  content: false, cq: "", ccase: false, cword: false, cregex: false, cidx: false, dupMode: 1, mode: "name", skipSys: true };
 let rows = [], total = 0, loaded = 0, busy = false, seq = 0, version = -1, facets = {};
 let selected = new Set(), anchor = null, cursor = null;
 let job = null, jobDone = false, jobFrom = 0, jobTimer = null;
@@ -410,6 +422,7 @@ function chips() {
 }
 function setView(v) {
   const was = S.view; S.view = v;
+  if (v && S.mode === "content") { S.mode = "name"; document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.m === "name")); paintAll(null); }
   if (S.content && v) setContent(false);
   if (v === "fsize") { S.sort = "size"; S.desc = true; } else if (was === "fsize") { S.sort = "name"; S.desc = false; }
   if (v !== "dups") stopDup();
@@ -469,8 +482,10 @@ function blank(title, text) {
 }
 async function refresh(keepScroll = false) {
   if (job) stopJob(true);
+  stopAll();
   renderSide(); chips(); renderHead();
   if (S.view === "recent") return loadRecent();
+  if (S.mode === "content" && !S.view) return contentOnly();
   const my = ++seq;
   $("t-title").textContent = { dups: "중복 파일", fsize: "폴더 용량" }[S.view] || "검색 결과";
   $("dupbar").hidden = S.view !== "dups";
@@ -479,7 +494,7 @@ async function refresh(keepScroll = false) {
   try {
     busy = true;
     if (S.view === "dups" || S.view === "fsize" || S.sort === "size" || S.sort === "mod" || S.size || S.date || /size:|dm:/.test(S.q)) $("count").textContent = "크기·날짜를 확인하는 중...";
-    const p = params(); p.set("offset", 0); p.set("limit", Math.min(want, 2000));
+    const p = params(); p.set("offset", 0); p.set("limit", S.mode === "both" && !S.view ? 2000 : Math.min(want, 2000));
     const d = await api("/api/search?" + p);
     if (my !== seq) return;
     const top = $("list").scrollTop;
@@ -495,6 +510,7 @@ async function refresh(keepScroll = false) {
     else if (S.view === "fsize") blank("폴더가 없습니다", "검색어에 맞는 폴더를 전체 용량이 큰 순서로 보여 줍니다.");
     else blank("찾는 파일이 없습니다", "검색어를 줄이거나 왼쪽 필터를 풀어 보세요.");
     updateScope();
+    if (S.mode === "both" && !S.view) { nameTotal = total; if (total > rows.length) $("count").textContent += ` (이름 일치는 처음 ${rows.length.toLocaleString()}개만 표시)`; scheduleAll(); }
   } catch (e) {
     if (my !== seq) return;
     $("rows").replaceChildren(); rows = []; total = 0; loaded = 0;
@@ -503,7 +519,7 @@ async function refresh(keepScroll = false) {
   } finally { if (my === seq) busy = false; }
 }
 async function more() {
-  if (busy || loaded >= total || job || S.view === "recent") return;
+  if (busy || loaded >= total || job || S.view === "recent" || (S.mode !== "name" && !S.view)) return;
   busy = true;
   const my = seq;
   try {
@@ -609,6 +625,7 @@ async function preview(r) {
   const pv = $("preview");
   const p = new URLSearchParams({ key: r.key });
   if (S.content && S.cq) { p.set("cq", S.cq); if (S.ccase) p.set("ccase", 1); if (S.cword) p.set("cword", 1); if (S.cregex) p.set("cregex", 1); }
+  else if (S.mode !== "name" && !S.view) { const c = splitQuery(S.q).content; if (c) { p.set("cq", c); if (S.case) p.set("ccase", 1); if (S.regex) p.set("cregex", 1); } }
   let d;
   try { d = await api("/api/preview?" + p); } catch (e) { if (pvKey === r.key) pv.replaceChildren(el("div", "pv-empty", e.message)); return; }
   if (pvKey !== r.key) return;
@@ -707,6 +724,113 @@ function stopJob(clear) {
   if (job && !jobDone) api(`/api/content/cancel?id=${job}`, { method: "POST" }).catch(() => {});
   if (clear) { clearTimeout(jobTimer); jobTimer = null; job = null; jobDone = false; $("cprog").classList.remove("show"); }
 }
+
+// ---------- search inside every file (mode 이름+내용 / 내용) ----------
+// The main box text is split: words like ext:, size:, dm:, file:, folder: or a
+// path (with \) choose which files to read; everything else is what to look
+// for inside them, with the same AND / | / ! / "phrase" rules as names.
+let aj = null, ajId = null, ajTimer = null, ajLive = 0, ajForce = false, nameTotal = 0, allDelay = null;
+const SCOPE_RE = /^!?(ext|size|dm|크기|날짜|file|folder|path):/i;
+function splitQuery(text) {
+  const scope = [], content = [];
+  for (const t of text.match(/[!-]?"[^"]*"|\S+/g) || []) (SCOPE_RE.test(t) || (/[\\/]/.test(t) && !t.startsWith('"')) ? scope : content).push(t);
+  return { scope: scope.join(" "), content: content.join(" ").replace(/^\s*(\||OR|또는)\s*|\s*(\||OR|또는)\s*$/g, "") };
+}
+function scheduleAll() { clearTimeout(allDelay); allDelay = setTimeout(() => startAll(false), S.mode === "content" ? 300 : 450); }
+function contentOnly() {
+  ++seq; rows = []; total = loaded = 0; selected.clear(); cursor = null; paintSel();
+  $("rows").replaceChildren(); $("t-title").textContent = "내용 검색 결과"; $("dupbar").hidden = true;
+  const { content } = splitQuery(S.q);
+  if (!content) { blank("파일 안에서 찾을 단어를 입력하세요", '예: 예산 보고서  ·  계약 | 발주  ·  회의 !취소  ·  "분기 실적"  ·  예산 ext:hwp;xlsx dm:2024'); $("count").textContent = ""; paintAll(null); return; }
+  blank(""); $("count").textContent = "내용을 찾는 중...";
+  scheduleAll();
+}
+async function startAll(force) {
+  stopAll();
+  const { scope, content } = splitQuery(S.q);
+  if (!content) { paintAll(null); return; }
+  const p = params(); p.set("q", scope); p.delete("sort"); p.delete("desc"); p.delete("dups"); p.delete("fsize");
+  const body = { cq: content, case: S.case, word: false, regex: S.regex, force, indexedOnly: false, docsOnly: true, skipSystem: S.skipSys };
+  const my = seq;
+  let d;
+  try {
+    d = await api("/api/content/start?" + p, { method: "POST", body: JSON.stringify(body) });
+    ajLive = 0; ajForce = force;
+    if (d.warn) { // too many unindexed files to read on every keystroke: use the index, offer the rest
+      ajLive = d.live; body.indexedOnly = true;
+      d = await api("/api/content/start?" + p, { method: "POST", body: JSON.stringify(body) });
+    }
+  } catch (e) { if (my === seq) { $("a-text").textContent = e.message; if (S.mode === "content") { blank("검색할 수 없습니다", e.message); $("count").textContent = ""; } } return; }
+  if (my !== seq) { api(`/api/content/cancel?id=${d.id}`, { method: "POST" }).catch(() => {}); return; }
+  aj = { id: d.id, from: 0, keys: new Map(rows.map((r, i) => [r.key, i])) }; ajId = d.id;
+  paintAll({ scanned: 0, total: d.total, matched: 0, done: false });
+  pollAll();
+}
+async function pollAll() {
+  if (!aj) return;
+  const id = aj.id; let d;
+  try { d = await api(`/api/content/poll?id=${id}&from=${aj.from}`); } catch { return; }
+  if (!aj || aj.id !== id) return;
+  if (d.results.length) {
+    aj.from += d.results.length;
+    for (const r of d.results) {
+      const i = aj.keys.get(r.key);
+      if (i != null) { rows[i].hits = r.hits; rows[i].snips = r.snips; }
+      else { aj.keys.set(r.key, rows.length); rows.push({ ...r, dir: false }); }
+    }
+    total = loaded = rows.length;
+    const top = $("list").scrollTop; $("rows").replaceChildren(); appendRows(rows, 0); paintSel(); $("list").scrollTop = top;
+    blank("");
+  }
+  paintAll(d);
+  if (d.done) {
+    aj = null;
+    if (!rows.length) blank(S.mode === "both" ? "이름이나 내용이 일치하는 파일이 없습니다" : "내용이 일치하는 파일이 없습니다",
+      ajLive ? `내용 색인이 안 된 문서 ${ajLive.toLocaleString()}개는 아직 읽지 않았습니다. 위의 '나머지도 읽기'를 누르거나 설정 > 내용 색인에 폴더를 추가하세요.` : "조건을 바꾸거나 왼쪽 필터를 풀어 보세요.");
+    return;
+  }
+  ajTimer = setTimeout(pollAll, 300);
+}
+function paintAll(d) {
+  const on = S.mode !== "name";
+  document.body.classList.toggle("allc", on);
+  if (!on) return;
+  const { scope, content } = splitQuery(S.q);
+  $("a-what").textContent = content ? `파일 내용에서 [${content}]${scope ? ` · 범위 ${scope}` : ""}` : (S.mode === "both" ? "이름은 바로 찾고, 내용은 입력을 멈추면 찾습니다" : "");
+  $("a-barbox").hidden = !d;
+  $("a-stop").hidden = !d || d.done;
+  if (!d) { $("a-text").textContent = ""; $("a-more").hidden = true; return; }
+  $("abar-fill").style.width = (d.total ? Math.round(d.scanned / d.total * 100) : 100) + "%";
+  let t = `${d.scanned.toLocaleString()} / ${d.total.toLocaleString()}개 확인 · 내용 일치 ${d.matched.toLocaleString()}개`;
+  if (d.done) t += d.matched >= d.limit ? ` · 처음 ${d.limit.toLocaleString()}개에서 멈춤` : d.stopped ? " · 중지됨" : ` · ${(d.ms / 1000).toFixed(1)}초`;
+  $("a-text").textContent = t;
+  const nf = d.fails ? Object.values(d.fails).reduce((a, b) => a + b, 0) : 0;
+  if (d.done && nf) { $("a-text").append(" · "); $("a-text").append(linkBtn(`읽지 못한 파일 ${nf.toLocaleString()}개`, () => showList("내용을 읽지 못한 파일", Object.entries(d.fails).map(([w, n]) => `${w} ${n}개`).join(" · "), failRows(d.failEx || [], false)))); }
+  $("a-more").hidden = !(d.done && ajLive && !ajForce);
+  $("a-more").textContent = `색인 안 된 문서 ${ajLive.toLocaleString()}개도 읽기`;
+  $("count").textContent = S.mode === "both" ? `이름 ${nameTotal.toLocaleString()}개 · 내용 ${d.matched.toLocaleString()}개` : `${d.matched.toLocaleString()}개 파일에서 찾음`;
+}
+function stopAll() {
+  clearTimeout(allDelay); clearTimeout(ajTimer);
+  if (aj) api(`/api/content/cancel?id=${aj.id}`, { method: "POST" }).catch(() => {});
+  aj = null;
+}
+function setMode(m) {
+  S.mode = m; store.set("mode", m);
+  document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.m === m));
+  $("q").placeholder = { name: "파일 이름 검색  (예: 보고서 ext:hwp;docx  ·  견적 | 발주  ·  size:>100mb  ·  dm:7d)",
+    both: "이름이나 내용에 들어간 단어  (예: 예산 보고서  ·  계약 | 발주  ·  ext:hwp dm:2024)",
+    content: '파일 내용에서 찾기  (예: 회의 !취소  ·  "분기 실적"  ·  예산 ext:xlsx;hwp dm:7d)' }[m];
+  if (m !== "name" && S.content) setContent(false);
+  if (m !== "name") S.view = "";
+  paintAll(null);
+  refresh();
+  $("q").focus();
+}
+document.querySelectorAll("#mode button").forEach(b => b.onclick = () => setMode(b.dataset.m));
+$("a-stop").onclick = () => { if (aj) api(`/api/content/cancel?id=${aj.id}`, { method: "POST" }).catch(() => {}); };
+$("a-more").onclick = () => startAll(true);
+$("a-sys").onchange = e => { S.skipSys = e.target.checked; store.set("skipSys", S.skipSys); if (S.mode !== "name") startAll(false); };
 
 // ---------- duplicate contents ----------
 let dupJob = null, dupTimer = null;
@@ -906,6 +1030,7 @@ $("q").addEventListener("input", () => {
   clearTimeout(remember.t); remember.t = setTimeout(remember, 1500);
 });
 $("cq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); startJob(); } });
+$("q").addEventListener("keydown", e => { if (e.key === "Enter" && S.mode !== "name") { e.preventDefault(); clearTimeout(typing); S.q = $("q").value; if (S.mode === "content") refresh(); else startAll(false); } });
 $("c-go").onclick = () => startJob();
 $("c-stop").onclick = () => stopJob(false);
 $("b-content").onclick = () => setContent(!S.content);
@@ -918,7 +1043,7 @@ $("b-save").onclick = () => {
 };
 $("b-export").onclick = async () => {
   try {
-    const url = job ? `/api/export?job=${job}` : "/api/export?" + params();
+    const url = job ? `/api/export?job=${job}` : S.mode === "content" && ajId && !S.view ? `/api/export?job=${ajId}` : "/api/export?" + params();
     const r = await fetch(url, { headers: { "X-Token": TOKEN } }); if (!r.ok) throw new Error(await r.text());
     const a = el("a"); a.href = URL.createObjectURL(await r.blob()); a.download = `REASearch_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
     toast("CSV 파일을 저장했습니다");
@@ -963,7 +1088,7 @@ async function poll() {
     $("state").textContent = `전체 ${s.total.toLocaleString()}개 · ${mode}${nf} · ${s.status}`;
     $("cstate").textContent = s.content.folders.length ? `내용 색인 ${s.content.docs.toLocaleString()}개${s.content.busy ? " · " + s.content.status : ""}` : "";
     $("about-text").textContent = `색인 방식: ${mode} · 항목 ${s.total.toLocaleString()}개. 색인과 설정은 %LOCALAPPDATA%\\REASearch 폴더에 저장됩니다.`;
-    if (s.version !== version && !busy && !job && !dupJob && S.view !== "recent") refresh(true);
+    if (s.version !== version && !busy && !job && !dupJob && S.view !== "recent" && (S.mode === "name" || S.view)) refresh(true);
     if (poll.focus != null && s.focus !== poll.focus) { window.focus(); $("q").focus(); $("q").select(); }
     poll.focus = s.focus;
     $("warn-num").hidden = !s.warnings; $("warn-num").textContent = s.warnings > 99 ? "99+" : s.warnings;
@@ -974,7 +1099,9 @@ async function poll() {
 
 const theme = store.get("theme", null); if (theme) document.documentElement.dataset.theme = theme;
 if (store.get("pv", false)) { document.body.classList.add("pv"); $("preview").replaceChildren(el("div", "pv-empty", "항목을 선택하면 여기에 미리보기가 나옵니다")); }
-renderHead(); renderSide(); refresh(); poll();
+S.skipSys = store.get("skipSys", true); $("a-sys").checked = S.skipSys;
+renderHead(); renderSide(); poll();
+setMode(store.get("mode", "name"));
 </script>
 </body>
 </html>
