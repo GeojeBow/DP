@@ -43,6 +43,7 @@ jobs:
           $s = Invoke-RestMethod 'http://127.0.0.1:18777/api/search?q=REASearch.exe&limit=5' -Headers $h
           $f = Invoke-RestMethod 'http://127.0.0.1:18777/api/facets?q=.dll' -Headers $h
           $u = Invoke-RestMethod "http://127.0.0.1:18777/api/search?q=.dll&limit=1&under=$($f.folder.folders[0].key)" -Headers $h
+          $g = Invoke-RestMethod 'http://127.0.0.1:18777/api/search?q=.dll&limit=3&ext=dll&within=!zzzz&group=folder' -Headers $h
           $rep = Invoke-RestMethod http://127.0.0.1:18777/api/report -Headers $h
           $log = Invoke-RestMethod http://127.0.0.1:18777/api/log -Headers $h
           Stop-Process $p.Id
@@ -53,9 +54,40 @@ jobs:
           "found: $($s.total)"
           "facets for .dll: $(($f.folder.crumbs | ForEach-Object name) -join ' > ') | top: $($f.folder.folders[0].name) $($f.folder.folders[0].count) | narrowed: $($u.total)"
           if ($s.total -lt 1) { exit 1 }
+          "grouped by folder: $($g.total) in $($g.groups.Count) folders, first row in '$($g.rows[0].gk)'"
           if ($u.total -ne $f.folder.folders[0].count) { exit 1 }
+          if ($g.groups.Count -lt 1 -or -not $g.rows[0].gk) { exit 1 }
       - name: Release build
         run: go build -trimpath -ldflags "-H windowsgui -s -w" -o release\REASearch.exe .
+      # The release exe opens its own WebView2 window (taskbar shows REA
+      # Search, not Edge). A screenshot of the desktop is kept as an artifact.
+      - name: Own window
+        shell: pwsh
+        run: |
+          $p = Start-Process .\release\REASearch.exe -ArgumentList '-no-admin','-port','18778' -PassThru
+          $title = ''
+          for ($i = 0; $i -lt 40 -and -not $title; $i++) { Start-Sleep 1; $p.Refresh(); $title = $p.MainWindowTitle }
+          Start-Sleep 4
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("$PWD\window.png")
+          } catch { "screenshot failed: $_" }
+          $edge = Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -match '--app=' }
+          $wv = Get-Process msedgewebview2 -ErrorAction SilentlyContinue
+          Select-String -Path "$env:LOCALAPPDATA\REASearch\REASearch.log" -Pattern 'WebView2|창' -ErrorAction SilentlyContinue | Select-Object -Last 5 | ForEach-Object { "log: $($_.Line)" }
+          Stop-Process $p.Id
+          "window title: '$title' | webview2 processes: $(@($wv).Count) | edge app windows: $(@($edge).Count)"
+          if ($edge) { 'fell back to an Edge app window'; exit 1 }
+          if ($title -ne 'REA Search' -or -not $wv) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: window-screenshot
+          path: apps/rea-search/go/window.png
+          if-no-files-found: ignore
       - name: Python version tests
         working-directory: apps/rea-search
         run: python -m unittest -v tests/test_index.py
@@ -76,7 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: apps/rea-search/README.md
+          sparse-checkout: |
+            apps/rea-search/README.md
+            apps/rea-search/THIRD_PARTY_NOTICES.txt
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
@@ -85,7 +119,7 @@ jobs:
       - name: Make the zip
         run: |
           mkdir REASearch
-          cp dl/REASearch.exe apps/rea-search/README.md REASearch/
+          cp dl/REASearch.exe apps/rea-search/README.md apps/rea-search/THIRD_PARTY_NOTICES.txt REASearch/
           zip -r REASearch.zip REASearch
       - name: Replace the rea-search-latest release
         env:

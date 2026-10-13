@@ -78,9 +78,10 @@ func alert(msg string) {
 	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x30) // MB_ICONWARNING
 }
 
-// openWindow opens the search page as an app window (Edge or Chrome
+// openAppWindow opens the search page as an app window (Edge or Chrome
 // "--app" mode: no tabs or address bar), falling back to the default browser.
-func openWindow(url string) error {
+// Used when WebView2 is not available.
+func openAppWindow(url string) error {
 	var cands []string
 	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
 		base := os.Getenv(env)

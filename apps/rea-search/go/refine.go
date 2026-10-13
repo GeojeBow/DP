@@ -1,13 +1,14 @@
 package main
 
-// Narrowing a result list from inside it: "only what is under this folder"
-// and "only these extensions", with counts per subfolder and per extension
-// so the user can see where the results are and click into them.
+// Narrowing a result list from inside it (the filter bar and the column
+// filters): file type, extension, folder, text within the results, date and
+// size, each with counts of what it would leave, plus grouping.
 
 import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func keyStr(k uint64) string { return strconv.FormatUint(k, 10) }
@@ -17,13 +18,25 @@ func parseKey(s string) (uint64, bool) {
 	return k, err == nil
 }
 
-// Refine is the in-results narrowing chosen in the facet panel.
-type Refine struct {
-	Under uint64   // folder key, 0 = everywhere
-	Exts  []string // lower case, "" = files without an extension
+// Slice is the narrowing chosen in the filter bar. Every part is ANDed.
+type Slice struct {
+	Cats    []string // categories (doc, image, folder...), none = all
+	Exts    []string // lower case, "" = no extension, "/" = folders
+	Under   uint64   // folder key, 0 = everywhere
+	Within  string   // words the name (or path, with \ or /) must contain; !word excludes
+	After   int64    // modified at or after (unix), 0 = no limit
+	Before  int64    // modified before (unix), 0 = no limit
+	MinSize int64    // bytes, -1 = no limit
+	MaxSize int64
 }
 
-func (r Refine) active() bool { return r.Under != 0 || len(r.Exts) > 0 }
+func noSlice() Slice { return Slice{MinSize: -1, MaxSize: -1} }
+
+func (s Slice) timeOn() bool { return s.After > 0 || s.Before > 0 }
+func (s Slice) sizeOn() bool { return s.MinSize >= 0 || s.MaxSize >= 0 }
+func (s Slice) active() bool {
+	return len(s.Cats) > 0 || len(s.Exts) > 0 || s.Under != 0 || strings.TrimSpace(s.Within) != "" || s.timeOn() || s.sizeOn()
+}
 
 // Parent returns the folder holding k; ok is false at a drive or share root.
 func (v *View) Parent(k uint64) (uint64, bool) {
@@ -165,43 +178,247 @@ func extKey(name string, dir bool) string {
 	return e // already lower case: no copy
 }
 
-// ApplyRefine narrows keys (keeping their order) and returns the facets:
-// folders are counted over results matching the extension choice, and
-// extensions over results under the chosen folder, so either can be changed
-// while seeing what the other would leave.
-func ApplyRefine(v *View, keys []uint64, rf Refine) ([]uint64, FolderFacet, []ExtCount) {
+// RangeCount is one date or size choice with how many results it would leave.
+type RangeCount struct {
+	ID    string `json:"id"`
+	From  int64  `json:"from"` // after / min size (-1 none)
+	To    int64  `json:"to"`   // before / max size (-1 none)
+	Count int    `json:"count"`
+}
+
+// SliceFacets is what the filter bar shows: for each part, the counts it
+// would give with the other parts kept (so choices can be changed while
+// seeing what each would leave), and totals for the narrowed list.
+type SliceFacets struct {
+	Total     int            `json:"total"`
+	Bytes     int64          `json:"bytes"`
+	MetaKnown bool           `json:"metaKnown"` // sizes and dates read for all results
+	Cats      map[string]int `json:"cats"`
+	Exts      []ExtCount     `json:"exts"`
+	Folder    FolderFacet    `json:"folder"`
+	Under     string         `json:"under"` // folder the panel shows (may be deeper than asked)
+	Dates     []RangeCount   `json:"dates"`
+	Sizes     []RangeCount   `json:"sizes"`
+}
+
+const (
+	dimCat = 1 << iota
+	dimExt
+	dimUnder
+	dimWithin
+	dimTime
+	dimSize
+	dimAll = dimCat | dimExt | dimUnder | dimWithin | dimTime | dimSize
+)
+
+// FacetMetaLimit is how many results get their size and date read just to
+// count the date and size choices (a filter on them reads them anyway).
+const FacetMetaLimit = 60000
+
+func datePresets(now time.Time) []RangeCount {
+	mid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	day := func(n int) int64 { return mid.AddDate(0, 0, n).Unix() }
+	jan1 := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+	return []RangeCount{
+		{ID: "today", From: day(0), To: 0},
+		{ID: "yesterday", From: day(-1), To: day(0)},
+		{ID: "7d", From: day(-6), To: 0},
+		{ID: "30d", From: day(-29), To: 0},
+		{ID: "year", From: jan1.Unix(), To: 0},
+		{ID: "lastyear", From: jan1.AddDate(-1, 0, 0).Unix(), To: jan1.Unix()},
+		{ID: "old", From: 0, To: now.AddDate(-1, 0, 0).Unix()},
+	}
+}
+
+func sizePresets() []RangeCount {
+	const kb, mb, gb = 1 << 10, 1 << 20, 1 << 30
+	return []RangeCount{
+		{ID: "zero", From: 0, To: 0},
+		{ID: "tiny", From: 1, To: 100*kb - 1},
+		{ID: "small", From: 100 * kb, To: mb - 1},
+		{ID: "medium", From: mb, To: 10*mb - 1},
+		{ID: "large", From: 10 * mb, To: 100*mb - 1},
+		{ID: "huge", From: 100 * mb, To: gb - 1},
+		{ID: "giant", From: gb, To: -1},
+	}
+}
+
+func inTime(m meta, after, before int64) bool {
+	return (after <= 0 || m.mod >= after) && (before <= 0 || m.mod < before)
+}
+
+func inSize(m meta, min, max int64) bool {
+	return m.size >= 0 && (min < 0 || m.size >= min) && (max < 0 || m.size <= max)
+}
+
+type withinTerm struct {
+	text string
+	not  bool
+	path bool
+}
+
+func parseWithin(s string) []withinTerm {
+	var out []withinTerm
+	for _, f := range strings.Fields(strings.ToLower(s)) {
+		t := withinTerm{text: f}
+		if strings.HasPrefix(f, "!") || strings.HasPrefix(f, "-") && len(f) > 1 {
+			t.not, t.text = true, f[1:]
+		}
+		t.path = strings.ContainsAny(t.text, `\/`)
+		if t.text != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// ApplySlice narrows keys (keeping their order). With facets it also counts
+// every choice; that reads sizes and dates for up to FacetMetaLimit results.
+func ApplySlice(v *View, keys []uint64, sl Slice, facets bool) ([]uint64, *SliceFacets) {
+	cats := map[string]bool{}
+	for _, c := range sl.Cats {
+		cats[c] = true
+	}
 	exts := map[string]bool{}
-	for _, e := range rf.Exts {
+	for _, e := range sl.Exts {
 		exts[e] = true
 	}
-	r := newRefiner(v, rf.Under)
-	out := make([]uint64, 0, len(keys))
+	terms := parseWithin(sl.Within)
+	metaKnown := false
+	if sl.timeOn() || sl.sizeOn() {
+		v.EnsureMeta(keys[:min(len(keys), MetaLimit)], nil)
+		metaKnown = len(keys) <= MetaLimit
+	} else if facets && len(keys) <= FacetMetaLimit {
+		v.EnsureMeta(keys, nil)
+		metaKnown = true
+	}
+	var dates, sizes []RangeCount
+	var fac *SliceFacets
+	if facets {
+		dates, sizes = datePresets(time.Now()), sizePresets()
+		fac = &SliceFacets{Cats: map[string]int{}, MetaKnown: metaKnown}
+	}
+	r := newRefiner(v, sl.Under)
 	byFolder := map[uint64]int{}
 	byExt := map[string]int{}
 	here := 0
+	out := make([]uint64, 0, min(len(keys), 1<<16))
 	for _, k := range keys {
 		name, dir, par, hasPar, ok := v.nodeParent(k)
 		if !ok {
 			continue
 		}
-		b := r.bucketOf(k, par, hasPar)
-		if rf.Under != 0 && b == noChild {
+		pass := dimAll
+		var cat, e string
+		if len(cats) > 0 || fac != nil {
+			if cat = categoryOf(name, dir); len(cats) > 0 && !cats[cat] {
+				pass &^= dimCat
+			}
+		}
+		if len(exts) > 0 || fac != nil {
+			if e = extKey(name, dir); len(exts) > 0 && !exts[e] {
+				pass &^= dimExt
+			}
+		}
+		b := noChild
+		if sl.Under != 0 || fac != nil {
+			if b = r.bucketOf(k, par, hasPar); sl.Under != 0 && b == noChild {
+				pass &^= dimUnder
+			}
+		}
+		if fac == nil && pass != dimAll {
 			continue
 		}
-		e := extKey(name, dir)
-		byExt[e]++
-		if len(exts) > 0 && !exts[e] {
+		if len(terms) > 0 {
+			lower := strings.ToLower(name)
+			var path string
+			for _, t := range terms {
+				hay := lower
+				if t.path {
+					if path == "" {
+						path = strings.ToLower(v.Path(k))
+					}
+					hay = path
+				}
+				if strings.Contains(hay, t.text) == t.not {
+					pass &^= dimWithin
+					break
+				}
+			}
+		}
+		var m meta
+		if sl.timeOn() || sl.sizeOn() || metaKnown {
+			m, _ = v.Meta(k)
+		}
+		if sl.timeOn() && (!m.ok || !inTime(m, sl.After, sl.Before)) {
+			pass &^= dimTime
+		}
+		if sl.sizeOn() && (!m.ok || dir || !inSize(m, sl.MinSize, sl.MaxSize)) {
+			pass &^= dimSize
+		}
+		if pass == dimAll {
+			out = append(out, k)
+		}
+		if fac == nil {
 			continue
 		}
-		if b == k && rf.Under != 0 {
-			here++ // directly in the folder (a matching subfolder counts here, not as its own bucket)
-		} else {
-			byFolder[b]++
+		others := func(d int) bool { return pass|d == dimAll }
+		if others(dimCat) {
+			fac.Cats[cat]++
 		}
-		out = append(out, k)
+		if others(dimExt) {
+			byExt[e]++
+		}
+		if pass == dimAll {
+			if b == k && sl.Under != 0 {
+				here++ // directly in the folder (a matching subfolder counts here)
+			} else {
+				byFolder[b]++
+			}
+			if m.ok && !dir && m.size > 0 {
+				fac.Bytes += m.size
+			}
+		}
+		if metaKnown && m.ok {
+			if others(dimTime) {
+				for i := range dates {
+					if inTime(m, dates[i].From, dates[i].To) {
+						dates[i].Count++
+					}
+				}
+			}
+			if others(dimSize) && !dir {
+				for i := range sizes {
+					if inSize(m, sizes[i].From, sizes[i].To) {
+						sizes[i].Count++
+					}
+				}
+			}
+		}
 	}
+	if fac == nil {
+		return out, nil
+	}
+	fac.Total = len(out)
+	fac.Dates, fac.Sizes = dates, sizes
+	fac.Folder = folderFacet(v, sl.Under, byFolder, here)
+	for e, n := range byExt {
+		fac.Exts = append(fac.Exts, ExtCount{Ext: e, Count: n})
+	}
+	sort.Slice(fac.Exts, func(i, j int) bool {
+		a, b := fac.Exts[i], fac.Exts[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		return a.Ext < b.Ext
+	})
+	fac.Under = keyStr(sl.Under)
+	return out, fac
+}
+
+func folderFacet(v *View, under uint64, byFolder map[uint64]int, here int) FolderFacet {
 	ff := FolderFacet{Here: here}
-	for f := rf.Under; f != 0; {
+	for f := under; f != 0; {
 		name, _, ok := v.Node(f)
 		if !ok {
 			break
@@ -218,7 +435,7 @@ func ApplyRefine(v *View, keys []uint64, rf Refine) ([]uint64, FolderFacet, []Ex
 	}
 	for f, n := range byFolder {
 		name, _, _ := v.Node(f)
-		if rf.Under == 0 {
+		if under == 0 {
 			name = v.Path(f) // roots: "C:", "\\server\share"
 		}
 		ff.Folders = append(ff.Folders, FolderCount{Key: keyStr(f), Name: name, Count: n})
@@ -230,43 +447,127 @@ func ApplyRefine(v *View, keys []uint64, rf Refine) ([]uint64, FolderFacet, []Ex
 		}
 		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	})
-	const showFolders = 60
+	const showFolders = 80
 	if len(ff.Folders) > showFolders {
 		ff.More = len(ff.Folders) - showFolders
 		ff.Folders = ff.Folders[:showFolders]
 	}
-	var ec []ExtCount
-	for e, n := range byExt {
-		ec = append(ec, ExtCount{Ext: e, Count: n})
-	}
-	sort.Slice(ec, func(i, j int) bool {
-		if ec[i].Count != ec[j].Count {
-			return ec[i].Count > ec[j].Count
-		}
-		return ec[i].Ext < ec[j].Ext
-	})
-	return out, ff, ec
+	return ff
 }
 
-// RefineAuto is ApplyRefine, but when every result sits in one subfolder
-// (and none directly in the chosen one) it goes deeper until there is a
-// choice to show, so the panel opens at e.g. D:\업무\2024 with its
-// subfolders instead of a single "D:" line. The result list is the same
-// either way, since everything was inside that subfolder.
-func RefineAuto(v *View, keys []uint64, rf Refine) ([]uint64, FolderFacet, []ExtCount, uint64) {
-	out, ff, ec := ApplyRefine(v, keys, rf)
-	for i := 0; i < 64 && len(ff.Folders) == 1 && ff.Here == 0 && ff.More == 0; i++ {
-		k, _ := parseKey(ff.Folders[0].Key)
+// SliceAuto is ApplySlice with facets, but when every result sits in one
+// subfolder (and none directly in the chosen one) the folder panel goes
+// deeper until there is a choice to show, so it opens at e.g. D:\업무\2024
+// with its subfolders instead of a single "D:" line. The result list is the
+// same either way, since everything was inside that subfolder.
+func SliceAuto(v *View, keys []uint64, sl Slice) ([]uint64, *SliceFacets) {
+	out, fac := ApplySlice(v, keys, sl, true)
+	for i := 0; i < 64 && len(fac.Folder.Folders) == 1 && fac.Folder.Here == 0 && fac.Folder.More == 0; i++ {
+		k, _ := parseKey(fac.Folder.Folders[0].Key)
 		if _, dir, _ := v.Node(k); !dir {
 			break
 		}
-		next := rf
+		next := sl
 		next.Under = k
-		o2, f2, e2 := ApplyRefine(v, keys, next)
-		if len(o2) != len(out) || len(f2.Folders) == 0 && f2.Here == 0 {
+		o2, f2 := ApplySlice(v, keys, next, true)
+		if len(o2) != len(out) || len(f2.Folder.Folders) == 0 && f2.Folder.Here == 0 {
 			break
 		}
-		out, ff, ec, rf = o2, f2, e2, next
+		out, fac, sl = o2, f2, next
 	}
-	return out, ff, ec, rf.Under
+	return out, fac
+}
+
+// ---- grouping ----
+
+// GroupInfo is one group of a grouped result list, in display order.
+type GroupInfo struct {
+	Key   string `json:"key"`
+	Count int    `json:"count"`
+}
+
+// groupKey is the group of one result for "folder", "cat", "ext", "date"
+// or "size"; date and size use the preset ids (disjoint buckets).
+func groupKey(v *View, k uint64, by string, dates []RangeCount) string {
+	name, dir, _ := v.Node(k)
+	switch by {
+	case "folder":
+		return v.Folder(k)
+	case "cat":
+		return categoryOf(name, dir)
+	case "ext":
+		return extKey(name, dir)
+	case "date":
+		m, ok := v.Meta(k)
+		if !ok || !m.ok {
+			return "unknown"
+		}
+		// today, yesterday, rest of 7 days, rest of 30 days, rest of this year, last year, older
+		for _, id := range []string{"today", "yesterday", "7d", "30d", "year", "lastyear"} {
+			for _, d := range dates {
+				if d.ID == id && inTime(m, d.From, d.To) {
+					return id
+				}
+			}
+		}
+		return "older"
+	case "size":
+		if dir {
+			return "folder"
+		}
+		m, ok := v.Meta(k)
+		if !ok || !m.ok {
+			return "unknown"
+		}
+		for _, s := range sizePresets() {
+			if inSize(m, s.From, s.To) {
+				return s.ID
+			}
+		}
+	}
+	return ""
+}
+
+var groupOrder = map[string][]string{
+	"cat":  categoryOrder,
+	"date": {"today", "yesterday", "7d", "30d", "year", "lastyear", "older", "unknown"},
+	"size": {"giant", "huge", "large", "medium", "small", "tiny", "zero", "folder", "unknown"},
+}
+
+// GroupBy reorders keys so each group is together (keeping the order inside
+// a group) and returns the groups in display order with each key's group.
+func GroupBy(v *View, keys []uint64, by string) ([]uint64, []GroupInfo, map[uint64]string) {
+	if by == "date" || by == "size" {
+		v.EnsureMeta(keys[:min(len(keys), MetaLimit)], nil)
+	}
+	dates := datePresets(time.Now())
+	gk := make(map[uint64]string, len(keys))
+	count := map[string]int{}
+	for _, k := range keys {
+		g := groupKey(v, k, by, dates)
+		gk[k] = g
+		count[g]++
+	}
+	var order []string
+	if o, ok := groupOrder[by]; ok {
+		for _, g := range o {
+			if count[g] > 0 {
+				order = append(order, g)
+			}
+		}
+	} else {
+		for g := range count {
+			order = append(order, g)
+		}
+		sort.Slice(order, func(i, j int) bool { return strings.ToLower(order[i]) < strings.ToLower(order[j]) })
+	}
+	rank := map[string]int{}
+	groups := make([]GroupInfo, len(order))
+	for i, g := range order {
+		rank[g] = i
+		groups[i] = GroupInfo{Key: g, Count: count[g]}
+	}
+	out := append([]uint64(nil), keys...)
+	sort.SliceStable(out, func(i, j int) bool { return rank[gk[out[i]]] < rank[gk[out[j]]] })
+	return out, groups, gk
 }

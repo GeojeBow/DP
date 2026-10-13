@@ -30,3 +30,6 @@ func fileCreated(st os.FileInfo) int64 { return 0 }
 func alert(msg string) { logf("%s", msg) }
 
 func openWindow(url string) error { return openBrowser(url) }
+
+// uiLoop keeps the main goroutine busy; windows open in the browser here.
+func uiLoop() { select {} }

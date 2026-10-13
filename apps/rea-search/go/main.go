@@ -128,9 +128,13 @@ func main() {
 			}
 		}()
 	}
-	if err := http.Serve(ln, s.routes()); err != nil {
-		alert(err.Error())
-	}
+	go func() {
+		if err := http.Serve(ln, s.routes()); err != nil {
+			alert(err.Error())
+			os.Exit(1)
+		}
+	}()
+	uiLoop() // the window lives on the main thread; never returns
 }
 
 func instancePath() string { return filepath.Join(dataDir(), "instance.json") }
@@ -146,31 +150,41 @@ func isRunning() bool {
 	return ok
 }
 
-// openRunning opens a window on an already running instance, if any.
+// openRunning asks an already running instance to show its window, if any.
+// The window belongs to that instance (this copy exits right away).
 func openRunning() bool {
-	host, ok := runningHost()
+	host, token, ok := runningInstance()
 	if ok {
-		openWindow("http://" + host + "/")
+		req, _ := http.NewRequest("POST", "http://"+host+"/api/summon", nil)
+		req.Header.Set("X-Token", token)
+		if resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req); err == nil {
+			resp.Body.Close()
+		}
 	}
 	return ok
 }
 
 func runningHost() (string, bool) {
+	host, _, ok := runningInstance()
+	return host, ok
+}
+
+func runningInstance() (string, string, bool) {
 	b, err := os.ReadFile(instancePath())
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
 	var in instance
 	if json.Unmarshal(b, &in) != nil || in.Port == 0 {
-		return "", false
+		return "", "", false
 	}
 	host := fmt.Sprintf("127.0.0.1:%d", in.Port)
 	req, _ := http.NewRequest("GET", "http://"+host+"/api/ping", nil)
 	req.Header.Set("X-Token", in.Token)
 	resp, err := (&http.Client{Timeout: 2 * time.Second}).Do(req)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
 	resp.Body.Close()
-	return host, resp.StatusCode == 200
+	return host, in.Token, resp.StatusCode == 200
 }

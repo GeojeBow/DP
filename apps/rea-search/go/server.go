@@ -33,21 +33,21 @@ type row struct {
 	Group  int    `json:"group,omitempty"`
 	Files  int32  `json:"files,omitempty"`  // folder size view: files inside
 	Approx bool   `json:"approx,omitempty"` // folder size still being read
+	GK     string `json:"gk,omitempty"`     // grouped view: the row's group
 }
 
 type cached struct {
 	sig       string
 	version   int
 	keys      []uint64
-	facets    map[string]int
-	groups    map[uint64]int
+	groups    map[uint64]int // duplicate groups
 	fsizes    map[uint64]FolderTotal
-	base      []uint64 // before the facet panel's narrowing
-	rf        Refine
+	base      []uint64 // before the filter bar's narrowing
+	sl        Slice
 	facetOnce sync.Once
-	folder    FolderFacet
-	exts      []ExtCount
-	under     uint64 // folder the facet panel shows (may be deeper than asked)
+	fac       *SliceFacets
+	glist     []GroupInfo       // grouped view: groups in order
+	gk        map[uint64]string // grouped view: each key's group
 	truncated bool
 	err       string
 }
@@ -275,6 +275,9 @@ func (s *server) routes() *http.ServeMux {
 		"/api/status":         s.status,
 		"/api/search":         s.search,
 		"/api/facets":         s.facets,
+		"/api/fileop":         s.fileOp,
+		"/api/pickfolder":     s.pickFolderHandler,
+		"/api/summon":         func(w http.ResponseWriter, r *http.Request) { s.summon(); writeJSON(w, "ok") },
 		"/api/schedule":       s.schedule,
 		"/api/manual":         s.manual,
 		"/api/open":           s.open,
@@ -433,7 +436,8 @@ type searchParams struct {
 	f     Filter
 	dups  int  // 1 same name and size, 2 same content
 	fsize bool // folders by total size
-	rf    Refine
+	sl    Slice
+	group string // folder, cat, ext, date, size
 }
 
 func num(r *http.Request, k string, def int64) int64 {
@@ -450,15 +454,22 @@ func parseSearch(r *http.Request) searchParams {
 	p := searchParams{
 		q:    g("q"),
 		opts: NameOpts{Case: on("case"), Path: on("path"), Regex: on("regex")},
-		f: Filter{Category: g("cat"), MinSize: num(r, "min", -1), MaxSize: num(r, "max", -1),
+		f: Filter{MinSize: num(r, "min", -1), MaxSize: num(r, "max", -1),
 			After: num(r, "after", 0), Before: num(r, "before", 0), Sort: g("sort"), Desc: on("desc")},
 		dups:  int(num(r, "dups", 0)),
 		fsize: on("fsize"),
+		group: g("group"),
+		sl: Slice{Within: g("within"), After: num(r, "sa", 0), Before: num(r, "sb", 0),
+			MinSize: num(r, "smin", -1), MaxSize: num(r, "smax", -1)},
 	}
-	p.rf.Under, _ = parseKey(g("under"))
-	if e := g("ext"); e != "" {
-		p.rf.Exts = strings.Split(strings.ToLower(e), ",")
+	p.sl.Under, _ = parseKey(g("under"))
+	list := func(k string) []string {
+		if v := g(k); v != "" {
+			return strings.Split(strings.ToLower(v), ",")
+		}
+		return nil
 	}
+	p.sl.Exts, p.sl.Cats = list("ext"), list("cat")
 	if !p.opts.Regex {
 		p.q = extractFilterTokens(p.q, &p.f, time.Now())
 	}
@@ -466,7 +477,7 @@ func parseSearch(r *http.Request) searchParams {
 }
 
 func (p searchParams) sig() string {
-	return fmt.Sprintf("%q|%v|%+v|%v|%v|%v", p.q, p.opts, p.f, p.dups, p.fsize, p.rf)
+	return fmt.Sprintf("%q|%v|%+v|%v|%v|%+v|%s", p.q, p.opts, p.f, p.dups, p.fsize, p.sl, p.group)
 }
 
 // run returns the full (cached) result list for the parameters.
@@ -487,13 +498,12 @@ func (s *server) run(p searchParams) *cached {
 		}
 	}
 	keys := v.SearchOpts(p.q, p.opts)
-	c.facets = Facets(v, keys)
 	if p.fsize {
 		c.fsizes = v.FolderSizes()
 		f := p.f
 		f.Category, f.Sort = "folder", ""
 		keys, c.truncated = Apply(v, keys, f, nil)
-		keys = append([]uint64{}, c.refine(v, keys, p.rf)...)
+		keys = append([]uint64{}, c.slice(v, keys, p.sl)...)
 		sort.SliceStable(keys, func(i, j int) bool {
 			a, b := c.fsizes[keys[i]], c.fsizes[keys[j]]
 			if p.f.Sort == "name" {
@@ -509,31 +519,35 @@ func (s *server) run(p searchParams) *cached {
 		return c
 	}
 	keys, c.truncated = Apply(v, keys, p.f, nil)
-	keys = c.refine(v, keys, p.rf)
+	keys = c.slice(v, keys, p.sl)
 	switch p.dups {
 	case 1:
 		keys, c.groups = Duplicates(v, keys, nil)
 	case 2:
 		keys, c.groups = DuplicatesByContent(v, keys)
+	default:
+		if p.group != "" {
+			keys, c.glist, c.gk = GroupBy(v, keys, p.group)
+		}
 	}
 	c.keys = keys
 	s.last = c
 	return c
 }
 
-// refine keeps the list before the facet panel's narrowing (for its counts)
+// slice keeps the list before the filter bar's narrowing (for its counts)
 // and returns the narrowed list.
-func (c *cached) refine(v *View, keys []uint64, rf Refine) []uint64 {
-	c.base, c.rf = keys, rf
-	if !rf.active() {
+func (c *cached) slice(v *View, keys []uint64, sl Slice) []uint64 {
+	c.base, c.sl = keys, sl
+	if !sl.active() {
 		return keys
 	}
-	out, _, _ := ApplyRefine(v, keys, rf)
+	out, _ := ApplySlice(v, keys, sl, false)
 	return out
 }
 
-// facets answers the panel next to the results: subfolders and extensions
-// with counts. It is asked for after the results are on screen, so a large
+// facets answers the filter bar: counts for every choice, subfolders and
+// totals. It is asked for after the results are on screen, so a large
 // result list never waits for it.
 func (s *server) facets(w http.ResponseWriter, r *http.Request) {
 	p := parseSearch(r)
@@ -543,9 +557,9 @@ func (s *server) facets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.facetOnce.Do(func() {
-		_, c.folder, c.exts, c.under = RefineAuto(s.eng.View(), c.base, c.rf)
+		_, c.fac = SliceAuto(s.eng.View(), c.base, c.sl)
 	})
-	writeJSON(w, map[string]any{"folder": c.folder, "exts": c.exts, "under": keyStr(c.under), "total": len(c.keys)})
+	writeJSON(w, c.fac)
 }
 
 func (s *server) rowFor(v *View, k uint64, groups map[uint64]int) (row, bool) {
@@ -589,10 +603,13 @@ func (s *server) search(w http.ResponseWriter, r *http.Request) {
 			if t, ok := c.fsizes[k]; ok && rw.Dir {
 				rw.Size, rw.Files, rw.Approx = t.Bytes, t.Files, !t.Known
 			}
+			if c.gk != nil {
+				rw.GK = c.gk[k]
+			}
 			rows = append(rows, rw)
 		}
 	}
-	writeJSON(w, map[string]any{"total": len(c.keys), "ms": ms, "rows": rows, "facets": c.facets,
+	writeJSON(w, map[string]any{"total": len(c.keys), "ms": ms, "rows": rows, "groups": c.glist,
 		"truncated": c.truncated, "version": c.version})
 }
 

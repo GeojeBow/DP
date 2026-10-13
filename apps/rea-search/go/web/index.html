@@ -93,13 +93,13 @@ tbody tr:hover td { background:var(--hover); }
 tbody tr.sel td { background:var(--sel); }
 tr.g-odd td { background:color-mix(in srgb, var(--chip) 55%, transparent); }
 tr.ghead td { background:var(--bg); color:var(--muted); font-size:12px; font-weight:600; padding-top:10px; }
-.c-name { width:30%; } .c-folder { width:40%; } .c-size { width:10%; text-align:right; } .c-mod { width:12%; } .c-type { width:8%; }
+.c-name { width:30%; } .c-folder { width:37%; } .c-size { width:10%; text-align:right; } .c-mod { width:13%; } .c-type { width:8%; }
 td.c-size { text-align:right; font-variant-numeric:tabular-nums; color:var(--muted); }
 td.c-mod, td.c-type, td.c-folder { color:var(--muted); font-variant-numeric:tabular-nums; }
 .nm { display:flex; align-items:center; gap:7px; min-width:0; }
 .nm span { overflow:hidden; text-overflow:ellipsis; }
 mark { background:var(--mark); color:var(--mark-fg); border-radius:2px; padding:0 1px; }
-td.snips { padding:0 10px 8px 37px; }
+td.snips { padding:0 10px 8px 71px; }
 .snip { display:flex; gap:8px; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:"Cascadia Mono","D2Coding",Consolas,monospace; }
 .snip b { color:var(--faint); font-weight:400; min-width:38px; text-align:right; }
 .badge { font-size:10px; border-radius:4px; padding:0 5px; background:var(--chip); color:var(--muted); margin-left:6px; flex:none; }
@@ -219,6 +219,104 @@ body.noside aside#side { display:none; }
   #preview { width:300px; } .c-type, .c-mod { display:none; }
 }
 @media (max-width:600px) { body.pv #preview { position:fixed; inset:0; width:auto; z-index:15; } .c-folder { display:none; } .c-name { width:70%; } .brand span { display:none; } }
+.c-chk { width:34px; padding-left:12px !important; padding-right:0 !important; }
+.cb { width:15px; height:15px; border:1.5px solid var(--faint); border-radius:4px; display:grid; place-items:center; cursor:pointer; color:var(--accent-fg); font-size:11px; line-height:1; background:var(--input); }
+.cb:hover { border-color:var(--accent); }
+tr.sel .cb, .cb.on, .cb.some { background:var(--accent); border-color:var(--accent); }
+tr.sel .cb::after, .cb.on::after { content:"✓"; }
+.cb.some::after { content:"–"; }
+th .lbl { cursor:inherit; }
+th .fx { visibility:hidden; border:0; background:transparent; border-radius:4px; padding:1px 3px; margin-left:4px; cursor:pointer; color:var(--faint); vertical-align:-2px; line-height:0; }
+th:hover .fx, th .fx.on { visibility:visible; }
+th .fx:hover { background:var(--hover); color:var(--fg); }
+th .fx.on { color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, transparent); }
+#fbar { display:flex; align-items:center; gap:6px; padding:6px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+body.nofilter #fbar, body.nofilter #sumbar { display:none; }
+.within { display:flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--input); border-radius:16px; padding:0 4px 0 9px; width:240px; color:var(--muted); }
+.within:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.within.on { border-color:var(--accent); color:var(--accent); }
+.within input { border:0; outline:0; background:transparent; padding:4px 0; flex:1; min-width:0; font-size:12px; }
+.within button { border:0; background:transparent; color:var(--faint); cursor:pointer; border-radius:50%; width:18px; height:18px; padding:0; }
+.within button:hover { color:var(--bad); }
+.pillb { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--panel); border-radius:16px; padding:4px 10px; cursor:pointer; font-size:12px; max-width:280px; }
+.pillb:hover { background:var(--hover); }
+.pillb .t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pillb .cv { color:var(--faint); font-size:9px; }
+.pillb.on { border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:color-mix(in srgb, var(--accent) 12%, var(--panel)); color:var(--accent); font-weight:600; }
+.pillb .x { border-radius:50%; width:16px; height:16px; display:grid; place-items:center; font-size:10px; margin-right:-4px; flex:none; }
+.pillb .x:hover { background:color-mix(in srgb, var(--bad) 18%, transparent); color:var(--bad); }
+.pillb.open { box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.vsep { width:1px; height:20px; background:var(--line); margin:0 2px; }
+#fbar .btn { padding:4px 8px; font-size:12px; }
+#sumbar { display:flex; align-items:center; gap:10px; padding:5px 10px; border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); flex-wrap:wrap; min-height:31px; transition:opacity .15s; }
+#sumbar.stale { opacity:.55; }
+#sum-text { white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--fg); }
+.stack { display:flex; height:8px; width:180px; border-radius:4px; overflow:hidden; background:var(--chip); flex:none; }
+.stack i { display:block; height:100%; cursor:pointer; min-width:3px; }
+.stack i.dim { opacity:.25; }
+.stack i:hover { filter:brightness(1.2); }
+.legend { display:flex; gap:2px; flex-wrap:wrap; }
+.legend button { border:0; background:transparent; cursor:pointer; color:var(--muted); font-size:12px; padding:1px 5px; border-radius:4px; display:inline-flex; align-items:center; gap:4px; }
+.legend button:hover { background:var(--hover); color:var(--fg); }
+.legend button.on { color:var(--fg); font-weight:600; }
+#sugg { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-left:auto; }
+.sg { border:1px dashed color-mix(in srgb, var(--accent) 55%, transparent); background:transparent; color:var(--accent); border-radius:14px; padding:2px 9px; cursor:pointer; font-size:12px; }
+.sg:hover { background:color-mix(in srgb, var(--accent) 10%, transparent); border-style:solid; }
+.pop { position:fixed; z-index:25; display:none; width:310px; max-height:min(470px, calc(100vh - 60px)); background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); flex-direction:column; overflow:hidden; }
+.pop.show { display:flex; }
+.pop-head { display:flex; align-items:baseline; gap:8px; padding:10px 12px 6px; font-weight:600; }
+.pop-head .hint { font-weight:400; }
+.pop-body { overflow:auto; padding:2px 6px 6px; flex:1; min-height:0; }
+.pop-foot { display:flex; gap:6px; padding:8px 10px; border-top:1px solid var(--line); align-items:center; }
+.pop-foot .btn { padding:4px 10px; font-size:12px; }
+.pop input[type=text], .pop input[type=date], .pop input[type=number] { border:1px solid var(--line); background:var(--input); border-radius:6px; padding:4px 8px; min-width:0; }
+.pop .search { margin:0 12px 6px; }
+.opt { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; text-align:left; padding:5px 6px; border-radius:6px; cursor:pointer; position:relative; }
+.opt:hover { background:var(--hover); }
+.opt .n { margin-left:auto; color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; flex:none; }
+.opt .only { display:none; border:1px solid var(--line); background:var(--panel); border-radius:5px; font-size:11px; padding:0 6px; color:var(--accent); flex:none; }
+.opt .only + .n { margin-left:6px; }
+.opt:hover .only { display:inline-block; margin-left:auto; }
+.opt.zero { color:var(--faint); }
+.opt .chk, .opt .rad { width:15px; height:15px; border:1.5px solid var(--faint); border-radius:4px; flex:none; display:grid; place-items:center; font-size:10px; color:var(--accent-fg); }
+.opt .rad { border-radius:50%; }
+.opt.on .chk { background:var(--accent); border-color:var(--accent); }
+.opt.on .chk::after { content:"✓"; }
+.opt.on .rad { border-color:var(--accent); background:var(--accent); box-shadow:inset 0 0 0 3px var(--panel); }
+.opt.on { font-weight:600; }
+.opt .nmx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.opt .bar2 { position:absolute; left:6px; bottom:1px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--c-folder) 55%, transparent); }
+.pop .crumbs { display:flex; flex-wrap:wrap; align-items:center; gap:1px; padding:0 10px 6px; font-size:12px; }
+.pop .crumbs button { border:0; background:transparent; color:var(--accent); cursor:pointer; padding:1px 4px; border-radius:4px; font-size:12px; }
+.pop .crumbs button:hover { background:var(--hover); }
+.pop .crumbs .cur { color:var(--fg); font-weight:600; }
+.pop .custom2 { display:flex; gap:6px; align-items:center; padding:4px 6px 4px 29px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+.pop .custom2 input[type=date] { width:128px; }
+.pop .custom2 input[type=number] { width:76px; }
+.pop .custom2 .btn { padding:3px 9px; font-size:12px; }
+.pop .note { color:var(--faint); font-size:12px; padding:4px 8px; }
+tr.ghead2 td { background:var(--bg); padding:7px 10px 5px; font-size:12px; color:var(--muted); cursor:pointer; border-bottom:1px solid var(--line); }
+tr.ghead2 td > * { vertical-align:middle; }
+tr.ghead2 .gt { font-weight:650; color:var(--fg); margin:0 6px 0 4px; }
+tr.ghead2 .gp { color:var(--faint); font-size:11px; }
+tr.ghead2 .car { display:inline-block; width:12px; transition:transform .15s; color:var(--faint); }
+tr.ghead2.closed .car { transform:rotate(-90deg); }
+tr.ghead2 .ga { margin-left:12px; visibility:hidden; }
+tr.ghead2:hover .ga { visibility:visible; }
+tr.ghead2:hover td { color:var(--fg); }
+#selbar { display:none; align-items:center; gap:6px; padding:7px 10px; border-top:1px solid var(--line); background:color-mix(in srgb, var(--accent) 7%, var(--panel)); flex-wrap:wrap; }
+#selbar.show { display:flex; }
+#selbar .what { font-weight:600; margin-right:6px; white-space:nowrap; }
+#selbar .btn { padding:4px 9px; font-size:12px; }
+#selbar .btn.warnb:hover { color:var(--bad); border-color:var(--bad); }
+#ask { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:45; }
+#ask.show { display:grid; }
+#ask .dlg { width:min(460px, calc(100vw - 32px)); }
+#ask-text { word-break:break-all; }
+#ask-input { width:100%; border:1px solid var(--line); background:var(--input); border-radius:7px; padding:7px 10px; font-size:14px; margin-bottom:4px; }
+.btn.danger { background:var(--bad); border-color:var(--bad); color:#fff; }
+@media (max-width:700px) { header { flex-wrap:wrap; } .searchbox { order:9; flex-basis:100%; } .within { width:100%; } #sugg { margin-left:0; } .stack { width:120px; } }
+#ask-text { white-space:pre-line; }
 </style>
 </head>
 <body>
@@ -261,35 +359,42 @@ body.noside aside#side { display:none; }
 <div class="main">
   <aside id="side">
     <h4>보기</h4><div id="views"></div>
-    <div id="refine-side">
     <h4 title="지금 결과가 들어 있는 폴더. 누르면 그 폴더 안의 결과만 봅니다">결과가 있는 폴더</h4><div id="fold"></div>
-    <h4 title="지금 결과의 확장자. 여러 개를 골라 그것만 볼 수 있습니다">확장자</h4><div id="exts"></div>
-    </div>
-    <h4>유형</h4><div id="cats"></div>
-    <h4>수정한 날짜</h4><div id="dates"></div>
-    <div class="custom" id="date-custom"><input type="date" id="d-from" title="시작일"><input type="date" id="d-to" title="종료일"></div>
-    <h4>크기</h4><div id="sizes"></div>
     <h4>저장한 검색</h4><div id="saved"></div>
     <h4>최근 검색</h4><div id="history"></div>
   </aside>
   <section class="results">
     <div class="toolbar">
-      <button class="btn icon" id="b-side" title="필터 패널 보이기/숨기기"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12l-4.5 5.5V13l-3 1.5v-6z"/></svg></button>
+      <button class="btn icon" id="b-side" title="왼쪽 패널 보이기/숨기기"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12l-4.5 5.5V13l-3 1.5v-6z"/></svg></button>
       <span class="title" id="t-title">검색 결과</span>
-      <div class="chips" id="chips"></div>
       <span id="dupbar" hidden><span class="seg"><button data-m="1">이름·크기가 같은</button><button data-m="2">내용까지 같은</button></span> <span class="hint" id="dup-text"></span> <button class="btn" id="dup-stop" hidden>중지</button></span>
       <div class="spacer"></div>
       <button class="btn" id="b-save" title="지금 검색을 저장"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 1.5h9v13L8 11l-4.5 3.5z"/></svg>저장</button>
       <button class="btn" id="b-export" title="결과를 CSV로 내보내기 (Excel)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 12v2h11v-2"/></svg>CSV</button>
     </div>
+    <div id="fbar">
+      <label class="within" id="within-box" title="지금 결과 안에서 다시 찾기. 여러 단어는 모두 들어간 것, !단어는 뺀 것, \ 가 들어가면 경로에서 찾습니다"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg><input id="within" placeholder="결과 내 검색 (예: 견적 !초안)" autocomplete="off" spellcheck="false"><button id="within-x" title="지우기" hidden>✕</button></label>
+      <button class="pillb" data-f="cat"></button><button class="pillb" data-f="ext"></button><button class="pillb" data-f="under"></button><button class="pillb" data-f="date"></button><button class="pillb" data-f="size"></button>
+      <span class="vsep"></span><button class="pillb" data-f="group"></button>
+      <div class="spacer"></div>
+      <button class="btn icon" id="f-back" title="이전 필터로 (Alt+←)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3 5 8l5 5"/></svg></button><button class="btn icon" id="f-fwd" title="다음 필터로 (Alt+→)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 3 5 5-5 5"/></svg></button>
+      <button class="btn" id="f-clear" hidden>필터 모두 해제</button>
+    </div>
+    <div id="sumbar" hidden><span id="sum-text"></span><div class="stack" id="sum-bar"></div><div class="legend" id="sum-legend"></div><div id="sugg"></div></div>
     <div id="crumbs" hidden></div>
     <div id="list"><table><thead><tr id="thead"></tr></thead><tbody id="rows"></tbody></table><div id="blank"></div></div>
+    <div id="selbar"></div>
   </section>
   <aside id="preview"></aside>
 </div>
 <footer><span id="count"></span><span id="selinfo"></span><span class="grow" id="state"></span><span id="cstate"></span></footer>
 
 <div class="menu" id="menu"></div>
+<div class="pop" id="pop"></div>
+<div id="ask"><div class="dlg">
+  <div class="dlg-head"><h3 id="ask-title"></h3></div>
+  <div class="pane on"><p id="ask-text"></p><input id="ask-input" autocomplete="off" spellcheck="false"><div class="rowbtns" style="justify-content:flex-end"><button class="btn" id="ask-no">취소</button><button class="btn primary" id="ask-ok">확인</button></div></div>
+</div></div>
 <div id="dlg"><div class="dlg">
   <div class="dlg-head"><h3>설정</h3><div class="spacer"></div><button class="btn icon" id="dlg-close" title="닫기">✕</button></div>
   <div class="tabs"><button class="tab" data-p="p-status">색인 현황</button><button class="tab" data-p="p-log">로그</button><button class="tab on" data-p="p-folders">검색할 폴더</button><button class="tab" data-p="p-content">내용 색인</button><button class="tab" data-p="p-sched">색인 일정</button><button class="tab" data-p="p-keys">단축키·시작·권한</button><button class="tab" data-p="p-help">검색 문법</button><button class="tab" data-p="p-about">정보</button></div>
@@ -386,17 +491,27 @@ const CATS = [["", "전체", "var(--accent)"], ["folder", "폴더", "var(--c-fol
 const CATNAME = Object.fromEntries(CATS.map(c => [c[0], c[1]]));
 const DAY = 86400;
 const midnight = n => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return Math.floor(d / 1000); };
-const DATES = [["", "전체"], ["today", "오늘"], ["7d", "최근 7일"], ["30d", "최근 30일"], ["year", "올해"], ["old", "1년 넘게 안 바뀐 파일"], ["custom", "직접 지정"]];
-const MB = 1 << 20;
-const SIZES = [["", "전체", -1, -1], ["s", "1 MB 미만", -1, MB - 1], ["m", "1 MB ~ 100 MB", MB, 100 * MB], ["l", "100 MB ~ 1 GB", 100 * MB, 1024 * MB], ["xl", "1 GB 이상", 1024 * MB, -1], ["zero", "빈 파일 (0 바이트)", 0, 0]];
+const DATES = [["today", "오늘"], ["yesterday", "어제"], ["7d", "최근 7일"], ["30d", "최근 30일"], ["year", "올해"], ["lastyear", "작년"], ["old", "1년 넘게 안 바뀐 파일"]];
+const GDATE = { today: "오늘", yesterday: "어제", "7d": "최근 7일 안", "30d": "최근 30일 안", year: "올해", lastyear: "작년", older: "그보다 오래된 파일", unknown: "날짜를 모름" };
+const KB = 1 << 10, MB = 1 << 20, GB = 1 << 30;
+const SIZES = [["zero", "빈 파일 (0 바이트)", 0, 0], ["tiny", "100 KB 미만", 1, 100 * KB - 1], ["small", "100 KB ~ 1 MB", 100 * KB, MB - 1], ["medium", "1 ~ 10 MB", MB, 10 * MB - 1],
+  ["large", "10 ~ 100 MB", 10 * MB, 100 * MB - 1], ["huge", "100 MB ~ 1 GB", 100 * MB, GB - 1], ["giant", "1 GB 이상", GB, -1]];
+const GSIZE = { ...Object.fromEntries(SIZES.map(s => [s[0], s[1]])), folder: "폴더", unknown: "크기를 모름" };
+const GROUPS = [["", "묶지 않음"], ["folder", "폴더별"], ["cat", "유형별"], ["ext", "확장자별"], ["date", "수정한 날짜별"], ["size", "크기별"]];
 const VIEWS = [["", "검색 결과"], ["dups", "중복 파일 찾기"], ["fsize", "폴더 용량"], ["recent", "최근 바뀐 파일"]];
-const COLS = [["name", "이름", "c-name"], ["path", "경로", "c-folder"], ["size", "크기", "c-size"], ["mod", "수정한 날짜", "c-mod"], ["type", "유형", "c-type"]];
+// column: sort key, title, class, the filter its funnel opens
+const COLS = [["chk", "", "c-chk"], ["name", "이름", "c-name", "ext"], ["path", "경로", "c-folder", "under"], ["size", "크기", "c-size", "size"], ["mod", "수정한 날짜", "c-mod", "date"], ["type", "유형", "c-type", "cat"]];
+const NCOL = COLS.length;
+const FUNNEL = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3h12l-4.5 5.5V13l-3 1.5v-6z"/></svg>`;
 
-const S = { q: "", case: false, path: false, regex: false, cat: "", date: "", from: "", to: "", size: "", sort: "name", desc: false, view: "",
+// The filters below narrow the current results without touching the search
+// box. They go back and forward with the arrows in the filter bar.
+const FKEYS = ["cats", "exts", "under", "underPath", "within", "date", "from", "to", "size", "smin", "smax", "group"];
+const S = { q: "", case: false, path: false, regex: false, sort: "name", desc: false, view: "",
   content: false, cq: "", ccase: false, cword: false, cregex: false, cidx: false, dupMode: 1, mode: "name", skipSys: true,
-  under: "", underPath: "", exts: [] };
-let rows = [], total = 0, loaded = 0, busy = false, seq = 0, version = -1, facets = {};
-let selected = new Set(), anchor = null, cursor = null;
+  cats: [], exts: [], under: "", underPath: "", within: "", date: "", from: "", to: "", size: "", smin: "", smax: "", group: "" };
+let rows = [], total = 0, loaded = 0, busy = false, seq = 0, version = -1, fac = null, groupCount = new Map();
+let selected = new Set(), anchor = null, cursor = null, collapsed = new Set();
 let job = null, jobDone = false, jobFrom = 0, jobTimer = null;
 let pvKey = null;
 
@@ -432,28 +547,38 @@ function hl(text, terms) {
 }
 function nameTerms() {
   if (S.regex || S.path) return [];
-  return S.q.split(/\s+|\|/).filter(t => t && !t.startsWith("!") && !t.includes(":") && !/[*?\\/]/.test(t)).map(t => t.replace(/"/g, "")).map(t => S.case ? t : t.toLowerCase());
+  const within = S.case ? [] : S.within.split(/\s+/).filter(t => t && !/^[!-]/.test(t) && !/[\\/]/.test(t)).map(t => t.toLowerCase());
+  return S.q.split(/\s+|\|/).filter(t => t && !t.startsWith("!") && !t.includes(":") && !/[*?\\/]/.test(t)).map(t => t.replace(/"/g, "")).map(t => S.case ? t : t.toLowerCase()).concat(within);
 }
 function segs(list) { const f = document.createDocumentFragment(); for (const s of list || []) f.append(s.m ? el("mark", null, s.t) : s.t); return f; }
 
+function dateRange(id) {
+  if (id === "custom") return [S.from ? Math.floor(new Date(S.from + "T00:00") / 1000) : 0, S.to ? Math.floor(new Date(S.to + "T00:00") / 1000) + DAY : 0];
+  const y = new Date().getFullYear(), jan1 = Math.floor(new Date(y, 0, 1) / 1000), ago = new Date(); ago.setFullYear(y - 1);
+  return { today: [midnight(0), 0], yesterday: [midnight(1), midnight(0)], "7d": [midnight(6), 0], "30d": [midnight(29), 0], year: [jan1, 0],
+    lastyear: [Math.floor(new Date(y - 1, 0, 1) / 1000), jan1], old: [0, Math.floor(ago / 1000)] }[id] || null;
+}
+function sizeRange(id) {
+  if (id === "custom") { const b = v => v === "" || isNaN(+v) ? -1 : Math.round(+v * MB); return [b(S.smin), b(S.smax)]; }
+  const s = SIZES.find(x => x[0] === id); return s ? [s[2], s[3]] : null;
+}
 function params() {
   const p = new URLSearchParams();
   p.set("q", S.q);
   if (S.case) p.set("case", 1); if (S.path) p.set("path", 1); if (S.regex) p.set("regex", 1);
-  if (S.cat) p.set("cat", S.cat);
-  const now = Math.floor(Date.now() / 1000);
-  const range = { today: [midnight(0), 0], "7d": [midnight(6), 0], "30d": [midnight(29), 0], year: [Math.floor(new Date(new Date().getFullYear(), 0, 1) / 1000), 0], old: [0, now - 365 * DAY] }[S.date];
-  if (range) { if (range[0]) p.set("after", range[0]); if (range[1]) p.set("before", range[1]); }
-  if (S.date === "custom") { if (S.from) p.set("after", Math.floor(new Date(S.from + "T00:00") / 1000)); if (S.to) p.set("before", Math.floor(new Date(S.to + "T00:00") / 1000) + DAY); }
-  const sz = SIZES.find(s => s[0] === S.size);
-  if (sz && S.size) { if (sz[2] >= 0) p.set("min", sz[2]); if (sz[3] >= 0) p.set("max", sz[3]); }
+  if (S.cats.length) p.set("cat", S.cats.join(","));
+  if (S.exts.length) p.set("ext", S.exts.join(","));
+  if (S.under) p.set("under", S.under);
+  if (S.within.trim()) p.set("within", S.within.trim());
+  const dr = dateRange(S.date); if (dr) { if (dr[0]) p.set("sa", dr[0]); if (dr[1]) p.set("sb", dr[1]); }
+  const sr = sizeRange(S.size); if (sr) { if (sr[0] >= 0) p.set("smin", sr[0]); if (sr[1] >= 0) p.set("smax", sr[1]); }
   if (S.sort !== "name" || S.desc) { p.set("sort", S.sort); if (S.desc) p.set("desc", 1); }
   if (S.view === "dups") p.set("dups", S.dupMode);
   if (S.view === "fsize") p.set("fsize", 1);
-  if (S.under) p.set("under", S.under);
-  if (S.exts.length) p.set("ext", S.exts.join(","));
+  if (S.group && !S.view) p.set("group", S.group);
   return p;
 }
+function filtersOn() { return !!(S.cats.length || S.exts.length || S.under || S.within.trim() || S.date || S.size); }
 
 // ---------- sidebar ----------
 function fitem(label, on, onclick, count, color) {
@@ -466,46 +591,226 @@ function fitem(label, on, onclick, count, color) {
 }
 function renderSide() {
   $("views").replaceChildren(...VIEWS.map(([k, l]) => fitem(l, S.view === k, () => setView(k))));
-  const all = Object.values(facets).reduce((a, b) => a + b, 0);
-  $("cats").replaceChildren(...CATS.filter(([k]) => !k || facets[k] || S.cat === k).map(([k, l, c]) => fitem(l, S.cat === k, () => { S.cat = k; refresh(); }, k ? (facets[k] || 0) : all, c)));
-  $("dates").replaceChildren(...DATES.map(([k, l]) => fitem(l, S.date === k, () => { S.date = k; refresh(); })));
-  $("date-custom").classList.toggle("show", S.date === "custom");
-  $("sizes").replaceChildren(...SIZES.map(([k, l]) => fitem(l, S.size === k, () => { S.size = k; refresh(); })));
   const saved = store.get("saved", []);
   $("saved").replaceChildren(...(saved.length ? saved.map((s, i) => { const b = fitem(s.label, false, () => applyState(s.state)); const x = el("span", "x", "✕"); x.title = "삭제"; x.onclick = e => { e.stopPropagation(); saved.splice(i, 1); store.set("saved", saved); renderSide(); }; b.append(x); return b; }) : [el("div", "empty-note", "툴바의 저장 버튼으로 추가")]));
   const hist = store.get("history", []);
   $("history").replaceChildren(...(hist.length ? hist.map(h => fitem(h, false, () => { $("q").value = h; S.q = h; S.view = ""; refresh(); })) : [el("div", "empty-note", "아직 없음")]));
 }
-function chips() {
-  const list = [];
-  if (S.under) { const parts = S.underPath.split(/[\\/]/).filter(Boolean); list.push(["폴더: " + (parts.length > 2 ? "…\\" + parts.slice(-2).join("\\") : S.underPath), () => { S.under = ""; S.underPath = ""; }, S.underPath]); }
-  if (S.exts.length) list.push(["확장자: " + S.exts.map(extLabel).join(", "), () => S.exts = []]);
-  if (S.cat) list.push([CATNAME[S.cat], () => S.cat = ""]);
-  if (S.date) list.push([S.date === "custom" ? `${S.from || "…"} ~ ${S.to || "…"}` : DATES.find(d => d[0] === S.date)[1], () => S.date = ""]);
-  if (S.size) list.push([SIZES.find(s => s[0] === S.size)[1], () => S.size = ""]);
-  if (S.sort !== "name" || S.desc) list.push([`정렬: ${COLS.find(c => c[0] === S.sort)[1]} ${S.desc ? "↓" : "↑"}`, () => { S.sort = "name"; S.desc = false; }]);
-  $("chips").replaceChildren(...list.map(([label, clear, tip]) => { const c = el("span", "chip", label); if (tip) c.title = tip; const b = el("button", null, "✕"); b.title = "필터 해제"; b.onclick = () => { clear(); refresh(); }; c.append(b); return c; }));
+
+// ---------- filter state and history (← →) ----------
+let fhist = [], fpos = -1;
+function fsnap() { const o = {}; for (const k of FKEYS) o[k] = Array.isArray(S[k]) ? [...S[k]] : S[k]; return o; }
+function fpush(typing) {
+  const s = fsnap(), cur = fhist[fpos];
+  if (cur && JSON.stringify(cur.s) === JSON.stringify(s)) return;
+  if (typing && cur && cur.w) { cur.s = s; return; } // typing in the box is one step
+  fhist = fhist.slice(0, fpos + 1); fhist.push({ s, w: !!typing });
+  if (fhist.length > 60) fhist.shift();
+  fpos = fhist.length - 1;
 }
-// ---------- narrowing inside the results (folder and extension panel) ----------
-let fseq = 0, extsAll = false;
+function fgo(d) {
+  const t = fpos + d; if (t < 0 || t >= fhist.length) return;
+  fpos = t; const s = fhist[t].s; for (const k of FKEYS) S[k] = Array.isArray(s[k]) ? [...s[k]] : s[k];
+  $("within").value = S.within; refresh();
+}
+function setF(ch, typing) { Object.assign(S, ch); fpush(typing); refresh(); }
+function toggleIn(k, v) { const a = [...S[k]], i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else a.push(v); setF({ [k]: a }); }
+function setUnder(key, path) { setF({ under: key || "", underPath: key ? path : "" }); }
+function clearFilters() { $("within").value = ""; setF({ cats: [], exts: [], under: "", underPath: "", within: "", date: "", from: "", to: "", size: "", smin: "", smax: "", group: "" }); }
 function extLabel(e) { return e === "/" ? "폴더" : e === "" ? "(확장자 없음)" : "." + e; }
-function setUnder(key, path) { S.under = key || ""; S.underPath = key ? path : ""; refresh(); }
-function toggleExt(e) { const i = S.exts.indexOf(e); if (i >= 0) S.exts.splice(i, 1); else S.exts.push(e); refresh(); }
 function crumbPath(crumbs, upto) {
   let p = "";
   for (const c of crumbs.slice(0, upto + 1)) p = p ? p.replace(/[\\]$/, "") + "\\" + c.name : c.name;
   return p;
 }
-function refineNote(text) {
-  $("fold").replaceChildren(el("div", "empty-note", text)); $("exts").replaceChildren(); $("crumbs").hidden = true;
+
+// ---------- filter bar ----------
+const FNAMES = { cat: "유형", ext: "확장자", under: "폴더", date: "수정한 날짜", size: "크기", group: "묶어 보기" };
+const FCLEAR = { cat: { cats: [] }, ext: { exts: [] }, under: { under: "", underPath: "" }, date: { date: "", from: "", to: "" }, size: { size: "", smin: "", smax: "" }, group: { group: "" } };
+function fval(f) { // what an active filter shows on its button; "" when it is off
+  const few = (list, lab) => list.slice(0, 2).map(lab).join(", ") + (list.length > 2 ? ` 외 ${list.length - 2}` : "");
+  switch (f) {
+    case "cat": return S.cats.length ? few(S.cats, c => CATNAME[c] || c) : "";
+    case "ext": return S.exts.length ? few(S.exts, extLabel) : "";
+    case "under": { if (!S.under) return ""; const parts = S.underPath.split(/[\\/]/).filter(Boolean); return parts.length > 2 ? "…\\" + parts.slice(-2).join("\\") : S.underPath; }
+    case "date": return S.date === "custom" ? `${S.from || "처음"} ~ ${S.to || "오늘"}` : S.date ? (DATES.find(d => d[0] === S.date) || [, ""])[1] : "";
+    case "size": { if (S.size !== "custom") return S.size ? (SIZES.find(s => s[0] === S.size) || [, ""])[1] : ""; const a = S.smin !== "", b = S.smax !== ""; return a && b ? `${S.smin} ~ ${S.smax} MB` : a ? `${S.smin} MB 이상` : b ? `${S.smax} MB 이하` : ""; }
+    case "group": return S.group ? GROUPS.find(g => g[0] === S.group)[1] : "";
+  }
+  return "";
 }
+function renderPills() {
+  for (const b of document.querySelectorAll("#fbar .pillb")) {
+    const f = b.dataset.f, v = fval(f);
+    b.classList.toggle("on", !!v); b.classList.toggle("open", popKind === f);
+    b.hidden = f === "group" && !!S.view;
+    const parts = [el("span", "t", v ? `${FNAMES[f]}: ${v}` : FNAMES[f])];
+    if (v) { const x = el("span", "x", "✕"); x.title = "이 필터 해제"; x.onclick = e => { e.stopPropagation(); closePop(); setF(FCLEAR[f]); }; parts.push(x); }
+    else parts.push(el("span", "cv", "▼"));
+    b.replaceChildren(...parts);
+    b.title = f === "under" && S.underPath ? S.underPath : `${FNAMES[f]}로 거르기`;
+  }
+  $("within-box").classList.toggle("on", !!S.within.trim()); $("within-x").hidden = !S.within;
+  $("f-clear").hidden = !filtersOn() && !S.group;
+  $("f-back").disabled = fpos <= 0; $("f-fwd").disabled = fpos >= fhist.length - 1;
+  document.body.classList.toggle("nofilter", S.view === "recent");
+}
+
+// ---------- filter popovers (the same ones open from the bar and from column headers) ----------
+let popKind = null, popAt = null, popExtQ = "", popDraft = {};
+function openPop(kind, anchor, draft) {
+  if (popKind === kind) return closePop();
+  popKind = kind; popAt = anchor.getBoundingClientRect(); popExtQ = ""; popDraft = draft || {};
+  renderPop(true); renderPills();
+}
+function closePop() { if (!popKind) return; popKind = null; $("pop").classList.remove("show"); renderPills(); }
+function placePop() {
+  const p = $("pop"), r = popAt; p.classList.add("show");
+  const w = p.offsetWidth, h = p.offsetHeight;
+  p.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+  p.style.top = (r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, innerHeight - h - 8) : r.bottom + 4) + "px";
+}
+function renderPop(first) {
+  if (!popKind) return;
+  const p = $("pop"), a = document.activeElement, keep = a && p.contains(a) ? a.dataset.k : null;
+  const build = { cat: popCat, ext: popExt, under: popFolder, date: popDate, size: popSize, group: popGroup, dest: popDest }[popKind];
+  p.replaceChildren(...build());
+  placePop();
+  const f = keep ? p.querySelector(`[data-k="${keep}"]`) : first ? p.querySelector("input.search") : null;
+  if (f) { f.focus(); if (f.type === "text") f.setSelectionRange(f.value.length, f.value.length); }
+}
+function popHead(title, hint) { const h = el("div", "pop-head", title); if (hint) h.append(el("span", "hint", hint)); return h; }
+function popFoot(btns) {
+  const f = el("div", "pop-foot"); f.append(el("div", "spacer"));
+  for (const [l, fn] of btns) { const b = el("button", "btn", l); b.onclick = fn; f.append(b); }
+  const c = el("button", "btn", "닫기"); c.onclick = closePop; f.append(c);
+  return f;
+}
+function opt(label, on, onclick, count, o = {}) {
+  const b = el("button", "opt" + (on ? " on" : "") + (count === 0 && !on ? " zero" : ""));
+  if (o.box !== false) b.append(el("span", o.radio ? "rad" : "chk"));
+  if (o.color) { const d = el("span", "dot"); d.style.background = o.color; b.append(d); }
+  if (o.icon) b.append(o.icon);
+  b.append(el("span", "nmx", label));
+  if (o.only) { const x = el("span", "only", "이것만"); x.title = "이것 하나만 고르기"; x.onclick = e => { e.stopPropagation(); o.only(); }; b.append(x); }
+  if (count != null) b.append(el("span", "n", count.toLocaleString()));
+  if (o.bar != null) { const i = el("i", "bar2"); i.style.width = `calc(${Math.max(3, o.bar)}% - 12px)`; b.append(i); }
+  if (o.title) b.title = o.title;
+  b.onclick = onclick;
+  return b;
+}
+const counting = () => el("div", "note", "개수를 세는 중…");
+function popCat() {
+  const body = el("div", "pop-body"), c = fac ? fac.cats || {} : {};
+  for (const [k, l, color] of CATS) {
+    if (!k) continue;
+    const n = fac ? c[k] || 0 : null;
+    if (fac && !n && !S.cats.includes(k)) continue;
+    body.append(opt(l, S.cats.includes(k), () => toggleIn("cats", k), n, { color, only: () => setF({ cats: [k] }) }));
+  }
+  if (!fac) body.append(counting()); else if (!body.children.length) body.append(el("div", "note", "결과 없음"));
+  return [popHead("유형", "여러 개 고를 수 있습니다"), body, popFoot(S.cats.length ? [["모두 해제", () => setF({ cats: [] })]] : [])];
+}
+function popExt() {
+  const s = el("input", "search"); s.type = "text"; s.placeholder = "확장자 찾기 (예: hwp)"; s.value = popExtQ; s.dataset.k = "extq";
+  const body = el("div", "pop-body");
+  const ex = fac ? [...(fac.exts || [])] : [];
+  for (const e of S.exts) if (!ex.some(x => x.ext === e)) ex.push({ ext: e, count: 0 });
+  const paint = () => {
+    const q = popExtQ.trim().replace(/^\./, "").toLowerCase();
+    const list = ex.filter(x => !q || extLabel(x.ext).toLowerCase().includes(q)).slice(0, 300);
+    body.replaceChildren(...list.map(x => opt(extLabel(x.ext), S.exts.includes(x.ext), () => toggleIn("exts", x.ext), fac ? x.count : null,
+      { color: `var(--c-${x.ext === "/" ? "folder" : catOf("a." + x.ext, false)})`, only: () => setF({ exts: [x.ext] }) })));
+    if (!fac) body.append(counting()); else if (!list.length) body.append(el("div", "note", "없음"));
+  };
+  s.oninput = () => { popExtQ = s.value; paint(); };
+  paint();
+  return [popHead("확장자", "여러 개 고를 수 있습니다"), s, body, popFoot(S.exts.length ? [["모두 해제", () => setF({ exts: [] })]] : [])];
+}
+function popFolder() {
+  const body = el("div", "pop-body"), ff = fac ? fac.folder || {} : {}, crumbs = ff.crumbs || [];
+  const cb = el("div", "crumbs");
+  const all = el("button", crumbs.length ? "" : "cur", "전체"); all.onclick = () => { if (S.under) setUnder(""); }; cb.append(all);
+  crumbs.forEach((c, i) => {
+    cb.append(el("span", "hint", "›"));
+    const b = el("button", S.under === c.key ? "cur" : "", c.name); b.title = crumbPath(crumbs, i);
+    b.onclick = () => { if (S.under !== c.key) setUnder(c.key, crumbPath(crumbs, i)); };
+    cb.append(b);
+  });
+  if (crumbs.length > 1 || S.under) {
+    const par = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+    body.append(opt("↑ 한 단계 위로", false, () => par ? setUnder(par.key, crumbPath(crumbs, crumbs.length - 2)) : setUnder(""), null, { box: false }));
+  }
+  const base = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") : "";
+  const max = Math.max(1, ...(ff.folders || []).map(f => f.count));
+  for (const f of ff.folders || []) {
+    const path = base ? base + "\\" + f.name : f.name;
+    body.append(opt(f.name, false, () => setUnder(f.key, path), f.count, { box: false, icon: icon("folder", true), bar: 100 * f.count / max, title: path + " 안의 결과만 보기" }));
+  }
+  if (ff.here && (ff.folders || []).length) body.append(el("div", "note", `그 밖에 이 폴더 바로 안 ${ff.here.toLocaleString()}개`));
+  if (ff.more) body.append(el("div", "note", `외 ${ff.more.toLocaleString()}곳 (개수가 많은 순)`));
+  if (!fac) body.append(counting()); else if (!(ff.folders || []).length) body.append(el("div", "note", fac.total ? "더 나눌 하위 폴더가 없습니다" : "결과 없음"));
+  return [popHead("폴더", "누르면 그 폴더 안의 결과만 봅니다"), cb, body, popFoot(S.under ? [["폴더 해제", () => setUnder("")]] : [])];
+}
+function rangeCount(list, id) { return fac && fac.metaKnown ? ((list || []).find(d => d.id === id) || { count: 0 }).count : null; }
+function popDate() {
+  const body = el("div", "pop-body");
+  body.append(opt("전체", !S.date, () => setF(FCLEAR.date), null, { radio: true }));
+  for (const [k, l] of DATES) body.append(opt(l, S.date === k, () => setF({ date: k, from: "", to: "" }), rangeCount(fac && fac.dates, k), { radio: true }));
+  const a = el("input"); a.type = "date"; a.dataset.k = "df"; a.value = popDraft.from ?? S.from; a.oninput = () => popDraft.from = a.value;
+  const b = el("input"); b.type = "date"; b.dataset.k = "dt"; b.value = popDraft.to ?? S.to; b.oninput = () => popDraft.to = b.value;
+  const go = () => { if (!a.value && !b.value) { toast("시작일이나 종료일을 고르세요"); a.focus(); return; } setF({ date: "custom", from: a.value, to: b.value }); };
+  const ok = el("button", "btn", "적용"); ok.onclick = go;
+  const cu = el("div", "custom2"); cu.append(a, "~", b, ok);
+  body.append(opt("직접 지정", S.date === "custom", go, null, { radio: true }), cu);
+  if (fac && !fac.metaKnown) body.append(el("div", "note", "결과가 많아 개수는 세지 않았습니다"));
+  return [popHead("수정한 날짜"), body];
+}
+function popSize() {
+  const body = el("div", "pop-body");
+  body.append(opt("전체", !S.size, () => setF(FCLEAR.size), null, { radio: true }));
+  for (const [k, l] of SIZES) body.append(opt(l, S.size === k, () => setF({ size: k, smin: "", smax: "" }), rangeCount(fac && fac.sizes, k), { radio: true }));
+  const num = (k, v) => { const i = el("input"); i.type = "number"; i.min = 0; i.step = "any"; i.dataset.k = k; i.value = popDraft[k] ?? v; i.oninput = () => popDraft[k] = i.value; i.onkeydown = e => { if (e.key === "Enter") go(); }; return i; };
+  const a = num("smin", S.smin), b = num("smax", S.smax);
+  const go = () => { if (a.value === "" && b.value === "") { toast("최소나 최대 크기를 넣으세요"); a.focus(); return; } setF({ size: "custom", smin: a.value, smax: b.value }); };
+  const ok = el("button", "btn", "적용"); ok.onclick = go;
+  const cu = el("div", "custom2"); cu.append(a, "~", b, "MB", ok);
+  body.append(opt("직접 지정", S.size === "custom", go, null, { radio: true }), cu);
+  if (fac && !fac.metaKnown) body.append(el("div", "note", "결과가 많아 개수는 세지 않았습니다"));
+  return [popHead("크기", "폴더는 크기로 거르면 빠집니다"), body];
+}
+function popGroup() {
+  const body = el("div", "pop-body");
+  for (const [k, l] of GROUPS) body.append(opt(l, S.group === k, () => { closePop(); setF({ group: k }); }, null, { radio: true }));
+  body.append(el("div", "note", "같은 묶음끼리 모아 보여 줍니다. 묶음 제목을 누르면 접고 펼칩니다."));
+  return [popHead("묶어 보기"), body];
+}
+function popDest() {
+  const { op, list } = popDraft, body = el("div", "pop-body");
+  body.append(opt("폴더 고르기…", false, () => { closePop(); fileOp(op, list); }, null, { box: false, icon: icon("folder", true) }));
+  const ds = store.get("dests", []);
+  if (ds.length) body.append(el("div", "note", "최근에 쓴 위치"));
+  for (const d of ds) body.append(opt(d, false, () => { closePop(); fileOp(op, list, d); }, null, { box: false, title: d }));
+  return [popHead(`${list.length.toLocaleString()}개를 ${op === "copy" ? "복사할" : "옮길"} 위치`), body];
+}
+document.addEventListener("mousedown", e => { if (popKind && !e.target.closest("#pop, .pillb, .fx, [data-pop]")) closePop(); });
+addEventListener("resize", () => closePop());
+
+// ---------- counts for the filters, the summary line and the folder panel ----------
+let fseq = 0;
+function refineNote(text) { $("fold").replaceChildren(el("div", "empty-note", text)); $("crumbs").hidden = true; }
 async function loadFacets(my) {
   const mine = ++fseq;
-  $("fold").replaceChildren(el("div", "empty-note", "세는 중…"));
+  if (!fac) $("fold").replaceChildren(el("div", "empty-note", "세는 중…"));
   let d;
-  try { d = await api("/api/facets?" + params()); } catch (e) { if (mine === fseq) refineNote(e.message); return; }
+  try { d = await api("/api/facets?" + params()); } catch (e) { if (mine === fseq) { fac = null; refineNote(e.message); renderSummary(); } return; }
   if (mine !== fseq || my !== seq) return;
-  const ff = d.folder || {}, crumbs = ff.crumbs || [];
+  fac = d;
+  renderFold(); renderSummary(); renderPills();
+  if (popKind) renderPop();
+}
+function renderFold() {
+  const ff = fac.folder || {}, crumbs = ff.crumbs || [];
   // breadcrumb above the results: where the results are, and a way back up
   const cb = $("crumbs"); cb.replaceChildren(el("span", null, "위치"));
   const all = el("button", crumbs.length ? "" : "cur", "전체"); all.onclick = () => { if (S.under) setUnder(""); }; cb.append(all);
@@ -524,8 +829,9 @@ async function loadFacets(my) {
   cb.hidden = false;
   // folder list in the side panel
   const max = Math.max(1, ...(ff.folders || []).map(f => f.count));
+  const base = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") : "";
   const items = (ff.folders || []).map(f => {
-    const path = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") + "\\" + f.name : f.name;
+    const path = base ? base + "\\" + f.name : f.name;
     const b = el("button", "fitem fold"); b.title = path + " 안의 결과만 보기";
     b.append(icon("folder", true), el("span", "nmx", f.name), el("span", "n", f.count.toLocaleString()));
     const bar = el("i", "bar2"); bar.style.width = Math.max(3, 100 * f.count / max) + "%"; b.append(bar);
@@ -534,7 +840,7 @@ async function loadFacets(my) {
   });
   if (ff.here && items.length) items.push(el("div", "empty-note", `그 밖에 이 폴더 바로 안 ${ff.here.toLocaleString()}개`));
   if (ff.more) items.push(el("div", "empty-note", `외 ${ff.more.toLocaleString()}곳 (개수가 많은 순)`));
-  if (!items.length) items.push(el("div", "empty-note", d.total ? "더 나눌 하위 폴더가 없습니다" : "결과 없음"));
+  if (!items.length) items.push(el("div", "empty-note", fac.total ? "더 나눌 하위 폴더가 없습니다" : "결과 없음"));
   if (crumbs.length > 1 || S.under) {
     const up = el("button", "fitem"); up.append(el("span", null, "↑ 한 단계 위로"));
     const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
@@ -542,19 +848,46 @@ async function loadFacets(my) {
     items.unshift(up);
   }
   $("fold").replaceChildren(...items);
-  // extensions: tick several to see only those
-  let ex = d.exts || [];
-  for (const e of S.exts) if (!ex.some(x => x.ext === e)) ex = [...ex, { ext: e, count: 0 }];
-  const shown = extsAll ? ex : ex.slice(0, 10).concat(ex.slice(10).filter(x => S.exts.includes(x.ext)));
-  const eb = shown.map(x => {
-    const on = S.exts.includes(x.ext);
-    const b = el("button", "fitem ext" + (on ? " on" : "")); b.append(el("span", "chk", on ? "✓" : ""), el("span", null, extLabel(x.ext)), el("span", "n", x.count.toLocaleString()));
-    b.onclick = () => toggleExt(x.ext);
-    return b;
-  });
-  if (ex.length > shown.length || extsAll && ex.length > 10) { const m = el("button", "side-more", extsAll ? "줄이기" : `모두 보기 (${ex.length}종류)`); m.onclick = () => { extsAll = !extsAll; loadFacets(seq); }; eb.push(m); }
-  if (S.exts.length) { const c = el("button", "side-more", "확장자 선택 해제"); c.onclick = () => { S.exts = []; refresh(); }; eb.push(c); }
-  $("exts").replaceChildren(...(eb.length ? eb : [el("div", "empty-note", "결과 없음")]));
+}
+// summary line: how many, how big, what kinds (click a colour to keep only
+// that kind) and a few one-click suggestions for narrowing a long list
+function renderSummary() {
+  const sb = $("sumbar"); sb.classList.remove("stale");
+  if (!fac || S.view === "recent") { sb.hidden = true; return; }
+  sb.hidden = false;
+  const T = fac.total, t = [`결과 ${T.toLocaleString()}개`];
+  if (fac.metaKnown && fac.bytes) t.push(`합계 ${fmtSize(fac.bytes)}`);
+  $("sum-text").textContent = t.join(" · ");
+  const cats = CATS.filter(c => c[0] && (fac.cats || {})[c[0]]).map(c => [...c, fac.cats[c[0]]]).sort((a, b) => b[3] - a[3]);
+  const sum = cats.reduce((a, c) => a + c[3], 0) || 1;
+  const pick = k => setF({ cats: S.cats.length === 1 && S.cats[0] === k ? [] : [k] });
+  $("sum-bar").hidden = !cats.length;
+  $("sum-bar").replaceChildren(...cats.map(([k, l, color, n]) => {
+    const i = el("i"); i.style.background = color; i.style.width = (100 * n / sum) + "%";
+    i.title = `${l} ${n.toLocaleString()}개 (${Math.round(100 * n / sum)}%) · 누르면 ${l}만 보기`;
+    if (S.cats.length && !S.cats.includes(k)) i.className = "dim";
+    i.onclick = () => pick(k); return i;
+  }));
+  $("sum-legend").replaceChildren(...cats.slice(0, 5).map(([k, l, color, n]) => {
+    const b = el("button", S.cats.includes(k) ? "on" : ""); const d = el("span", "dot"); d.style.background = color;
+    b.append(d, `${l} ${n.toLocaleString()}`); b.title = `${l}만 보기`; b.onclick = () => pick(k); return b;
+  }));
+  const sg = [], add = (label, fn, tip) => { const b = el("button", "sg", label); b.onclick = fn; if (tip) b.title = tip; sg.push(b); };
+  if (T >= 20 && S.view !== "dups") {
+    const ff = fac.folder || {}, fl = ff.folders || [], crumbs = ff.crumbs || [];
+    if (fl.length >= 2 && fl[0].count / T >= 0.2 && fl[0].count < T) {
+      const base = crumbs.length ? crumbPath(crumbs, crumbs.length - 1).replace(/[\\]$/, "") : "", f = fl[0];
+      add(`'${f.name}' 폴더만 ${f.count.toLocaleString()}개`, () => setUnder(f.key, base ? base + "\\" + f.name : f.name), "결과가 가장 많은 폴더");
+    }
+    const ex = (fac.exts || []).filter(x => x.ext !== "/");
+    if (!S.exts.length && ex.length >= 2 && ex[0].count / T >= 0.2 && ex[0].count < T) add(`${extLabel(ex[0].ext)}만 ${ex[0].count.toLocaleString()}개`, () => setF({ exts: [ex[0].ext] }), "가장 많은 확장자");
+    if (!S.date && fac.metaKnown) {
+      const pickD = ["7d", "30d"].map(id => (fac.dates || []).find(d => d.id === id)).find(d => d && d.count && d.count < T);
+      if (pickD) add(`${pickD.id === "7d" ? "최근 7일" : "최근 30일"}에 바뀐 것 ${pickD.count.toLocaleString()}개`, () => setF({ date: pickD.id }));
+    }
+    if (!S.group && !S.view && T >= 100 && fl.length >= 3) add("폴더별로 묶어 보기", () => setF({ group: "folder" }));
+  }
+  $("sugg").replaceChildren(...(sg.length ? [el("span", null, "추천")] : []), ...sg.slice(0, 4));
 }
 function sideToggle() {
   if (matchMedia("(max-width:900px)").matches) { document.body.classList.toggle("sideopen"); }
@@ -673,15 +1006,25 @@ function remember() {
 
 // ---------- results ----------
 function renderHead() {
-  $("thead").replaceChildren(...COLS.map(([k, l, cls]) => {
-    const th = el("th", cls, l);
-    if (S.sort === k && !job && S.view !== "recent" && S.view !== "dups") th.append(el("span", "arrow", S.desc ? "▼" : "▲"));
-    th.onclick = () => { if (job || S.view === "recent" || S.view === "dups") return; if (S.sort === k) S.desc = !S.desc; else { S.sort = k; S.desc = k === "size" || k === "mod"; } refresh(); };
+  const sortable = !job && S.view !== "recent" && S.view !== "dups";
+  $("thead").replaceChildren(...COLS.map(([k, l, cls, f]) => {
+    const th = el("th", cls);
+    if (k === "chk") { const cb = el("span", "cb"); cb.id = "cb-all"; cb.title = "불러온 결과 모두 선택 / 해제 (Ctrl+A)"; cb.onclick = e => { e.stopPropagation(); toggleAll(); }; th.append(cb); return th; }
+    th.append(el("span", "lbl", l));
+    if (S.sort === k && sortable) th.append(el("span", "arrow", S.desc ? "▼" : "▲"));
+    if (f && S.view !== "recent") {
+      const fx = el("button", "fx" + (fval(f) ? " on" : "")); fx.innerHTML = FUNNEL; fx.title = `${FNAMES[f]}로 거르기`;
+      fx.onclick = e => { e.stopPropagation(); openPop(f, fx); }; th.append(fx);
+    }
+    if (sortable) th.title = "누르면 정렬 · 깔때기를 누르면 거르기";
+    th.onclick = () => { if (!sortable) return; if (S.sort === k) S.desc = !S.desc; else { S.sort = k; S.desc = k === "size" || k === "mod"; } refresh(); };
     return th;
   }));
+  paintAllBox();
 }
 function rowEl(r, idx) {
   const tr = el("tr"); tr.dataset.i = idx;
+  const c = el("td", "c-chk"); c.append(el("span", "cb")); c.title = "선택"; tr.append(c);
   const n = el("td", "c-name"); const nm = el("div", "nm"); nm.append(icon(r.cat, r.dir)); const sp = el("span"); sp.append(hl(r.name, nameTerms())); nm.append(sp);
   if (r.hits) { const b = el("span", "badge hit", `${r.hits}줄`); b.title = "일치한 줄 수"; nm.append(b); }
   if (r.kind) nm.append(el("span", "badge k-" + r.kind.split(" ")[0], r.kind));
@@ -693,37 +1036,92 @@ function rowEl(r, idx) {
   tr.append(el("td", "c-type", r.files != null ? `파일 ${r.files.toLocaleString()}개` : (CATNAME[r.cat] || "")));
   if (r.group) tr.classList.add(r.group % 2 ? "g-odd" : "g-even");
   if (selected.has(r.key)) tr.classList.add("sel");
+  if (r.gk !== undefined && collapsed.has(r.gk)) tr.hidden = true;
   return tr;
+}
+// ---------- grouped results ----------
+function groupLabel(g) {
+  switch (S.group) {
+    case "folder": return g || "(드라이브 맨 위)";
+    case "cat": return CATNAME[g] || g;
+    case "ext": return extLabel(g);
+    case "date": return GDATE[g] || g;
+    case "size": return GSIZE[g] || g;
+  }
+  return g;
+}
+function groupFilter(g, r) { // the filter that keeps only this group, if there is one
+  switch (S.group) {
+    case "folder": return r.parent ? { under: r.parent, underPath: g } : null;
+    case "cat": return { cats: [g] };
+    case "ext": return { exts: [g] };
+    case "date": return GDATE[g] && !["older", "unknown"].includes(g) ? { date: g, from: "", to: "" } : null;
+    case "size": return SIZES.some(s => s[0] === g) ? { size: g, smin: "", smax: "" } : null;
+  }
+  return null;
+}
+function groupHead(r) {
+  const g = r.gk, tr = el("tr", "ghead2" + (collapsed.has(g) ? " closed" : "")); tr.dataset.g = g;
+  const td = el("td"); td.colSpan = NCOL;
+  td.append(el("span", "car", "▾"));
+  if (S.group === "folder") td.append(icon("folder", true));
+  else if (S.group === "cat") { const d = el("span", "dot"); d.style.cssText = `display:inline-block;background:var(--c-${g || "other"})`; td.append(d); }
+  if (S.group === "folder" && g) { // folder name first, the full path after it
+    const parts = g.split(/[\\/]/).filter(Boolean);
+    td.append(el("span", "gt", parts[parts.length - 1] || g), el("span", "gp", g + "  ·  "));
+  } else td.append(el("span", "gt", groupLabel(g)));
+  td.append(el("span", null, `${(groupCount.get(g) ?? 0).toLocaleString()}개`));
+  const sel = linkBtn("이 묶음 모두 선택", e => { e.stopPropagation(); rows.forEach(x => { if (x.gk === g) selected.add(x.key); }); paintSel(); }); sel.classList.add("ga"); td.append(sel);
+  const f = groupFilter(g, r);
+  if (f) { const b = linkBtn("이 묶음만 보기", e => { e.stopPropagation(); setF(f); }); b.classList.add("ga"); td.append(b); }
+  tr.append(td); tr.title = "누르면 접기 / 펼치기";
+  tr.onclick = () => toggleGroup(g);
+  return tr;
+}
+function toggleGroup(g) {
+  const close = !collapsed.has(g); close ? collapsed.add(g) : collapsed.delete(g);
+  for (const tr of $("rows").children) {
+    if (tr.classList.contains("ghead2")) { if (tr.dataset.g === g) tr.classList.toggle("closed", close); }
+    else if (tr.dataset.i != null && rows[+tr.dataset.i] && rows[+tr.dataset.i].gk === g) tr.hidden = close;
+  }
 }
 function appendRows(list, start) {
   const frag = document.createDocumentFragment();
-  let prev = start > 0 ? rows[start - 1].group : null;
+  let prev = start > 0 ? rows[start - 1].group : null, prevG = start > 0 ? rows[start - 1].gk : null;
   list.forEach((r, i) => {
     if (r.group && r.group !== prev) {
-      const head = el("tr", "ghead"); const td = el("td", null, `중복 ${r.group} · ${S.dupMode === 2 ? "내용이 같은 파일" : "같은 이름, 같은 크기"} (${fmtSize(r.size)})`); td.colSpan = 5; head.append(td); frag.append(head);
+      const head = el("tr", "ghead"); const td = el("td", null, `중복 ${r.group} · ${S.dupMode === 2 ? "내용이 같은 파일" : "같은 이름, 같은 크기"} (${fmtSize(r.size)})`); td.colSpan = NCOL; head.append(td); frag.append(head);
       prev = r.group;
     }
+    if (r.gk !== undefined && r.gk !== prevG) { frag.append(groupHead(r)); prevG = r.gk; }
     frag.append(rowEl(r, start + i));
     if (r.snips && r.snips.length) {
-      const tr = el("tr"); tr.dataset.i = start + i; tr.className = "snrow"; const td = el("td", "snips"); td.colSpan = 5;
+      const tr = el("tr"); tr.dataset.i = start + i; tr.className = "snrow"; const td = el("td", "snips"); td.colSpan = NCOL;
       for (const s of r.snips) { const d = el("div", "snip"); d.append(el("b", null, s.line)); const t = el("span"); t.append(segs(s.segs)); d.append(t); td.append(d); }
-      tr.append(td); frag.append(tr);
+      tr.append(td); if (r.gk !== undefined && collapsed.has(r.gk)) tr.hidden = true; frag.append(tr);
     }
   });
   $("rows").append(frag);
 }
-function blank(title, text) {
+function takeRows(list) { // grouped rows always carry their group, "" included
+  if (S.group && !S.view) for (const r of list) r.gk = r.gk ?? "";
+  return list;
+}
+function blank(title, text, action) {
   const b = $("blank"); b.replaceChildren();
   if (!title) return;
-  const d = el("div", "blank"); d.append(el("h3", null, title)); if (text) d.append(el("div", null, text)); b.append(d);
+  const d = el("div", "blank"); d.append(el("h3", null, title)); if (text) d.append(el("div", null, text));
+  if (action) { const x = el("button", "btn", action[0]); x.style.marginTop = "12px"; x.onclick = action[1]; d.append(x); }
+  b.append(d);
 }
 async function refresh(keepScroll = false) {
   if (job) stopJob(true);
   stopAll();
-  renderSide(); chips(); renderHead();
-  fseq++;
-  if (S.view === "recent") { refineNote("최근 바뀐 파일 보기에서는 쓰지 않습니다"); return loadRecent(); }
-  if (S.mode === "content" && !S.view) { refineNote("내용 결과는 이름 모드에서 고른 폴더·확장자 안에서 찾습니다"); return contentOnly(); }
+  if (!keepScroll) collapsed.clear();
+  renderSide(); renderPills(); renderHead(); if (popKind) renderPop();
+  fseq++; $("sumbar").classList.add("stale");
+  if (S.view === "recent") { refineNote("최근 바뀐 파일 보기에서는 쓰지 않습니다"); $("sumbar").hidden = true; return loadRecent(); }
+  if (S.mode === "content" && !S.view) { contentOnly(); loadFacets(seq); return; }
   const my = ++seq;
   $("t-title").textContent = { dups: "중복 파일", fsize: "폴더 용량" }[S.view] || "검색 결과";
   $("dupbar").hidden = S.view !== "dups";
@@ -731,42 +1129,43 @@ async function refresh(keepScroll = false) {
   const want = keepScroll ? Math.max(PAGE, loaded) : PAGE;
   try {
     busy = true;
-    if (S.view === "dups" || S.view === "fsize" || S.sort === "size" || S.sort === "mod" || S.size || S.date || /size:|dm:/.test(S.q)) $("count").textContent = "크기·날짜를 확인하는 중...";
+    if (S.view === "dups" || S.view === "fsize" || S.sort === "size" || S.sort === "mod" || S.size || S.date || S.group === "date" || S.group === "size" || /size:|dm:/.test(S.q)) $("count").textContent = "크기·날짜를 확인하는 중...";
     const p = params(); p.set("offset", 0); p.set("limit", S.mode === "both" && !S.view ? 2000 : Math.min(want, 2000));
     const d = await api("/api/search?" + p);
     if (my !== seq) return;
     const top = $("list").scrollTop;
-    rows = d.rows; total = d.total; loaded = rows.length; version = d.version; facets = d.facets || {};
-    if (!keepScroll) { selected.clear(); cursor = null; paintSel(); }
-    $("rows").replaceChildren(); appendRows(rows, 0);
+    rows = takeRows(d.rows); total = d.total; loaded = rows.length; version = d.version;
+    groupCount = new Map((d.groups || []).map(g => [g.key, g.count]));
+    if (!keepScroll) { selected.clear(); cursor = null; }
+    $("rows").replaceChildren(); appendRows(rows, 0); paintSel();
     $("list").scrollTop = keepScroll ? top : 0;
-    renderSide();
     $("count").textContent = `${total.toLocaleString()}개 · ${d.ms.toFixed(d.ms < 10 ? 1 : 0)} ms` + (d.truncated ? " · 크기/날짜 조건은 앞쪽 50만 개에만 적용" : "");
+    const loosen = filtersOn() ? ["필터 모두 해제", clearFilters] : null;
     if (total) blank("");
     else if (S.view === "dups" && S.dupMode === 2) blank(dupJob ? "내용을 비교하는 중입니다" : "내용이 같은 파일이 없습니다", "크기가 같은 파일끼리 내용을 비교합니다. 검색어나 유형, 크기 필터로 범위를 정할 수 있습니다.");
     else if (S.view === "dups") blank("중복 파일이 없습니다", "이름과 크기가 같은 파일을 찾습니다. 위에서 '내용까지 같은'을 고르면 이름이 달라도 내용이 같은 파일을 찾습니다.");
-    else if (S.view === "fsize") blank("폴더가 없습니다", "검색어에 맞는 폴더를 전체 용량이 큰 순서로 보여 줍니다.");
-    else blank("찾는 파일이 없습니다", "검색어를 줄이거나 왼쪽 필터를 풀어 보세요.");
+    else if (S.view === "fsize") blank("폴더가 없습니다", "검색어에 맞는 폴더를 전체 용량이 큰 순서로 보여 줍니다.", loosen);
+    else blank("찾는 파일이 없습니다", filtersOn() ? "위쪽 필터 때문에 모두 빠졌습니다. 필터를 풀어 보세요." : "검색어를 줄이거나 다르게 써 보세요.", loosen);
     updateScope();
     loadFacets(my);
     if (S.mode === "both" && !S.view) { nameTotal = total; if (total > rows.length) $("count").textContent += ` (이름 일치는 처음 ${rows.length.toLocaleString()}개만 표시)`; scheduleAll(); }
   } catch (e) {
     if (my !== seq) return;
-    $("rows").replaceChildren(); rows = []; total = 0; loaded = 0;
+    $("rows").replaceChildren(); rows = []; total = 0; loaded = 0; paintSel();
     blank("검색할 수 없습니다", e.message);
     $("count").textContent = "";
   } finally { if (my === seq) busy = false; }
 }
-async function more() {
+async function more(n = PAGE) {
   if (busy || loaded >= total || job || S.view === "recent" || (S.mode !== "name" && !S.view)) return;
   busy = true;
   const my = seq;
   try {
-    const p = params(); p.set("offset", loaded); p.set("limit", PAGE);
+    const p = params(); p.set("offset", loaded); p.set("limit", Math.min(n, 2000));
     const d = await api("/api/search?" + p);
     if (my !== seq) return;
     const start = rows.length;
-    rows.push(...d.rows); loaded = rows.length; appendRows(d.rows, start);
+    rows.push(...takeRows(d.rows)); loaded = rows.length; appendRows(d.rows, start); paintAllBox();
   } finally { busy = false; }
 }
 $("list").addEventListener("scroll", () => { const l = $("list"); if (l.scrollTop + l.clientHeight > l.scrollHeight - 600) more(); });
@@ -789,32 +1188,109 @@ const EXTCAT = {};
 function catOf(name, dir) { if (dir) return "folder"; const i = name.lastIndexOf("."); return (i > 0 && EXTCAT[name.slice(i + 1).toLowerCase()]) || "other"; }
 
 // ---------- selection ----------
+function visible(i) { const r = rows[i]; return !!r && !(r.gk !== undefined && collapsed.has(r.gk)); }
 function paintSel() {
-  for (const tr of $("rows").querySelectorAll("tr.sel")) tr.classList.remove("sel");
-  rows.forEach((r, i) => { if (selected.has(r.key)) $("rows").querySelectorAll(`tr[data-i="${i}"]`).forEach(t => t.classList.add("sel")); });
+  for (const tr of $("rows").querySelectorAll("tr[data-i]")) { const r = rows[+tr.dataset.i]; tr.classList.toggle("sel", !!r && selected.has(r.key)); }
   const sel = rows.filter(r => selected.has(r.key));
   const bytes = sel.reduce((a, r) => a + (r.size > 0 && !r.dir ? r.size : 0), 0);
   $("selinfo").textContent = sel.length > 1 ? `${sel.length}개 선택 · ${fmtSize(bytes)}` : "";
+  paintAllBox(); renderSelbar(sel, bytes);
+}
+function paintAllBox() {
+  const b = $("cb-all"); if (!b) return;
+  let n = 0; for (const r of rows) if (selected.has(r.key)) n++;
+  b.classList.toggle("on", n > 0 && n === rows.length); b.classList.toggle("some", n > 0 && n < rows.length);
+}
+function toggleAll() {
+  if (rows.length && rows.every(r => selected.has(r.key))) selected.clear(); else rows.forEach(r => selected.add(r.key));
+  paintSel();
 }
 function selectIdx(i, mode) {
   if (i < 0 || i >= rows.length) return;
   const key = rows[i].key;
   if (mode === "toggle") { selected.has(key) ? selected.delete(key) : selected.add(key); anchor = i; }
-  else if (mode === "range" && anchor != null) { selected.clear(); const [a, b] = [Math.min(anchor, i), Math.max(anchor, i)]; for (let j = a; j <= b; j++) selected.add(rows[j].key); }
+  else if (mode === "range" && anchor != null) { selected.clear(); const [a, b] = [Math.min(anchor, i), Math.max(anchor, i)]; for (let j = a; j <= b; j++) if (visible(j)) selected.add(rows[j].key); }
+  else if (mode === "add" && anchor != null) { const [a, b] = [Math.min(anchor, i), Math.max(anchor, i)]; for (let j = a; j <= b; j++) if (visible(j)) selected.add(rows[j].key); }
   else { selected.clear(); selected.add(key); anchor = i; }
   cursor = i; paintSel();
   const tr = $("rows").querySelector(`tr[data-i="${i}"]`); if (tr) tr.scrollIntoView({ block: "nearest" });
   if (document.body.classList.contains("pv")) preview(rows[i]);
 }
 function selRows() { const s = rows.filter(r => selected.has(r.key)); return s.length ? s : (cursor != null && rows[cursor] ? [rows[cursor]] : []); }
-$("rows").addEventListener("click", e => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; selectIdx(+tr.dataset.i, e.ctrlKey || e.metaKey ? "toggle" : e.shiftKey ? "range" : "one"); });
-$("rows").addEventListener("dblclick", e => { const tr = e.target.closest("tr[data-i]"); if (tr) act("open", [rows[+tr.dataset.i]]); });
+async function selectEverything() {
+  const want = Math.min(total, 10000);
+  toast(`결과 ${want.toLocaleString()}개를 불러오는 중…`);
+  while (loaded < want) { while (busy) await new Promise(r => setTimeout(r, 50)); const n = loaded; await more(2000); if (loaded === n) break; }
+  rows.forEach(r => selected.add(r.key)); paintSel();
+}
+// the bar under the list: what is selected and what can be done with it
+function renderSelbar(sel, bytes) {
+  const bar = $("selbar");
+  if (!sel.length) { bar.classList.remove("show"); return; }
+  bar.classList.add("show");
+  const B = (label, fn, o = {}) => { const b = el("button", "btn" + (o.cls ? " " + o.cls : ""), label); b.onclick = fn; if (o.title) b.title = o.title; if (o.pop) b.dataset.pop = 1; return b; };
+  const items = [el("span", "what", `${sel.length.toLocaleString()}개 선택${bytes ? " · " + fmtSize(bytes) : ""}`),
+    B("열기", () => act("open", sel), { title: "Enter" }),
+    B("폴더에서 보기", () => act("reveal", sel), { title: "Ctrl+Enter" }),
+    B("경로 복사", () => act("copy", sel), { title: "Ctrl+C" }),
+    B("복사…", e => openPop("dest", e.currentTarget, { op: "copy", list: sel }), { pop: 1, title: "다른 폴더로 복사" }),
+    B("이동…", e => openPop("dest", e.currentTarget, { op: "move", list: sel }), { pop: 1, title: "다른 폴더로 옮기기" })];
+  if (sel.length === 1) items.push(B("이름 바꾸기", () => fileOp("rename", sel), { title: "F2" }));
+  items.push(B("휴지통", () => fileOp("trash", sel), { cls: "warnb", title: "휴지통으로 보내기 (Delete)" }));
+  items.push(el("div", "spacer"));
+  if (sel.length === loaded && total > loaded) items.push(B(`결과 전체 ${Math.min(total, 10000).toLocaleString()}개 선택`, selectEverything, { title: "아직 불러오지 않은 결과까지 (최대 1만 개)" }));
+  items.push(B("선택 해제", () => { selected.clear(); paintSel(); }, { title: "Esc" }));
+  bar.replaceChildren(...items);
+}
+$("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-i]"); if (!tr) return;
+  const i = +tr.dataset.i;
+  if (e.target.closest(".c-chk")) { selectIdx(i, e.shiftKey ? "add" : "toggle"); return; }
+  selectIdx(i, e.ctrlKey || e.metaKey ? "toggle" : e.shiftKey ? "range" : "one");
+});
+$("rows").addEventListener("dblclick", e => { const tr = e.target.closest("tr[data-i]"); if (tr && !e.target.closest(".c-chk")) act("open", [rows[+tr.dataset.i]]); });
 $("rows").addEventListener("contextmenu", e => {
   const tr = e.target.closest("tr[data-i]"); if (!tr) return;
   e.preventDefault(); const i = +tr.dataset.i; if (!selected.has(rows[i].key)) selectIdx(i, "one");
   showMenu(e.clientX, e.clientY, selRows());
 });
 
+// ---------- copy, move, recycle bin, rename (Windows' own dialogs and undo) ----------
+function ask({ title, text, input, sel, ok = "확인", danger }) {
+  return new Promise(res => {
+    $("ask-title").textContent = title; $("ask-text").textContent = text || ""; $("ask-text").hidden = !text;
+    const inp = $("ask-input"); inp.hidden = input == null; inp.value = input ?? "";
+    const okb = $("ask-ok"); okb.textContent = ok; okb.className = "btn " + (danger ? "danger" : "primary");
+    $("ask").classList.add("show");
+    const done = v => { $("ask").classList.remove("show"); okb.onclick = $("ask-no").onclick = $("ask").onkeydown = $("ask").onclick = null; res(v); };
+    okb.onclick = () => done(input == null ? true : inp.value);
+    $("ask-no").onclick = () => done(null);
+    $("ask").onclick = e => { if (e.target.id === "ask") done(null); };
+    $("ask").onkeydown = e => { e.stopPropagation(); if (e.key === "Escape") done(null); else if (e.key === "Enter") { e.preventDefault(); okb.click(); } };
+    setTimeout(() => { if (input != null) { inp.focus(); inp.setSelectionRange(0, sel ?? inp.value.length); } else okb.focus(); }, 0);
+  });
+}
+async function fileOp(op, list, dest) {
+  if (!list.length) return;
+  const what = list.length === 1 ? `'${list[0].name}'` : `${list.length.toLocaleString()}개 항목`;
+  const body = { op, keys: list.map(r => r.key) };
+  if (op === "trash" && !await ask({ title: "휴지통으로 보낼까요?", text: `${what}\n휴지통에서 다시 되살릴 수 있습니다.`, ok: "휴지통으로 보내기", danger: true })) return;
+  if (op === "rename") {
+    const r = list[0], dot = r.dir ? -1 : r.name.lastIndexOf(".");
+    const name = await ask({ title: "이름 바꾸기", text: r.folder, input: r.name, sel: dot > 0 ? dot : r.name.length, ok: "바꾸기" });
+    if (name == null || !name.trim() || name.trim() === r.name) return;
+    body.name = name.trim();
+  }
+  if (op === "copy" || op === "move") body.dest = dest || "";
+  try {
+    const d = await api("/api/fileop", { method: "POST", body: JSON.stringify(body) });
+    if (d.cancelled) return;
+    if (d.dest) { const ds = store.get("dests", []).filter(x => x.toLowerCase() !== d.dest.toLowerCase()); ds.unshift(d.dest); store.set("dests", ds.slice(0, 6)); }
+    const verb = { copy: "복사했습니다", move: "옮겼습니다", trash: "휴지통으로 보냈습니다", rename: "이름을 바꿨습니다" }[op];
+    toast(`${op === "rename" ? `'${body.name}'(으)로 ` : what + " "}${verb}${d.dest ? ` → ${d.dest}` : ""}${d.aborted ? " (일부 취소)" : ""}`);
+    if (op !== "copy") { selected.clear(); refresh(true); }
+  } catch (e) { toast(e.message); }
+}
 // ---------- actions ----------
 async function act(how, list = selRows()) {
   if (!list.length) return;
@@ -848,10 +1324,15 @@ function showMenu(x, y, list) {
     else if (r.parent) item("결과에서 이 폴더만 보기", () => setUnder(r.parent, folder));
     const dot = r.name.lastIndexOf(".");
     const ext = r.dir ? "/" : dot > 0 ? r.name.slice(dot + 1).toLowerCase() : "";
-    if (!S.exts.includes(ext)) item(`결과에서 ${extLabel(ext)}만 보기`, () => { S.exts = [ext]; refresh(); });
+    if (!S.exts.includes(ext)) item(`결과에서 ${extLabel(ext)}만 보기`, () => setF({ exts: [ext] }));
     if (r.dir) item("이 폴더 내용 검색", () => { addTerm(/\s/.test(folder) ? `"${folder}\\"` : folder + "\\"); setContent(true); });
     if (r.dir) item("이 폴더를 내용 색인에 추가", async () => { try { await api("/api/cindex", { method: "POST", body: JSON.stringify({ action: "add", path: folder }) }); toast("내용 색인에 추가했습니다. 백그라운드에서 색인합니다."); } catch (e) { toast(e.message); } });
   }
+  m.append(el("hr"));
+  item("복사…", () => fileOp("copy", list));
+  item("이동…", () => fileOp("move", list));
+  if (list.length === 1) item("이름 바꾸기", () => fileOp("rename", list), "F2");
+  item("휴지통으로 보내기", () => fileOp("trash", list), "Delete");
   m.style.display = "block";
   m.style.left = Math.max(4, Math.min(x, innerWidth - m.offsetWidth - 8)) + "px"; m.style.top = Math.max(4, Math.min(y, innerHeight - m.offsetHeight - 8)) + "px";
 }
@@ -914,7 +1395,7 @@ function setContent(on) {
 }
 function updateScope() {
   if (!S.content) return;
-  const filt = S.q || S.cat || S.date || S.size;
+  const filt = S.q || filtersOn();
   $("c-scope").textContent = filt ? `이름 검색과 필터로 고른 ${total.toLocaleString()}개 안에서 찾습니다` : "모든 파일에서 찾습니다. 이름이나 유형 필터로 범위를 좁히면 빨라집니다.";
 }
 async function startJob(force = false) {
@@ -1337,9 +1818,9 @@ if (store.get("noside", false)) document.body.classList.add("noside");
 $("b-side").classList.toggle("on", !document.body.classList.contains("noside") && !matchMedia("(max-width:900px)").matches);
 $("b-settings").onclick = () => openSettings();
 $("b-theme").onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const next = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = next; store.set("theme", next); };
-$("b-save").onclick = () => {
-  const label = prompt("이 검색의 이름", S.q || CATNAME[S.cat] || "검색"); if (!label) return;
-  const saved = store.get("saved", []); saved.unshift({ label, state: { ...S, exts: [...S.exts], under: "", underPath: "", content: false, view: S.view === "recent" ? "" : S.view } }); store.set("saved", saved.slice(0, 30)); renderSide(); toast("저장했습니다");
+$("b-save").onclick = async () => {
+  const label = await ask({ title: "이 검색 저장", text: "왼쪽 '저장한 검색'에서 다시 열 수 있습니다. 폴더 필터는 저장하지 않습니다.", input: S.q || fval("cat") || "검색", ok: "저장" }); if (!label || !label.trim()) return;
+  const saved = store.get("saved", []); saved.unshift({ label: label.trim(), state: { ...S, cats: [...S.cats], exts: [...S.exts], under: "", underPath: "", content: false, view: S.view === "recent" ? "" : S.view } }); store.set("saved", saved.slice(0, 30)); renderSide(); toast("저장했습니다");
 };
 $("b-export").onclick = async () => {
   try {
@@ -1349,37 +1830,54 @@ $("b-export").onclick = async () => {
     toast("CSV 파일을 저장했습니다");
   } catch (e) { toast(e.message); }
 };
-$("d-from").onchange = e => { S.from = e.target.value; refresh(); };
-$("d-to").onchange = e => { S.to = e.target.value; refresh(); };
+let wT;
+$("within").addEventListener("input", e => { clearTimeout(wT); wT = setTimeout(() => setF({ within: e.target.value }, true), 180); });
+$("within").addEventListener("keydown", e => { if (e.key === "Escape" && e.target.value) { e.stopPropagation(); clearTimeout(wT); e.target.value = ""; setF({ within: "" }); } else if (e.key === "Enter") { clearTimeout(wT); setF({ within: e.target.value }, true); } });
+$("within-x").onclick = e => { e.preventDefault(); clearTimeout(wT); $("within").value = ""; setF({ within: "" }); };
+document.querySelectorAll("#fbar .pillb").forEach(b => b.onclick = () => openPop(b.dataset.f, b));
+$("f-back").onclick = () => fgo(-1); $("f-fwd").onclick = () => fgo(1);
+$("f-clear").onclick = clearFilters;
 function applyState(st) {
-  Object.assign(S, st); $("q").value = S.q;
-  S.exts = [...(st.exts || [])]; S.under = st.under || ""; S.underPath = st.underPath || "";
+  st = { ...st };
+  if (st.cat != null && !st.cats) st.cats = st.cat ? [st.cat] : []; // saved before several kinds could be picked
+  const oldSize = { s: ["", "1"], m: ["1", "100"], l: ["100", "1024"], xl: ["1024", ""] }[st.size];
+  if (oldSize) { st.size = "custom"; [st.smin, st.smax] = oldSize; }
+  delete st.cat; delete st.facets;
+  Object.assign(S, { cats: [], exts: [], under: "", underPath: "", within: "", date: "", from: "", to: "", size: "", smin: "", smax: "", group: "" }, st);
+  S.cats = [...S.cats]; S.exts = [...S.exts];
+  $("q").value = S.q; $("within").value = S.within;
   for (const [id, k] of [["o-case", "case"], ["o-path", "path"], ["o-regex", "regex"]]) $(id).classList.toggle("on", S[k]);
-  $("d-from").value = S.from || ""; $("d-to").value = S.to || "";
-  refresh();
+  fpush(); refresh();
 }
 document.addEventListener("keydown", e => {
+  if ($("ask").classList.contains("show")) return;
   const inField = e.target.matches("input, textarea, select");
+  if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); fgo(e.key === "ArrowLeft" ? -1 : 1); return; }
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.shiftKey && e.key.toLowerCase() === "f") { e.preventDefault(); setContent(!S.content); return; }
   if (ctrl && (e.key === "f" || e.key === "l")) { e.preventDefault(); $("q").focus(); $("q").select(); return; }
   if (e.key === "F1") { e.preventDefault(); openHelp(); return; }
   if (e.key === "Escape") {
+    if (popKind) return closePop();
     if ($("help").classList.contains("show")) return $("help").classList.remove("show");
     if ($("menu").style.display === "block") return hideMenu();
     if ($("dlg2").style.display === "grid") return $("dlg2").style.display = "none";
     if ($("dlg").classList.contains("show")) return $("dlg").classList.remove("show");
     if (e.target === $("q") && $("q").value) { $("q").value = ""; S.q = ""; refresh(); }
+    else if (!inField && selected.size) { selected.clear(); paintSel(); }
     return;
   }
   if ($("dlg").classList.contains("show")) return;
-  if (e.key === "ArrowDown") { e.preventDefault(); if (inField) e.target.blur(); const i = cursor == null ? 0 : Math.min(cursor + 1, rows.length - 1); selectIdx(i, e.shiftKey ? "range" : "one"); if (i >= rows.length - 5) more(); return; }
-  if (e.key === "ArrowUp" && !inField) { e.preventDefault(); if (cursor == null || cursor === 0) { $("q").focus(); return; } selectIdx(cursor - 1, e.shiftKey ? "range" : "one"); return; }
+  const step = (from, d) => { let i = from; do i += d; while (i >= 0 && i < rows.length && !visible(i)); return i; };
+  if (e.key === "ArrowDown" && !e.target.matches("#pop *")) { e.preventDefault(); if (inField) e.target.blur(); const i = step(cursor == null ? -1 : cursor, 1); if (i < rows.length) selectIdx(i, e.shiftKey ? "range" : "one"); if (i >= rows.length - 5) more(); return; }
+  if (e.key === "ArrowUp" && !inField) { e.preventDefault(); const i = cursor == null ? -1 : step(cursor, -1); if (i < 0) { $("q").focus(); return; } selectIdx(i, e.shiftKey ? "range" : "one"); return; }
   if (inField) return;
   if (e.key === "Enter") { e.preventDefault(); act(ctrl ? "reveal" : "open"); }
   else if (e.key === " ") { e.preventDefault(); togglePreview(); }
   else if (ctrl && e.key === "c") { e.preventDefault(); act("copy"); }
   else if (ctrl && e.key === "a") { e.preventDefault(); rows.forEach(r => selected.add(r.key)); paintSel(); }
+  else if (e.key === "Delete") { e.preventDefault(); fileOp("trash", selRows()); }
+  else if (e.key === "F2") { e.preventDefault(); const l = selRows(); if (l.length === 1) fileOp("rename", l); }
 });
 
 // engine status: progress while indexing, refresh when files change
@@ -1403,7 +1901,7 @@ async function poll() {
 const theme = store.get("theme", null); if (theme) document.documentElement.dataset.theme = theme;
 if (store.get("pv", false)) { document.body.classList.add("pv"); $("preview").replaceChildren(el("div", "pv-empty", "항목을 선택하면 여기에 미리보기가 나옵니다")); }
 S.skipSys = store.get("skipSys", true); $("a-sys").checked = S.skipSys;
-renderHead(); renderSide(); poll();
+fpush(); renderHead(); renderSide(); renderPills(); poll();
 setMode(store.get("mode", "name"));
 </script>
 </body>

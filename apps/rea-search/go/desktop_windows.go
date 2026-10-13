@@ -166,6 +166,13 @@ var (
 
 // bringWindow restores and focuses an open search window. False if none.
 func bringWindow() bool {
+	if h := uiHwnd.Load(); h != 0 {
+		if ic, _, _ := procIsIconic.Call(h); ic != 0 {
+			procShowWindow.Call(h, 9) // SW_RESTORE
+		}
+		procSetForegroundWindow.Call(h)
+		return true
+	}
 	enumMu.Lock()
 	enumFound = 0
 	procEnumWindows.Call(enumCB, 0)
