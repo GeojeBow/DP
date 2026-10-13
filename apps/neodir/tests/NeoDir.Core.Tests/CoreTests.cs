@@ -143,6 +143,7 @@ public class SettingsStoreTests
         var settings = new AppSettings { Layout = LayoutKind.Three, ShowHidden = true };
         settings.Favorites.Add(new Favorite { Name = "작업", Path = @"D:\Work" });
         settings.Panes.Add(new PaneState { Tabs = [@"C:\", @"D:\"], SelectedTab = 1 });
+        settings.Workspaces.Add(new Workspace { Name = "정산", Layout = LayoutKind.TwoColumns, Panes = [new PaneState { Tabs = [@"D:\정산"] }] });
         store.Save(settings);
 
         var loaded = store.Load();
@@ -151,6 +152,8 @@ public class SettingsStoreTests
         Assert.Equal(@"D:\Work", loaded.Favorites[0].Path);
         Assert.Equal(1, loaded.Panes[0].SelectedTab);
         Assert.True(double.IsNaN(loaded.WindowLeft));
+        Assert.Equal(LayoutKind.TwoColumns, loaded.Workspaces[0].Layout);
+        Assert.Equal(@"D:\정산", loaded.Workspaces[0].Panes[0].Tabs[0]);
 
         File.WriteAllText(store.FilePath, "{ not json");
         Assert.Equal(LayoutKind.Four, store.Load().Layout);

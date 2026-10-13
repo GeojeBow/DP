@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using NeoDir.Core;
@@ -22,6 +23,7 @@ public partial class MainWindow : Window, IPaneHost
     private FolderPane _active;
     private LayoutKind _layout;
     private DateTime _drivesRefreshed;
+    private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
 
     public MainWindow()
     {
@@ -65,6 +67,19 @@ public partial class MainWindow : Window, IPaneHost
         ApplyLayout(_settings.Layout);
 
         _toastTimer.Tick += (_, _) => HideToast();
+        _previewTimer.Tick += (_, _) =>
+        {
+            _previewTimer.Stop();
+            Preview.Show(_active.SelectedEntries);
+        };
+        SetPreview(_settings.PreviewVisible, _settings.PreviewWidth);
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        // The Windows right-click menu draws its submenus through this window's messages.
+        HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(ShellContextMenu.HandleWindowMessage);
     }
 
     public string? StartupPath { get; set; }
@@ -158,6 +173,7 @@ public partial class MainWindow : Window, IPaneHost
         foreach (var p in _panes) p.IsActive = p == pane && VisiblePaneCount > 1;
         StatusText.Text = pane.StatusText;
         Title = $"NeoDir — {PathCrumbs.DisplayName(pane.CurrentPath)}";
+        SchedulePreview();
     }
 
     private void CyclePane(int direction)
@@ -180,6 +196,105 @@ public partial class MainWindow : Window, IPaneHost
         if (pane != _active) return;
         StatusText.Text = pane.StatusText;
         Title = $"NeoDir — {PathCrumbs.DisplayName(pane.CurrentPath)}";
+    }
+
+    public void OnPaneSelectionChanged(FolderPane pane)
+    {
+        if (pane == _active) SchedulePreview();
+    }
+
+    private void SchedulePreview()
+    {
+        if (Preview.Visibility != Visibility.Visible) return;
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void SetPreview(bool visible, double width)
+    {
+        PreviewToggle.IsChecked = visible;
+        Preview.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        PreviewSplitter.Visibility = Preview.Visibility;
+        PreviewColumn.Width = visible ? new GridLength(Math.Clamp(width, 200, 900)) : new GridLength(0);
+        PreviewSplitterColumn.Width = visible ? new GridLength(4) : new GridLength(0);
+        if (visible) SchedulePreview();
+    }
+
+    private void OnPreviewToggle(object sender, RoutedEventArgs e) => TogglePreview();
+
+    private void TogglePreview()
+    {
+        var visible = Preview.Visibility != Visibility.Visible;
+        if (!visible) _settings.PreviewWidth = PreviewColumn.ActualWidth;
+        SetPreview(visible, _settings.PreviewWidth);
+    }
+
+    // ───────────── Workspaces ─────────────
+
+    private void OnWorkspaceClick(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = WorkspaceButton, Placement = PlacementMode.Bottom };
+        MenuItem Add(string header, string glyph, Action action, string? gesture = null)
+        {
+            var item = new MenuItem { Header = header, Tag = glyph, InputGestureText = gesture ?? "" };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+            return item;
+        }
+
+        for (var i = 0; i < _settings.Workspaces.Count; i++)
+        {
+            var workspace = _settings.Workspaces[i];
+            Add(workspace.Name, "\uE8A9", () => LoadWorkspace(workspace), i < 9 ? $"Ctrl+Alt+{i + 1}" : null);
+        }
+        if (_settings.Workspaces.Count > 0) menu.Items.Add(new Separator());
+        Add("지금 화면을 작업공간으로 저장…", "\uE74E", SaveWorkspace);
+        if (_settings.Workspaces.Count > 0)
+        {
+            menu.Items.Add(new Separator());
+            foreach (var workspace in _settings.Workspaces.ToList())
+            {
+                Add($"삭제: {workspace.Name}", "\uE74D", () =>
+                {
+                    _settings.Workspaces.Remove(workspace);
+                    SaveSettings();
+                    ShowToast($"작업공간을 지웠어요: {workspace.Name}");
+                });
+            }
+        }
+        menu.IsOpen = true;
+    }
+
+    private void SaveWorkspace()
+    {
+        var suggested = $"작업공간 {_settings.Workspaces.Count + 1}";
+        var name = InputDialog.Ask(this, "작업공간 저장", suggested,
+            n => string.IsNullOrWhiteSpace(n) ? "이름을 입력하세요." : null, selectAll: true,
+            message: "지금 레이아웃과 모든 패널의 탭을 저장해요. 같은 이름이 있으면 덮어써요.");
+        if (name == null) return;
+        var workspace = new Workspace
+        {
+            Name = name,
+            Layout = _layout,
+            Panes = _panes.Select(p => p.GetState()).ToList(),
+            ActivePane = _active.Index,
+        };
+        var index = _settings.Workspaces.FindIndex(w => w.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0) _settings.Workspaces[index] = workspace;
+        else _settings.Workspaces.Add(workspace);
+        SaveSettings();
+        ShowToast($"작업공간을 저장했어요: {name}");
+    }
+
+    private void LoadWorkspace(Workspace workspace)
+    {
+        for (var i = 0; i < _panes.Length && i < workspace.Panes.Count; i++) _panes[i].LoadState(workspace.Panes[i]);
+        ApplyLayout(workspace.Layout);
+        var active = _panes[Math.Clamp(workspace.ActivePane, 0, VisiblePaneCount - 1)];
+        SetActive(active);
+        active.FocusList();
+        WorkspaceLabel.Text = workspace.Name;
+        ShowToast($"작업공간을 열었어요: {workspace.Name}");
     }
 
     public void OpenInNextPane(FolderPane from, string path)
@@ -256,6 +371,11 @@ public partial class MainWindow : Window, IPaneHost
         {
             new() { Name = "내 PC", Path = PathCrumbs.ThisPc, Glyph = "", Usage = -1 },
             new() { Name = "홈", Path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Glyph = "", Usage = -1 },
+        };
+        foreach (var (name, path) in KnownFolders.OneDrives())
+            links.Add(new SidebarItem { Name = name, Path = path, Glyph = "\uE753", Usage = -1 });
+        links.AddRange(new List<SidebarItem>
+        {
             new() { Name = "바탕 화면", Path = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Glyph = "", Usage = -1 },
             new() { Name = "다운로드", Path = KnownFolders.Downloads, Glyph = "", Usage = -1 },
             new() { Name = "문서", Path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Glyph = "", Usage = -1 },
@@ -432,6 +552,9 @@ public partial class MainWindow : Window, IPaneHost
             "F2 / Del / Shift+Del  이름 바꾸기 / 휴지통 / 영구 삭제\n" +
             "Ctrl+Shift+N  새 폴더 · Ctrl+Shift+C  경로 복사\n" +
             "Ctrl+D  즐겨찾기 · Ctrl+B  사이드바 · Ctrl+H  숨김 파일\n" +
+            "Ctrl+P  미리보기 · Ctrl+Alt+1~9  작업공간 열기\n" +
+            "필터에서 Enter  하위 폴더까지 검색\n" +
+            "Shift+우클릭  Windows 기본 메뉴 (압축, 보내기, 새로 만들기 등)\n" +
             "끌어서 놓기: 같은 드라이브는 이동, 다른 드라이브는 복사 (Ctrl=복사, Shift=이동)";
         InputDialog.Confirm(this, "단축키", help, "닫기");
     }
@@ -450,6 +573,11 @@ public partial class MainWindow : Window, IPaneHost
 
         switch (key)
         {
+            case >= Key.D1 and <= Key.D9 when ctrl && alt:
+                var slot = key - Key.D1;
+                if (slot < _settings.Workspaces.Count) LoadWorkspace(_settings.Workspaces[slot]);
+                break;
+            case Key.P when ctrl: TogglePreview(); break;
             case Key.D1 or Key.NumPad1 when ctrl: ApplyLayout(LayoutKind.Single); break;
             case Key.D2 or Key.NumPad2 when ctrl: ApplyLayout(LayoutKind.TwoColumns); break;
             case Key.D3 or Key.NumPad3 when ctrl: ApplyLayout(LayoutKind.TwoRows); break;
@@ -549,6 +677,8 @@ public partial class MainWindow : Window, IPaneHost
         _settings.Favorites = _favorites.Select(f => new Favorite { Name = f.Name, Path = f.Path }).ToList();
         _settings.ShowHidden = ShowHidden;
         _settings.SidebarVisible = Sidebar.Visibility == Visibility.Visible;
+        _settings.PreviewVisible = Preview.Visibility == Visibility.Visible;
+        if (_settings.PreviewVisible && PreviewColumn.ActualWidth > 0) _settings.PreviewWidth = PreviewColumn.ActualWidth;
         if (_settings.SidebarVisible && SidebarColumn.ActualWidth > 0) _settings.SidebarWidth = SidebarColumn.ActualWidth;
         try
         {
@@ -578,5 +708,50 @@ public static class KnownFolders
             catch (Exception) { }
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
         }
+    }
+
+    /// <summary>
+    /// Every signed-in OneDrive (personal and work/school), labelled like Explorer:
+    /// "OneDrive - 개인", "OneDrive - 회사명".
+    /// </summary>
+    public static List<(string Name, string Path)> OneDrives()
+    {
+        var found = new List<(string Name, string Path)>();
+        void Add(string? name, string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return;
+            path = PathCrumbs.Normalize(path);
+            if (found.Any(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase))) return;
+            found.Add((string.IsNullOrWhiteSpace(name) ? System.IO.Path.GetFileName(path) : name, path));
+        }
+
+        try
+        {
+            using var accounts = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\OneDrive\Accounts");
+            foreach (var id in accounts?.GetSubKeyNames() ?? [])
+            {
+                using var account = accounts!.OpenSubKey(id);
+                var folder = account?.GetValue("UserFolder") as string;
+                var company = account?.GetValue("DisplayName") as string;
+                var name = id.Equals("Personal", StringComparison.OrdinalIgnoreCase)
+                    ? "OneDrive - 개인"
+                    : string.IsNullOrWhiteSpace(company) ? null : $"OneDrive - {company}";
+                Add(name, folder);
+            }
+        }
+        catch (Exception) { }
+
+        Add(null, Environment.GetEnvironmentVariable("OneDriveCommercial"));
+        Add(null, Environment.GetEnvironmentVariable("OneDriveConsumer"));
+        Add(null, Environment.GetEnvironmentVariable("OneDrive"));
+
+        // Last resort: "OneDrive", "OneDrive - Contoso" folders in the user profile.
+        try
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            foreach (var dir in Directory.EnumerateDirectories(home, "OneDrive*")) Add(null, dir);
+        }
+        catch (Exception) { }
+        return found;
     }
 }

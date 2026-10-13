@@ -42,6 +42,12 @@ public sealed class FileEntry
     public DateTime Modified { get; init; }
     public string? Detail { get; init; }
     public Brush? Foreground { get; init; }
+    /// <summary>OneDrive "online-only" file: reading it would download it.</summary>
+    public bool IsCloudOnly { get; init; }
+    /// <summary>Folder relative to the search root, shown only in search results.</summary>
+    public string? Location { get; init; }
+
+    public Visibility CloudVisibility => IsCloudOnly ? Visibility.Visible : Visibility.Collapsed;
 
     public double Opacity => IsHidden ? 0.55 : 1;
 
@@ -51,7 +57,7 @@ public sealed class FileEntry
         {
             if (!_iconLoaded)
             {
-                _icon = ShellInfo.GetIcon(FullPath, IsDirectory, IsDrive);
+                _icon = ShellInfo.GetIcon(FullPath, IsDirectory, IsDrive, IsCloudOnly);
                 _iconLoaded = true;
             }
             return _icon;
@@ -82,20 +88,67 @@ public sealed class FileEntry
         foreach (var info in dir.EnumerateFileSystemInfos("*", options))
         {
             token.ThrowIfCancellationRequested();
-            var isDir = (info.Attributes & FileAttributes.Directory) != 0;
-            var color = isDir ? null : colors.ColorFor(info.Name);
-            entries.Add(new FileEntry
-            {
-                FullPath = info.FullName,
-                Name = info.Name,
-                IsDirectory = isDir,
-                IsHidden = (info.Attributes & FileAttributes.Hidden) != 0,
-                Size = info is FileInfo file ? file.Length : -1,
-                Modified = info.LastWriteTime,
-                Foreground = color == null ? null : BrushFor(color),
-            });
+            entries.Add(From(info, colors, null));
         }
         return entries;
+    }
+
+    private const FileAttributes RecallOnOpen = (FileAttributes)0x40000;
+    private const FileAttributes RecallOnDataAccess = (FileAttributes)0x400000;
+
+    public static FileEntry From(FileSystemInfo info, ColorRules colors, string? location)
+    {
+        var attributes = info.Attributes;
+        var isDir = (attributes & FileAttributes.Directory) != 0;
+        var color = isDir ? null : colors.ColorFor(info.Name);
+        return new FileEntry
+        {
+            FullPath = info.FullName,
+            Name = info.Name,
+            IsDirectory = isDir,
+            IsHidden = (attributes & FileAttributes.Hidden) != 0,
+            IsCloudOnly = !isDir && (attributes & (FileAttributes.Offline | RecallOnOpen | RecallOnDataAccess)) != 0,
+            Size = info is FileInfo file ? file.Length : -1,
+            Modified = info.LastWriteTime,
+            Foreground = color == null ? null : BrushFor(color),
+            Location = location,
+        };
+    }
+
+    /// <summary>
+    /// Walks every subfolder for names matching <paramref name="filter"/>, handing results
+    /// over in batches so the list fills while it searches.
+    /// </summary>
+    public static int Search(string root, NameFilter filter, bool showHidden, ColorRules colors,
+        Action<List<FileEntry>> onBatch, int limit, CancellationToken token)
+    {
+        var options = new EnumerationOptions
+        {
+            IgnoreInaccessible = true,
+            RecurseSubdirectories = true,
+            AttributesToSkip = showHidden ? 0 : FileAttributes.Hidden | FileAttributes.System,
+            ReturnSpecialDirectories = false,
+        };
+        var batch = new List<FileEntry>();
+        var found = 0;
+        var lastFlush = Environment.TickCount64;
+        foreach (var info in new DirectoryInfo(root).EnumerateFileSystemInfos("*", options))
+        {
+            token.ThrowIfCancellationRequested();
+            if (!filter.Matches(info.Name)) continue;
+            var folder = System.IO.Path.GetDirectoryName(info.FullName) ?? "";
+            var location = folder.Length > root.TrimEnd('\\').Length ? folder[(root.TrimEnd('\\').Length + 1)..] : "";
+            batch.Add(From(info, colors, location));
+            if (++found >= limit) break;
+            if (batch.Count >= 200 || Environment.TickCount64 - lastFlush > 250)
+            {
+                onBatch(batch);
+                batch = [];
+                lastFlush = Environment.TickCount64;
+            }
+        }
+        if (batch.Count > 0) onBatch(batch);
+        return found;
     }
 
     private static List<FileEntry> ReadDrives()
@@ -170,6 +223,7 @@ public sealed class FileEntrySorter : System.Collections.IComparer
             "Modified" => a.Modified.CompareTo(b.Modified),
             "Type" => string.Compare(a.TypeName, b.TypeName, StringComparison.CurrentCultureIgnoreCase),
             "Size" => a.Size.CompareTo(b.Size),
+            "Location" => string.Compare(a.Location, b.Location, StringComparison.CurrentCultureIgnoreCase),
             _ => 0,
         };
         if (result == 0) result = ShellInfo.CompareNatural(a.Name, b.Name);

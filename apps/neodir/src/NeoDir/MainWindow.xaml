@@ -87,8 +87,18 @@
                     <StackPanel Orientation="Horizontal" Margin="10,0,0,0" WindowChrome.IsHitTestVisibleInChrome="True">
                         <ToggleButton x:Name="SidebarToggle" Style="{StaticResource ToggleIcon}" Content="&#xE700;"
                                       ToolTip="사이드바 (Ctrl+B)" Click="OnSidebarToggle" />
+                        <ToggleButton x:Name="PreviewToggle" Style="{StaticResource ToggleIcon}" Content="&#xE8A1;"
+                                      ToolTip="미리보기 패널 (Ctrl+P)" Click="OnPreviewToggle" />
                         <ToggleButton x:Name="HiddenToggle" Style="{StaticResource ToggleIcon}" Content="&#xE7B3;"
                                       ToolTip="숨김 파일 보기 (Ctrl+H)" Click="OnHiddenToggle" />
+                        <Button x:Name="WorkspaceButton" Style="{StaticResource IconButton}" Width="Auto"
+                                ToolTip="작업공간: 지금 레이아웃과 탭을 저장하고 한 번에 불러오기" Click="OnWorkspaceClick">
+                            <StackPanel Orientation="Horizontal" Margin="9,0">
+                                <TextBlock Text="&#xE8A9;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" />
+                                <TextBlock x:Name="WorkspaceLabel" Text="작업공간" FontFamily="{StaticResource UiFont}" FontSize="12"
+                                           Margin="7,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource IconButton}" Content="&#xE897;" Foreground="{StaticResource SubTextBrush}"
                                 ToolTip="단축키 도움말 (F1)" Click="OnHelpClick" />
                     </StackPanel>
@@ -101,6 +111,8 @@
                     <ColumnDefinition x:Name="SidebarColumn" Width="230" MinWidth="0" />
                     <ColumnDefinition x:Name="SidebarSplitterColumn" Width="4" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="PreviewSplitterColumn" Width="0" />
+                    <ColumnDefinition x:Name="PreviewColumn" Width="0" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Sidebar -->
@@ -133,6 +145,9 @@
                 <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Style="{StaticResource PaneSplitter}" />
 
                 <Grid x:Name="PaneHost" Grid.Column="2" Margin="0,0,4,0" />
+
+                <GridSplitter x:Name="PreviewSplitter" Grid.Column="3" Style="{StaticResource PaneSplitter}" Visibility="Collapsed" />
+                <local:PreviewPanel x:Name="Preview" Grid.Column="4" Margin="0,0,4,0" Visibility="Collapsed" />
 
                 <!-- Toast -->
                 <Border x:Name="Toast" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,22"

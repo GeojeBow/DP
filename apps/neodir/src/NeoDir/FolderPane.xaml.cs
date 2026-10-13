@@ -20,6 +20,7 @@ public interface IPaneHost
     void ShowToast(string message, bool isError = false);
     void OnPaneActivated(FolderPane pane);
     void OnPaneStatusChanged(FolderPane pane);
+    void OnPaneSelectionChanged(FolderPane pane);
     void OpenInNextPane(FolderPane from, string path);
     bool IsFavorite(string path);
     void ToggleFavorite(string path);
@@ -36,6 +37,10 @@ public partial class FolderPane : UserControl
     private NameFilter _filter = new(null);
     private FileEntrySorter _sorter = new("Name", false);
     private bool _isActive;
+
+    // Subfolder search: while set, the list shows results under this folder instead of its contents.
+    private string? _searchRoot;
+    private GridViewColumn? _locationColumn;
 
     // Drag state: a press on an already-selected row keeps the multi-selection until we know it's not a drag.
     private Point _dragStart;
@@ -173,7 +178,20 @@ public partial class FolderPane : UserControl
         Navigate(parent);
     }
 
-    public void Refresh() => _ = ReloadAsync(keepView: true);
+    public void Refresh()
+    {
+        if (_searchRoot != null) StartSearch();
+        else _ = ReloadAsync(keepView: true);
+    }
+
+    public void LoadState(PaneState state)
+    {
+        var paths = state.Tabs.Where(p => p == PathCrumbs.ThisPc || Directory.Exists(p)).ToList();
+        if (paths.Count == 0) return;
+        _tabs.Clear();
+        foreach (var path in paths) _tabs.Add(new FolderTab(path));
+        TabStrip.SelectedIndex = Math.Clamp(state.SelectedTab, 0, _tabs.Count - 1);
+    }
 
     public void EditAddress()
     {
@@ -225,6 +243,8 @@ public partial class FolderPane : UserControl
 
         _loadCts?.Cancel();
         var cts = _loadCts = new CancellationTokenSource();
+        _searchRoot = null;
+        ShowLocationColumn(false);
 
         var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (keepView) selected.UnionWith(SelectedEntries.Select(e => e.Name));
@@ -325,6 +345,7 @@ public partial class FolderPane : UserControl
 
     private void ScheduleRefresh()
     {
+        if (_searchRoot != null) return;
         _refreshTimer.Stop();
         _refreshTimer.Start();
     }
@@ -347,8 +368,10 @@ public partial class FolderPane : UserControl
     {
         var total = _view?.Count ?? 0;
         var selected = SelectedEntries;
-        var text = $"{total:N0}개 항목";
-        if (!_filter.IsEmpty) text += $" (필터: {_filter.Query})";
+        var text = _searchRoot != null
+            ? $"'{_filter.Query}' 검색 결과 {total:N0}개 (하위 폴더 포함)"
+            : $"{total:N0}개 항목";
+        if (_searchRoot == null && !_filter.IsEmpty) text += $" (필터: {_filter.Query})";
         if (selected.Count > 0)
         {
             text += $"  ·  {selected.Count:N0}개 선택";
@@ -653,6 +676,13 @@ public partial class FolderPane : UserControl
     {
         FilterHint.Visibility = FilterBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         _filter = new NameFilter(FilterBox.Text);
+        if (_searchRoot != null)
+        {
+            // Editing the query goes back to filtering this folder live; Enter searches again.
+            _searchRoot = null;
+            _ = ReloadAsync(keepView: false);
+            return;
+        }
         _view?.Refresh();
         if (_view != null && !_filter.IsEmpty)
         {
@@ -670,11 +700,82 @@ public partial class FolderPane : UserControl
             FocusList();
             e.Handled = true;
         }
+        else if (e.Key == Key.Enter && !_filter.IsEmpty && InRealFolder)
+        {
+            StartSearch();
+            e.Handled = true;
+        }
         else if (e.Key is Key.Down or Key.Enter)
         {
             FocusList();
             e.Handled = true;
         }
+    }
+
+    /// <summary>Finds names matching the filter in every subfolder; results stream in.</summary>
+    public async void StartSearch()
+    {
+        if (_filter.IsEmpty || !InRealFolder) return;
+        _loadCts?.Cancel();
+        var cts = _loadCts = new CancellationTokenSource();
+        var root = CurrentPath;
+        var filter = _filter;
+        _searchRoot = root;
+        _watcher?.Dispose();
+        _watcher = null;
+
+        var results = new ObservableCollection<FileEntry>();
+        _view = new ListCollectionView(results) { CustomSort = _sorter };
+        List.ItemsSource = _view;
+        ShowLocationColumn(true);
+        EmptyText.Text = "하위 폴더에서 찾는 중…";
+        EmptyText.Visibility = Visibility.Visible;
+        UpdateStatus();
+
+        const int limit = 5000;
+        var showHidden = _host.ShowHidden;
+        var colors = _host.ColorRules;
+        int found;
+        try
+        {
+            found = await Task.Run(() => FileEntry.Search(root, filter, showHidden, colors, batch =>
+                Dispatcher.InvokeAsync(() =>
+                {
+                    if (cts.IsCancellationRequested) return;
+                    foreach (var entry in batch) results.Add(entry);
+                    EmptyText.Visibility = Visibility.Collapsed;
+                    UpdateStatus();
+                }), limit, cts.Token), cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _host.ShowToast(ex.Message, isError: true);
+            return;
+        }
+        if (cts.IsCancellationRequested) return;
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+        EmptyText.Text = "찾는 항목이 없어요";
+        UpdateEmptyText();
+        UpdateStatus();
+        if (found >= limit) _host.ShowToast($"결과가 많아서 {limit:N0}개에서 멈췄어요. 검색어를 더 구체적으로 적어보세요.");
+    }
+
+    private void ShowLocationColumn(bool show)
+    {
+        if (List.View is not GridView grid) return;
+        _locationColumn ??= new GridViewColumn
+        {
+            Header = new GridViewColumnHeader { Tag = "Location", Content = "위치" },
+            DisplayMemberBinding = new Binding(nameof(FileEntry.Location)),
+            Width = 220,
+        };
+        var shown = grid.Columns.Contains(_locationColumn);
+        if (show && !shown) grid.Columns.Insert(1, _locationColumn);
+        else if (!show && shown) grid.Columns.Remove(_locationColumn);
     }
 
     private void ClearFilter()
@@ -702,7 +803,11 @@ public partial class FolderPane : UserControl
         header.Content = $"{header.Content} {(descending ? "▼" : "▲")}";
     }
 
-    private void OnListSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateStatus();
+    private void OnListSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateStatus();
+        _host.OnPaneSelectionChanged(this);
+    }
 
     private void OnListKeyDown(object sender, KeyEventArgs e)
     {
@@ -871,6 +976,14 @@ public partial class FolderPane : UserControl
         var selected = SelectedEntries;
         var onItem = FindParent<ListViewItem>((DependencyObject)e.OriginalSource) != null && selected.Count > 0;
 
+        // Shift+right-click goes straight to the full Windows menu, like Explorer's "more options".
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && (onItem || InRealFolder))
+        {
+            e.Handled = true;
+            ShowWindowsMenu(onItem, extended: true);
+            return;
+        }
+
         MenuItem Add(string header, string glyph, Action action, string? gesture = null, bool enabled = true)
         {
             var item = new MenuItem { Header = header, Tag = glyph, InputGestureText = gesture ?? "", IsEnabled = enabled };
@@ -896,8 +1009,18 @@ public partial class FolderPane : UserControl
             Add("이름 바꾸기", "", RenameSelection, "F2", selected.Count == 1 && !first.IsDrive);
             Add("삭제", "", () => DeleteSelection(false), "Del", !first.IsDrive);
             menu.Items.Add(new Separator());
+            if (_searchRoot != null)
+            {
+                Add("파일 위치 열기", "\uE8DA", () =>
+                {
+                    _pendingSelect = first.FullPath;
+                    Navigate(Path.GetDirectoryName(first.FullPath)!);
+                });
+            }
             Add("탐색기에서 보기", "", () => ShellInfo.RevealInExplorer(first.FullPath));
             Add("속성", "", () => ShellInfo.ShowProperties(first.FullPath));
+            menu.Items.Add(new Separator());
+            Add("Windows 메뉴 더 보기", "\uE712", () => ShowWindowsMenu(true, false), "Shift+우클릭");
         }
         else
         {
@@ -912,6 +1035,41 @@ public partial class FolderPane : UserControl
             Add("탐색기에서 열기", "", () => ShellInfo.RevealInExplorer(CurrentPath), null, real);
             Add("새로 고침", "", Refresh, "F5");
             if (real) Add("속성", "", () => ShellInfo.ShowProperties(CurrentPath));
+            if (real)
+            {
+                menu.Items.Add(new Separator());
+                Add("Windows 메뉴 더 보기 (새로 만들기 등)", "\uE712", () => ShowWindowsMenu(false, false), "Shift+우클릭");
+            }
+        }
+    }
+
+    private void ShowWindowsMenu(bool forSelection, bool extended)
+    {
+        try
+        {
+            if (forSelection)
+            {
+                var paths = SelectedEntries.Select(x => x.FullPath).ToList();
+                if (paths.Count == 0) return;
+                // The shell menu works on one folder's items; search results can span many.
+                var folder = Path.GetDirectoryName(paths[0].TrimEnd('\\'));
+                if (paths.Any(p => !string.Equals(Path.GetDirectoryName(p.TrimEnd('\\')), folder, StringComparison.OrdinalIgnoreCase)))
+                    paths = paths.Take(1).ToList();
+                ShellContextMenu.ShowForItems(_host.Owner, paths, extended, verb =>
+                {
+                    if (!verb.Equals("rename", StringComparison.OrdinalIgnoreCase)) return false;
+                    RenameSelection();
+                    return true;
+                });
+            }
+            else if (InRealFolder)
+            {
+                ShellContextMenu.ShowForFolder(_host.Owner, CurrentPath, extended);
+            }
+        }
+        catch (Exception ex)
+        {
+            _host.ShowToast("Windows 메뉴를 열지 못했어요: " + ex.Message, isError: true);
         }
     }
 

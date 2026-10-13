@@ -29,7 +29,7 @@ public static class ShellInfo
     private static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, string> TypeCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public static ImageSource? GetIcon(string path, bool isDirectory, bool isDrive = false)
+    public static ImageSource? GetIcon(string path, bool isDirectory, bool isDrive = false, bool cloudOnly = false)
     {
         string key;
         bool useAttributes;
@@ -46,7 +46,8 @@ public static class ShellInfo
         else
         {
             var ext = Path.GetExtension(path);
-            useAttributes = !PerFileIcons.Contains(ext);
+            // Reading an online-only OneDrive file's own icon would download it.
+            useAttributes = cloudOnly || !PerFileIcons.Contains(ext);
             key = useAttributes ? (ext.Length == 0 ? "<noext>" : ext) : path;
         }
 
@@ -180,4 +181,70 @@ public static class ShellInfo
 
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     private static extern int StrCmpLogicalW(string a, string b);
+}
+
+/// <summary>Explorer-quality thumbnails (PDF pages, video frames, Office docs) for the preview panel.</summary>
+public static class Thumbnails
+{
+    private const int ThumbnailOnly = 0x8;
+
+    /// <summary>Runs on its own STA thread; returns a frozen image or null when Windows has none.</summary>
+    public static Task<BitmapSource?> GetAsync(string path, int size)
+    {
+        var tcs = new TaskCompletionSource<BitmapSource?>();
+        var thread = new Thread(() =>
+        {
+            try { tcs.SetResult(Get(path, size)); }
+            catch (Exception) { tcs.SetResult(null); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        return tcs.Task;
+    }
+
+    private static BitmapSource? Get(string path, int size)
+    {
+        var iid = new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b");
+        if (SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out var factory) != 0 || factory == null) return null;
+        try
+        {
+            if (factory.GetImage(new NativeSize { Width = size, Height = size }, ThumbnailOnly, out var hbitmap) != 0) return null;
+            try
+            {
+                var source = Imaging.CreateBitmapSourceFromHBitmap(hbitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                var copy = new WriteableBitmap(source);
+                copy.Freeze();
+                return copy;
+            }
+            finally
+            {
+                DeleteObject(hbitmap);
+            }
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(factory);
+        }
+    }
+
+    [StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeSize
+    {
+        public int Width;
+        public int Height;
+    }
+
+    [ComImport, Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItemImageFactory
+    {
+        [PreserveSig] int GetImage(NativeSize size, int flags, out IntPtr hbitmap);
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHCreateItemFromParsingName(string path, IntPtr bindContext, ref Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory? item);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr handle);
 }

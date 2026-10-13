@@ -74,7 +74,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="200" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
                     <Button x:Name="BackButton" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="뒤로 (Alt+←)" Click="OnBackClick" />
@@ -123,10 +123,10 @@
                 <Grid Grid.Column="3">
                     <TextBox x:Name="FilterBox" Style="{StaticResource FieldBox}" Height="30" Padding="26,0,6,0"
                              TextChanged="OnFilterChanged" PreviewKeyDown="OnFilterKeyDown"
-                             ToolTip="이름으로 거르기. 띄어쓰기 = 모두 포함, ; = 또는, *.pdf 같은 와일드카드 가능" />
+                             ToolTip="입력하면 이 폴더에서 바로 거르고, Enter를 누르면 하위 폴더까지 찾아요. 띄어쓰기 = 모두 포함, ; = 또는, *.pdf 같은 와일드카드 가능" />
                     <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="12" IsHitTestVisible="False"
                                Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
-                    <TextBlock x:Name="FilterHint" Text="필터 (Ctrl+F)" IsHitTestVisible="False" Foreground="{StaticResource SubTextBrush}"
+                    <TextBlock x:Name="FilterHint" Text="필터 · Enter=하위 폴더 검색" IsHitTestVisible="False" Foreground="{StaticResource SubTextBrush}"
                                VerticalAlignment="Center" Margin="30,0,0,0" />
                 </Grid>
             </Grid>
@@ -160,6 +160,9 @@
                                                    RenderOptions.BitmapScalingMode="HighQuality" />
                                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                                        Foreground="{Binding Foreground, TargetNullValue={StaticResource TextBrush}}" />
+                                            <TextBlock Text="&#xE753;" FontFamily="{StaticResource IconFont}" FontSize="11" Margin="7,0,0,0"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource SubTextBrush}"
+                                                       Visibility="{Binding CloudVisibility}" ToolTip="온라인 전용 (열면 다운로드돼요)" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>

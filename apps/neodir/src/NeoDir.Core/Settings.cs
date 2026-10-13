@@ -24,6 +24,15 @@ public sealed class PaneState
     public int SelectedTab { get; set; }
 }
 
+/// <summary>A saved arrangement: layout plus every pane's tabs, restorable in one click.</summary>
+public sealed class Workspace
+{
+    public string Name { get; set; } = "";
+    public LayoutKind Layout { get; set; } = LayoutKind.Four;
+    public List<PaneState> Panes { get; set; } = [];
+    public int ActivePane { get; set; }
+}
+
 public sealed class AppSettings
 {
     public LayoutKind Layout { get; set; } = LayoutKind.Four;
@@ -34,6 +43,9 @@ public sealed class AppSettings
     public bool ShowHidden { get; set; }
     public bool SidebarVisible { get; set; } = true;
     public double SidebarWidth { get; set; } = 230;
+    public bool PreviewVisible { get; set; }
+    public double PreviewWidth { get; set; } = 320;
+    public List<Workspace> Workspaces { get; set; } = [];
     public double WindowLeft { get; set; } = double.NaN;
     public double WindowTop { get; set; } = double.NaN;
     public double WindowWidth { get; set; } = 1400;
