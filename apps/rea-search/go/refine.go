@@ -200,9 +200,9 @@ type SliceFacets struct {
 	// most results first: the side panel's "결과가 있는 폴더".
 	Parents     []FolderCount `json:"parents"`
 	ParentsMore int           `json:"parentsMore"`
-	Under     string         `json:"under"` // folder the panel shows (may be deeper than asked)
-	Dates     []RangeCount   `json:"dates"`
-	Sizes     []RangeCount   `json:"sizes"`
+	Under       string        `json:"under"` // folder the panel shows (may be deeper than asked)
+	Dates       []RangeCount  `json:"dates"`
+	Sizes       []RangeCount  `json:"sizes"`
 }
 
 const (
