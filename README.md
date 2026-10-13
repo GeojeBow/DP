@@ -13,6 +13,7 @@
 | `supabase/migrations` | Postgres 스키마, RLS, 스토리지 버킷 |
 | `supabase/seed.sql` | 기본 제공 리포트 서식 (Executive PDF, Modern Excel) |
 | `supabase/tests` | CI에서 마이그레이션을 검증하는 스모크 테스트 |
+| `apps/rea-search` | 별도 프로젝트: Windows용 즉시 파일 이름 검색 프로그램 ([README](apps/rea-search/README.md)) |
 
 ## 로컬 실행
 

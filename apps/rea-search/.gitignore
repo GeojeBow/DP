@@ -1,0 +1,4 @@
+REASearch.exe
+__pycache__/
+release/
+*.test
