@@ -10,6 +10,9 @@ public enum LayoutKind
     TwoRows,
     Three,
     Four,
+    ThreeRows,
+    FourRows,
+    OneOverTwo,
 }
 
 public sealed class Favorite

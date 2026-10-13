@@ -81,6 +81,16 @@
                             <RadioButton x:Name="Layout5" Style="{StaticResource LayoutButton}" Tag="Four" Checked="OnLayoutChecked" ToolTip="4개 (Ctrl+5)">
                                 <Path Style="{StaticResource LayoutGlyph}" Data="M1,1 H17 V13 H1 Z M9,1 V13 M1,7 H17" />
                             </RadioButton>
+                            <Border Width="1" Margin="4,5" Background="{StaticResource BorderBrush}" />
+                            <RadioButton x:Name="Layout6" Style="{StaticResource LayoutButton}" Tag="ThreeRows" Checked="OnLayoutChecked" ToolTip="세로 모니터: 위아래 3단 (Ctrl+6)">
+                                <Path Style="{StaticResource LayoutGlyph}" Data="M4,0.5 H14 V13.5 H4 Z M4,4.8 H14 M4,9.2 H14" />
+                            </RadioButton>
+                            <RadioButton x:Name="Layout7" Style="{StaticResource LayoutButton}" Tag="FourRows" Checked="OnLayoutChecked" ToolTip="세로 모니터: 위아래 4단 (Ctrl+7)">
+                                <Path Style="{StaticResource LayoutGlyph}" Data="M4,0.5 H14 V13.5 H4 Z M4,3.75 H14 M4,7 H14 M4,10.25 H14" />
+                            </RadioButton>
+                            <RadioButton x:Name="Layout8" Style="{StaticResource LayoutButton}" Tag="OneOverTwo" Checked="OnLayoutChecked" ToolTip="세로 모니터: 위 1개 + 아래 2개 (Ctrl+8)">
+                                <Path Style="{StaticResource LayoutGlyph}" Data="M4,0.5 H14 V13.5 H4 Z M4,7 H14 M9,7 V13.5" />
+                            </RadioButton>
                         </StackPanel>
                     </Border>
 

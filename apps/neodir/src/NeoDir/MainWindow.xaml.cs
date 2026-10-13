@@ -96,7 +96,7 @@ public partial class MainWindow : Window, IPaneHost
     {
         LayoutKind.Single => 1,
         LayoutKind.TwoColumns or LayoutKind.TwoRows => 2,
-        LayoutKind.Three => 3,
+        LayoutKind.Three or LayoutKind.ThreeRows or LayoutKind.OneOverTwo => 3,
         _ => 4,
     };
 
@@ -113,6 +113,9 @@ public partial class MainWindow : Window, IPaneHost
             LayoutKind.TwoColumns => Split(_panes[0], _panes[1], sideBySide: true),
             LayoutKind.TwoRows => Split(_panes[0], _panes[1], sideBySide: false),
             LayoutKind.Three => Split(_panes[0], Split(_panes[1], _panes[2], sideBySide: false), sideBySide: true),
+            LayoutKind.ThreeRows => Stack(sideBySide: false, _panes[0], _panes[1], _panes[2]),
+            LayoutKind.FourRows => Stack(sideBySide: false, _panes),
+            LayoutKind.OneOverTwo => Split(_panes[0], Split(_panes[1], _panes[2], sideBySide: true), sideBySide: false),
             _ => Split(Split(_panes[0], _panes[1], sideBySide: true), Split(_panes[2], _panes[3], sideBySide: true), sideBySide: false),
         };
         PaneHost.Children.Add(root);
@@ -123,6 +126,9 @@ public partial class MainWindow : Window, IPaneHost
             LayoutKind.TwoColumns => Layout2,
             LayoutKind.TwoRows => Layout3,
             LayoutKind.Three => Layout4,
+            LayoutKind.ThreeRows => Layout6,
+            LayoutKind.FourRows => Layout7,
+            LayoutKind.OneOverTwo => Layout8,
             _ => Layout5,
         };
         radio.IsChecked = true;
@@ -131,34 +137,39 @@ public partial class MainWindow : Window, IPaneHost
         else SetActive(_active);
     }
 
-    private Grid Split(UIElement first, UIElement second, bool sideBySide)
+    private Grid Split(UIElement first, UIElement second, bool sideBySide) => Stack(sideBySide, first, second);
+
+    /// <summary>Lays the panes out in equal columns (or rows) with a splitter between each pair.</summary>
+    private Grid Stack(bool sideBySide, params UIElement[] items)
     {
         var grid = new Grid();
-        var splitter = new GridSplitter { Style = (Style)FindResource("PaneSplitter") };
+        for (var i = 0; i < items.Length; i++)
+        {
+            if (i > 0)
+            {
+                var splitter = new GridSplitter { Style = (Style)FindResource("PaneSplitter") };
+                AddCell(grid, splitter, new GridLength(4), sideBySide, 0);
+            }
+            AddCell(grid, items[i], new GridLength(1, GridUnitType.Star), sideBySide, sideBySide ? 160 : 120);
+        }
+        return grid;
+    }
+
+    private static void AddCell(Grid grid, UIElement element, GridLength size, bool sideBySide, double min)
+    {
         if (sideBySide)
         {
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 160 });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 160 });
-            Grid.SetColumn(splitter, 1);
-            Grid.SetColumn(second, 2);
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = size, MinWidth = min });
+            Grid.SetColumn(element, grid.ColumnDefinitions.Count - 1);
+            Grid.SetRow(element, 0);
         }
         else
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 120 });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(4) });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 120 });
-            Grid.SetRow(splitter, 1);
-            Grid.SetRow(second, 2);
+            grid.RowDefinitions.Add(new RowDefinition { Height = size, MinHeight = min });
+            Grid.SetRow(element, grid.RowDefinitions.Count - 1);
+            Grid.SetColumn(element, 0);
         }
-        Grid.SetColumn(first, 0);
-        Grid.SetRow(first, 0);
-        if (sideBySide) Grid.SetRow(second, 0);
-        else Grid.SetColumn(second, 0);
-        grid.Children.Add(first);
-        grid.Children.Add(splitter);
-        grid.Children.Add(second);
-        return grid;
+        grid.Children.Add(element);
     }
 
     private void OnLayoutChecked(object sender, RoutedEventArgs e)
@@ -539,7 +550,7 @@ public partial class MainWindow : Window, IPaneHost
     private void ShowHelp()
     {
         const string help =
-            "Ctrl+1~5  레이아웃 바꾸기\n" +
+            "Ctrl+1~5  레이아웃 바꾸기 (6~8: 세로 모니터용)\n" +
             "F6 / Shift+F6  다음·이전 패널\n" +
             "Ctrl+T / Ctrl+W  새 탭 / 탭 닫기 (휠 클릭으로도 닫힘)\n" +
             "Ctrl+Tab  다음 탭\n" +
@@ -583,6 +594,9 @@ public partial class MainWindow : Window, IPaneHost
             case Key.D3 or Key.NumPad3 when ctrl: ApplyLayout(LayoutKind.TwoRows); break;
             case Key.D4 or Key.NumPad4 when ctrl: ApplyLayout(LayoutKind.Three); break;
             case Key.D5 or Key.NumPad5 when ctrl: ApplyLayout(LayoutKind.Four); break;
+            case Key.D6 or Key.NumPad6 when ctrl: ApplyLayout(LayoutKind.ThreeRows); break;
+            case Key.D7 or Key.NumPad7 when ctrl: ApplyLayout(LayoutKind.FourRows); break;
+            case Key.D8 or Key.NumPad8 when ctrl: ApplyLayout(LayoutKind.OneOverTwo); break;
             case Key.F6: CyclePane(shift ? -1 : 1); break;
             case Key.F1: ShowHelp(); break;
             case Key.F5: _active.Refresh(); break;
