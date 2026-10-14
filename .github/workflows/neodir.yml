@@ -38,6 +38,9 @@ jobs:
           if ($p.HasExited) { throw "NeoDir.exe exited early with code $($p.ExitCode)" }
           Stop-Process -Id $p.Id -Force
           Get-Item publish/NeoDir.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+      - name: Zip the exe (for networks that block .exe downloads)
+        shell: pwsh
+        run: Compress-Archive -Path publish/NeoDir.exe -DestinationPath publish/NeoDir.zip -Force
       - uses: actions/upload-artifact@v4
         with:
           name: NeoDir-win-x64
@@ -53,10 +56,14 @@ jobs:
           name: NeoDir 최신 빌드
           prerelease: true
           target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
-          body: 최신 커밋에서 자동으로 만든 NeoDir.exe 입니다.
-          files: apps/neodir/publish/NeoDir.exe
+          body: 최신 커밋에서 자동으로 만든 NeoDir.exe 입니다. .exe를 받을 수 없으면 NeoDir.zip을 받으세요.
+          files: |
+            apps/neodir/publish/NeoDir.exe
+            apps/neodir/publish/NeoDir.zip
       - name: Release
         if: startsWith(github.ref, 'refs/tags/neodir-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/neodir/publish/NeoDir.exe
+          files: |
+            apps/neodir/publish/NeoDir.exe
+            apps/neodir/publish/NeoDir.zip
