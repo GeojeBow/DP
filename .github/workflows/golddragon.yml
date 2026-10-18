@@ -1,0 +1,21 @@
+name: Golddragon game
+
+on:
+  pull_request:
+    paths: ['games/golddragon/**', '.github/workflows/golddragon.yml']
+  push:
+    branches: [main]
+    paths: ['games/golddragon/**', '.github/workflows/golddragon.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: games/golddragon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test

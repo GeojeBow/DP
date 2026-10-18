@@ -13,6 +13,7 @@
 | `supabase/migrations` | Postgres 스키마, RLS, 스토리지 버킷 |
 | `supabase/seed.sql` | 기본 제공 리포트 서식 (Executive PDF, Modern Excel) |
 | `supabase/tests` | CI에서 마이그레이션을 검증하는 스모크 테스트 |
+| `games/golddragon` | 🐉 황금 용의 던전: 집 와이파이에서 가족이 함께하는 D&D 협동 게임 ([실행 방법](games/golddragon/README.md)) |
 
 ## 로컬 실행
 

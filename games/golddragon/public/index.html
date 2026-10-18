@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14110f">
+<title>황금 용의 던전</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Lobby -->
+  <section id="lobby" class="screen hidden">
+    <div class="lobby-card">
+      <div class="title"><span class="dragon">🐉</span><h1>황금 용의 던전</h1></div>
+      <p class="story">황금 용이 소중한 알을 도둑맞았어요. 셋이 힘을 모아 3층짜리 던전을 내려가 알을 되찾아 주세요!</p>
+      <h2>모험에 참가한 영웅</h2>
+      <ul id="lobbyHeroes" class="lobby-heroes"></ul>
+      <form id="joinForm">
+        <h2>내 영웅 만들기</h2>
+        <input id="heroName" maxlength="10" placeholder="영웅 이름 (예: 아빠, 지우)" autocomplete="off" required>
+        <div id="classPicker" class="class-picker"></div>
+        <button type="submit" class="btn primary">참가하기</button>
+      </form>
+      <button id="startBtn" class="btn gold big">⚔️ 모험 시작</button>
+      <p class="hint" id="lobbyHint">PC·핸드폰 모두 같은 주소로 접속하면 함께할 수 있어요. 참가하지 않으면 구경만 할 수 있어요.</p>
+      <p class="hint credit">규칙: System Reference Document 5.1 (Wizards of the Coast, CC-BY-4.0) 기반의 팬 게임이에요.</p>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section id="game" class="screen hidden">
+    <header class="topbar">
+      <div class="floor-name" id="floorName"></div>
+      <div class="stats"><span title="파티 골드">💰 <b id="gold">0</b></span><span title="파티 치유 물약">🧪 <b id="potions">0</b></span><span id="viewers" title="접속한 기기"></span></div>
+    </header>
+    <div class="order" id="order"></div>
+    <div class="main">
+      <div class="board" id="board">
+        <canvas id="map"></canvas>
+        <div id="banner" class="banner"></div>
+        <div id="tooltip" class="tooltip hidden"></div>
+        <button id="zoomBtn" class="zoom" title="전체 지도 / 확대">🔍</button>
+      </div>
+      <aside class="side">
+        <div id="controls" class="controls"></div>
+        <div id="party" class="party"></div>
+        <div class="log-wrap"><div class="log-title">모험 기록</div><div id="log" class="log"></div></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Victory -->
+  <section id="won" class="screen hidden">
+    <div class="lobby-card center">
+      <div class="trophy">🏆🥚🐉</div>
+      <h1>모험 성공!</h1>
+      <p class="story">붉은 용을 물리치고 황금 용의 알을 되찾았어요. 황금 용이 영웅들에게 고마움의 인사를 합니다!</p>
+      <p id="wonStats" class="story"></p>
+      <button id="restartBtn" class="btn gold big">🔄 새 모험 시작하기</button>
+    </div>
+  </section>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="client.js"></script>
+</body>
+</html>
